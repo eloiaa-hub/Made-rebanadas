@@ -40,17 +40,19 @@ function hacerRanura(poly, r, w) {
   if (((seg.i - pri.i + n) % n) > n / 2) return null;
   const out = [];
   for (let k = seg.i + 1; ; k++) { const idx = k % n; out.push(poly[idx]); if (idx === pri.i) break; }
-  out.push([xp, pri.v], [xp, r.mid], [xs, r.mid], [xs, seg.v]);
+  const e1 = [xp, r.mid], e2 = [xs, r.mid];
+  out.push([xp, pri.v], e1, e2, [xs, seg.v]);
+  out.esq = [e1, e2];                      // esquinas interiores (para el hueso de perro)
   return out;
 }
 // aplica las ranuras de una pieza con un ancho dado (en sus coordenadas); devuelve el polígono y las que fallan
 function ranurar(base, ranuras, w) {
-  let poly = base; const fallan = [];
+  let poly = base; const fallan = [], esq = [];
   for (const r of ranuras) {
     const ww = r.ancho != null ? r.ancho : w, nuevo = r.lat ? hacerRanuraLat(poly, r, ww) : hacerRanura(poly, r, ww);
-    if (nuevo) poly = nuevo; else fallan.push(r);
+    if (nuevo) { poly = nuevo; if (nuevo.esq) esq.push(...nuevo.esq); } else fallan.push(r);
   }
-  return { poly, fallan };
+  return { poly, fallan, esq };
 }
 
 function reticula(res) {

@@ -31,10 +31,15 @@ function geoFab(c) {
   const k = escalaFab();
   // las ranuras se rehacen con el grosor de fabricación (el de la maqueta, si lo es)
   const wF = (grosorFab() + holguraRanuraFab()) / k;
-  const base = c.generar ? c.generar(wF) : c.ranuras && c.ranuras.length ? ranurar(c.base, c.ranuras, wF).poly : c.poly;
+  let base = c.poly, esq = [];
+  if (c.generar) { base = c.generar(wF); esq = base.esq || []; }
+  else if (c.ranuras && c.ranuras.length) { const rr = ranurar(c.base, c.ranuras, wF); base = rr.poly; esq = rr.esq; }
+  // hueso de perro en las esquinas interiores de ranuras y muescas (radio de la fresa)
+  let huesosMal = 0, nHuesos = 0;
+  if (conHueso() && esq.length) { const h = huesoDePerro(base, esq, fresaFab() / 2 / k); base = h.poly; huesosMal = h.fallan; nHuesos = esq.length - h.fallan; }
   const poly = base.map(p => [p[0] * k, p[1] * k]);
   return {
-    c, poly, caja: cajaDe(poly), r: radioFab(), area: Math.abs(c.area) * k * k,
+    c, poly, caja: cajaDe(poly), r: radioFab(), area: Math.abs(c.area) * k * k, huesosMal, nHuesos, nEsq: esq.length,
     // agujeros [x, y, radio]: los de las varillas y los propios de la pieza (el tubo en los discos)
     agujeros: c.agujeros.map(j => [P.varillas.lista[j][0] * k, P.varillas.lista[j][1] * k, radioFab()]).concat((c.huecos || []).map(h => [h.x * k, h.y * k, h.r * k])),
     etiqueta: puntoEtiqueta(c).map(v => v * k),
@@ -112,24 +117,32 @@ function abrirFabricar() {
         <label class="fila" title="Espacio entre piezas: al menos el diámetro de la fresa más unos milímetros (en láser, 2 a 4 mm)">Separación entre piezas (mm) <input type="number" id="fS" value="${f.sep}" min="0" step="1"></label>
         <label class="fila chk"><input type="checkbox" id="fG" ${f.girar ? 'checked' : ''}> Permitir girar 90° (cuida la veta)</label>
         <label class="fila chk"><input type="checkbox" id="fN" ${f.numeros ? 'checked' : ''}> Grabar el número (o la letra) en cada pieza</label>
+        <h4>CNC</h4>
+        <label class="fila" title="${enMaqueta() ? 'En láser, 0 (sin hueso de perro)' : 'Diámetro de la fresa de corte'}">Ø de la fresa${enMaqueta() ? ' (maqueta)' : ''} (mm) <input type="number" id="fFresa" value="${fresaFab()}" min="0" step="0.5"></label>
+        <label class="fila chk" title="Círculos en las esquinas interiores de ranuras y muescas, para que la pieza que entra llegue al fondo"><input type="checkbox" id="fHueso" ${P.cnc.hueso ? 'checked' : ''}> Hueso de perro en ranuras y muescas</label>
+        <label class="fila chk" title="El contorno sale en rectas y arcos (G01, G02, G03) en vez de muchos tramos rectos"><input type="checkbox" id="fArcos" ${P.cnc.arcos ? 'checked' : ''}> Contornos con arcos</label>
+        <label class="fila" title="Lo que se puede separar el arco de la curva original">Tolerancia de los arcos (mm) <input type="number" id="fTol" value="${P.cnc.tolArco}" min="0.005" max="1" step="0.01"></label>
         <div class="info" id="fInfo"></div>
         <p class="nota" style="margin-top:10px">El DXF lleva las capas <b>CORTE</b> (contornos, con las ranuras), <b>TALADROS</b> (agujeros de las varillas), <b>GRABADO</b> (números) y <b>TABLERO</b> (borde del tablero).</p>
-        <p class="nota">Esta colocación usa el rectángulo de cada costilla. Para encajarlas por su forma real, usa <b>🧩 Anidador</b>.</p>
+        <p class="nota">Esta colocación usa el rectángulo de cada costilla. Para encajarlas por su forma real, usa <b>🧩 Anidador</b>. Para programar una pieza en G-code, <b>➜ Calcador</b>.</p>
       </div>
       <div><canvas id="fPrev" width="900" height="520"></canvas></div>
     </div>`,
-    [['🧩 Anidador', () => { cerrarModal(); abrirAnidador(); }], ['⬇ CSV de cortes', () => exportarCSVCortes()], ['📄 SVG', () => exportarSVG()], ['📐 DXF', () => exportarDXF(), true]], true);
+    [['➜ Calcador', () => { cerrarModal(); dialogoCalcador(); }], ['🧩 Anidador', () => { cerrarModal(); abrirAnidador(); }], ['⬇ CSV de cortes', () => exportarCSVCortes()], ['📄 SVG', () => exportarSVG()], ['📐 DXF', () => exportarDXF(), true]], true);
   const leer = () => {
     const t = $('#fTab').value;
     if (t !== 'otro') { const [a, h] = t.split('x').map(Number); $('#fA').value = a; $('#fH').value = h; }
     f.ancho = Math.max(50, +$('#fA').value); f.alto = Math.max(50, +$('#fH').value);
     f.borde = Math.max(0, +$('#fB').value); f.sep = Math.max(0, +$('#fS').value);
     f.girar = $('#fG').checked; f.numeros = $('#fN').checked; f.modo = $('#fModo').value;
+    const fr = Math.max(0, +$('#fFresa').value || 0); if (enMaqueta()) P.maqueta.fresa = fr; else P.cnc.fresa = fr;
+    P.cnc.hueso = $('#fHueso').checked; P.cnc.arcos = $('#fArcos').checked; P.cnc.tolArco = clamp(+$('#fTol').value || 0.05, 0.005, 1);
+    UI.sucio = true;
     previsualizarFab();
   };
   $('#fModo').value = f.modo;
   if (!lista.some(t => t.a === f.ancho && t.h === f.alto)) $('#fTab').value = 'otro';
-  ['#fTab', '#fB', '#fS', '#fG', '#fN', '#fModo'].forEach(s => $(s).onchange = leer);
+  ['#fTab', '#fB', '#fS', '#fG', '#fN', '#fModo', '#fFresa', '#fHueso', '#fArcos', '#fTol'].forEach(s => $(s).onchange = leer);
   ['#fA', '#fH'].forEach(s => $(s).onchange = () => { $('#fTab').value = 'otro'; leer(); });
   previsualizarFab();
 }
@@ -176,6 +189,15 @@ function previsualizarFab() {
     info.push(`<b>${col.tableros.length}</b> tablero${col.tableros.length === 1 ? '' : 's'} de ${fmt(f.ancho)} × ${fmt(f.alto)} mm · aprovechamiento <b>${fmt(col.uso * 100)} %</b>.`);
     if (col.grandes.length) info.push(`<span style="color:var(--peligro)">No caben en el tablero: ${col.grandes.map(p => p.c.nombre).join(', ')}.</span>`);
   }
+  // CNC: huesos de perro, arcos y si la fresa cabe en las ranuras
+  const ps = col.tableros.flatMap(t => t.piezas), nH = ps.reduce((a, p) => a + p.g.nHuesos, 0), mH = ps.reduce((a, p) => a + p.g.huesosMal, 0), nE = ps.reduce((a, p) => a + p.g.nEsq, 0);
+  const fr = fresaFab(), anchoR = grosorFab() + holguraRanuraFab();
+  if (nE) {
+    if (conHueso()) info.push(`Hueso de perro de Ø ${fmt(fr, 1)} mm en ${nH} esquinas` + (mH ? ` <span style="color:var(--peligro)">(${mH} no caben: ranura demasiado estrecha para la fresa)</span>` : '') + '.');
+    else info.push(`<span style="color:#b26b00">${nE} esquinas interiores en ranuras y muescas sin hueso de perro: con fresa quedarán redondeadas y no encajarán del todo.</span>`);
+    if (fr && P.tipo === 'reticula' && fr > anchoR - 0.2) info.push(`<span style="color:var(--peligro)">La fresa de Ø ${fmt(fr, 1)} mm no cabe en las ranuras de ${fmt(anchoR, 2)} mm.</span>`);
+  }
+  if (P.cnc.arcos && ps.length) { const p0 = ps[0], cc = contornoCNC(p0.g.poly); info.push(`Contornos con arcos: la ${esc(p0.c.nombre.toLowerCase())} pasa de ${p0.g.poly.length} puntos a ${cc.pts.length} tramos (${cc.b.filter(v => v).length} arcos).`); }
   info.push(P.tipo === 'reticula' ? `Ranuras de ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm · grosor del tablero ${fmt(grosorFab(), 1)} mm.` : `Agujeros: Ø ${fmt(2 * radioFab(), 2)} mm · grosor del tablero ${fmt(grosorFab(), 1)} mm.`);
   $('#fInfo').innerHTML = info.join('<br>');
 }
@@ -190,16 +212,17 @@ function dxf() {
   [['CORTE', 7], ['TALADROS', 1], ['GRABADO', 5], ['TABLERO', 8]].forEach(([nom, c]) => { g(0, 'LAYER'); g(2, nom); g(70, 0); g(62, c); g(6, 'CONTINUOUS'); });
   g(0, 'ENDTAB'); g(0, 'ENDSEC');
   g(0, 'SECTION'); g(2, 'ENTITIES');
-  const poli = (capa, pts) => {
+  const poli = (capa, pts, bs) => {
     g(0, 'POLYLINE'); g(8, capa); g(66, 1); g(10, 0); g(20, 0); g(30, 0); g(70, 1);
-    pts.forEach(p => { g(0, 'VERTEX'); g(8, capa); g(10, n(p[0])); g(20, n(p[1])); g(30, 0); });
+    pts.forEach((p, i) => { g(0, 'VERTEX'); g(8, capa); g(10, n(p[0])); g(20, n(p[1])); g(30, 0); if (bs && bs[i]) g(42, (Math.round(bs[i] * 1e6) / 1e6).toString()); });
     g(0, 'SEQEND'); g(8, capa);
   };
   col.tableros.forEach((t, b) => {
     const ox = b * ((f.modo === 'fila' ? t.ancho : f.ancho) + 200);
     if (f.modo !== 'fila') poli('TABLERO', [[ox, 0], [ox + f.ancho, 0], [ox + f.ancho, f.alto], [ox, f.alto]]);
     t.piezas.forEach(pz => {
-      poli('CORTE', simplificaCerrado(pz.g.poly, 0.05).map(p => { const q = aTablero(pz, p); return [ox + q[0], q[1]]; }));
+      const cc = contornoCNC(pz.g.poly);
+      poli('CORTE', cc.pts.map(p => { const q = aTablero(pz, p); return [ox + q[0], q[1]]; }), cc.b);
       pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); g(0, 'CIRCLE'); g(8, 'TALADROS'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(a[2])); });
       if (f.numeros) {
         const q = aTablero(pz, pz.g.etiqueta), h = altoTexto(pz.g);
@@ -222,7 +245,15 @@ function svg() {
     const Y = y => th - y, n = v => Math.round(v * 100) / 100;
     if (f.modo !== 'fila') partes.push(`<rect x="${ox}" y="0" width="${tw}" height="${th}" fill="none" stroke="#999" stroke-width="0.5"/>`);
     t.piezas.forEach(pz => {
-      const d = simplificaCerrado(pz.g.poly, 0.05).map((p, i) => { const q = aTablero(pz, p); return (i ? 'L' : 'M') + n(ox + q[0]) + ' ' + n(Y(q[1])); }).join(' ') + ' Z';
+      const cc = contornoCNC(pz.g.poly), qs = cc.pts.map(p => aTablero(pz, p));
+      let d = 'M' + n(ox + qs[0][0]) + ' ' + n(Y(qs[0][1]));
+      qs.forEach((q, i) => {
+        const r2 = qs[(i + 1) % qs.length], bu = cc.b[i];
+        if (!bu) { if (i + 1 < qs.length) d += ' L' + n(ox + r2[0]) + ' ' + n(Y(r2[1])); return; }
+        const cu = Math.hypot(r2[0] - q[0], r2[1] - q[1]), Rr = cu * (1 + bu * bu) / (4 * Math.abs(bu));
+        d += ` A${n(Rr)} ${n(Rr)} 0 ${Math.abs(bu) > 1 ? 1 : 0} ${bu > 0 ? 0 : 1} ${n(ox + r2[0])} ${n(Y(r2[1]))}`;
+      });
+      d += ' Z';
       partes.push(`<path d="${d}" fill="none" stroke="#000" stroke-width="0.2"/>`);
       pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); partes.push(`<circle cx="${n(ox + q[0])}" cy="${n(Y(q[1]))}" r="${n(a[2])}" fill="none" stroke="#d00" stroke-width="0.2"/>`); });
       if (f.numeros) { const q = aTablero(pz, pz.g.etiqueta); partes.push(`<text x="${n(ox + q[0])}" y="${n(Y(q[1]))}" font-family="Arial" font-size="${n(altoTexto(pz.g))}" text-anchor="middle" dominant-baseline="middle" fill="#00f">${pz.c.etq}</text>`); }

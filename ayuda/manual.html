@@ -49,7 +49,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 
 <header class="port">
   <h1>Made-rebanadas</h1>
-  <p>Manual de uso · versión 1.3 · Muebles orgánicos hechos con costillas de tablero, sin internet · Por Eloi A.A.</p>
+  <p>Manual de uso · versión 1.4 · Muebles orgánicos hechos con costillas de tablero, sin internet · Por Eloi A.A.</p>
 </header>
 
 <figure><img src="img/portada.jpg" alt="Banco ondulado hecho con costillas de contrachapado"></figure>
@@ -69,7 +69,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <a href="#pared">12. Paneles de pared</a><br>
   <a href="#comprobar">13. Comprobaciones</a><br>
   <a href="#vista3d">14. La vista 3D</a><br>
-  <a href="#fabricar">15. Paso 5 · Fabricar: tableros y DXF</a><br>
+  <a href="#fabricar">15. Paso 5 · Fabricar: tableros, DXF y Calcador</a><br>
   <a href="#despiece">16. Despiece y lista de compra</a><br>
   <a href="#maqueta">17. Maqueta a escala</a><br>
   <a href="#plano">18. Plano de montaje en PDF</a><br>
@@ -217,7 +217,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 <p><b>Comprobaciones de la retícula</b>: costillas sin ningún larguero, largueros que cruzan menos de 2 costillas, cruces muy bajos (unión floja), largueros que se pisan y ranuras imposibles (cuando el borde es casi vertical en el cruce: cambia el margen o el número de largueros).</p>
 <p>Fabricar, el DXF, el SVG, el despiece, el CSV de cortes, el Anidador y la maqueta funcionan igual, con las ranuras ya dibujadas en el contorno (capa CORTE). En la maqueta, las ranuras se hacen con el grosor de la maqueta más su holgura. El <b>plano</b> trae la planta de la retícula, los largueros acotados y los pasos de montaje propios:</p>
 <figure><img src="img/ret_plano2.jpg" alt="Plano de la retícula" style="max-width:640px"></figure>
-<div class="caja taller">Las ranuras salen con las esquinas interiores vivas. Con una fresa de radio r quedan redondeadas: usa una fresa bastante más estrecha que la ranura y repasa las esquinas con formón o lima, o déjalas en «hueso de perro» en el programa de CNC.</div>
+<div class="caja taller">Con una fresa redonda las esquinas interiores de las ranuras quedan redondeadas y la otra pieza no llega al fondo. Activa el <b>hueso de perro</b> en Fabricar (sección 15): el programa lo dibuja solo con el Ø de tu fresa.</div>
 
 <h2 id="curva">10. Planta curva (arco y S)</h2>
 <p>Con <b>Costillas con varillas</b>, el apartado <b>Planta</b> permite que el mueble siga una curva vista desde arriba. Las costillas van <b>perpendiculares a la curva</b>, abiertas en abanico, y las varillas la siguen.</p>
@@ -309,7 +309,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <li><b>📷 Imagen</b> guarda la vista 3D en PNG a alta resolución.</li>
 </ul>
 
-<h2 id="fabricar">15. Paso 5 · Fabricar: tableros y DXF</h2>
+<h2 id="fabricar">15. Paso 5 · Fabricar: tableros, DXF y Calcador</h2>
 <figure><img src="img/fabricar.png" alt="Ventana Fabricar"></figure>
 <p><b>🪚 Fabricar</b> coloca todas las costillas en tableros y muestra cuántos hacen falta y el aprovechamiento. Puedes elegir:</p>
 <ul>
@@ -328,6 +328,31 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <tr><td>TABLERO</td><td>Borde del tablero</td><td>Solo de referencia</td></tr>
 </table>
 <p>El <b>SVG</b> tiene lo mismo, en milímetros, para la cortadora láser o para imprimir plantillas a escala 1:1.</p>
+<h3>Opciones de CNC</h3>
+<div class="dos">
+  <img src="img/fab_cnc.png" alt="Opciones de CNC en Fabricar">
+  <div>
+    <ul>
+      <li><b>Ø de la fresa</b>: la de corte. En la maqueta tiene su propio valor (0 en láser).</li>
+      <li><b>Hueso de perro en ranuras y muescas</b>: en cada esquina interior de las ranuras de la retícula, las muescas de los discos y las de los rastreles, un arco del radio de la fresa que pasa por la esquina. Así la fresa llega al rincón y la otra pieza entra hasta el fondo. Solo se hace en ranuras y muescas, no en el dibujo del mueble.</li>
+      <li><b>Contornos con arcos</b>: el contorno sale en <b>rectas y arcos</b> (en el DXF, polilínea con <i>bulge</i>; en el SVG, arcos) en lugar de cientos de tramos rectos. El programa de CNC queda mucho más corto, con G02/G03, y la fresa avanza más suave.</li>
+      <li><b>Tolerancia de los arcos</b>: lo que se puede separar el arco de la curva dibujada (0,05 mm por defecto).</li>
+    </ul>
+    <p>Debajo, la ventana dice cuántos huesos de perro se han hecho, si alguno no cabe (ranura más estrecha que la fresa) y cuántos tramos y arcos tiene el contorno.</p>
+  </div>
+</div>
+<figure><img src="img/hueso.png" alt="Hueso de perro en las ranuras" style="max-width:560px"><figcaption>Fondo de las ranuras de un larguero, con el hueso de perro en cada esquina.</figcaption></figure>
+<h3>Llevar una pieza al Calcador</h3>
+<div class="dos">
+  <img src="img/calcador.png" alt="Ventana del Calcador">
+  <div>
+    <p>El botón <b>➜ Calcador</b> (en la vista de la costilla y en Fabricar) abre la pieza seleccionada en el <b>Calcador de la Suite CNC</b>: contorno en rectas y arcos, agujeros, ranuras con su hueso de perro, profundidad = grosor + 0,5 mm y el cero pieza en la esquina de abajo a la izquierda. Allí se programa su G-code (G01, G02, G03) como cualquier ejercicio.</p>
+    <ul>
+      <li><b>Dirección del Calcador</b>: la Suite en internet (por defecto) o tu copia local. Se recuerda en el navegador.</li>
+      <li><b>⬇ .json de esta pieza</b> o <b>de todas</b>: proyectos del Calcador para abrir allí con 📂 Abrir, aunque no haya internet.</li>
+    </ul>
+  </div>
+</div>
 <p><b>⬇ CSV de cortes</b> guarda una línea por costilla (nombre, largo y ancho de su rectángulo, cantidad y veta) con el mismo formato de despiece que lee el <b>Anidador</b> y que abre cualquier hoja de cálculo. <b>🧩 Anidador</b> abre el Anidador con las costillas por su forma real (sección 19).</p>
 <div class="caja taller">Taladra y vacía <b>los agujeros antes que el contorno</b>: si cortas primero la pieza, se puede mover al hacer los agujeros. Deja puentes (pestañas) si la pieza es pequeña.</div>
 
@@ -418,8 +443,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 <ul>
   <li>La retícula solo se hace en planta recta. En la retícula, las costillas son perpendiculares al largo y los largueros paralelos a él (no hay ángulos libres).</li>
   <li>En la planta curva, las varillas se dibujan curvadas: hay que curvarlas en el taller al radio que indica el plano.</li>
-  <li>Las ranuras se dibujan con esquinas vivas: el redondeo de la fresa (hueso de perro) se hace en el programa de CNC.</li>
-  <li>Los contornos del DXF son polilíneas de muchos tramos rectos cortos (no arcos), con una tolerancia de 0,05 mm.</li>
+  <li>Los arcos del DXF aproximan las curvas dibujadas (que no son arcos de verdad) con la tolerancia que pongas; los arcos de la pieza no coinciden con los puntos de control del perfil.</li>
   <li>La colocación de <b>Fabricar</b> usa el rectángulo que envuelve cada costilla; para encajarlas por su forma, usa el <b>Anidador</b>.</li>
   <li>Las varillas son rectas y paralelas al largo del mueble.</li>
 </ul>

@@ -8,7 +8,7 @@
 'use strict';
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
-const VERSION = '1.3';
+const VERSION = '1.4';
 const T = window.THREE;
 
 /* ===================== UTILIDADES ===================== */
@@ -77,7 +77,8 @@ function proyectoBase() {
     costillas: { grosor: 18, modo: 'separacion', separacion: 60, numero: 25, base: true, tope: false, topeAlt: 400, material: 'abedul', color: '#f2efe8' },
     varillas: { tipo: 'roscada', diam: 10, holgura: 0.5, margen: 20, tramo: 'todas', separadores: true, sepD: 22, sobra: 12, autoN: 3, lista: [] },
     vista: { explosion: 0, fantasma: false, varillas: true, resalta: true, claves: true },
-    maqueta: { activa: false, escala: 5, grosor: 3, diam: 3, holgura: 0.2 },
+    maqueta: { activa: false, escala: 5, grosor: 3, diam: 3, holgura: 0.2, fresa: 0 },
+    cnc: { fresa: 6, hueso: true, arcos: true, tolArco: 0.05 },
     reticula: { num: 4, margen: 40, holgura: 0.3, xArriba: true, vuelo: 25 },
     planta: { forma: 'recta', radio: 2500, sentido: 1, amplitud: 150, ondas: 1 },
     radial: { tubo: 20, holguraTubo: 0.5, discos: 2, rDisco: 0, holgura: 0.3 },

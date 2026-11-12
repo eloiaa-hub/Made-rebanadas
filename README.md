@@ -1,6 +1,6 @@
 # Made-rebanadas — Por Eloi A.A.
 
-**Versión 1.3** · novedades en [NOVEDADES.md](NOVEDADES.md)
+**Versión 1.4** · novedades en [NOVEDADES.md](NOVEDADES.md)
 
 **Portada en línea:** <https://eloiaa-hub.github.io/Made-rebanadas/>
 
@@ -25,6 +25,8 @@ Funciona en el navegador (Chrome, Edge o Firefox), sin instalar nada y **sin con
 - **Varillas**: roscada, redondo de madera o tubo, con separadores; colocación automática y comprobación de la madera que queda al borde en cada costilla.
 - **Comprobaciones**: varillas que no caben o demasiado juntas, costillas sueltas o con una sola varilla, separadores que asoman.
 - **3D**: maderas y cantos de contrachapado, varillas, tuercas y separadores, vista explosionada, volumen ideal e imagen PNG.
+- **CNC**: hueso de perro automático en ranuras y muescas, y contornos en rectas y arcos (G02/G03).
+- **➜ Calcador**: cada pieza se abre en el Calcador de la Suite CNC para programar su G-code.
 - **Fabricar**: costillas colocadas en tableros con su número grabado; **DXF** (capas CORTE, TALADROS, GRABADO, TABLERO) y **SVG** en mm.
 - **Despiece y lista de compra** en CSV, y **CSV de cortes** con el formato del Anidador.
 - **Maqueta a escala** (1:2 a 1:20) para cortarla antes en la láser.

@@ -1,5 +1,11 @@
 # Novedades de Made-rebanadas
 
+## v1.4
+
+- **Hueso de perro** automático en las esquinas interiores de ranuras (retícula) y muescas (discos y rastreles), con el Ø de la fresa; la maqueta tiene su propia fresa (0 en láser). Aviso si la fresa no cabe en la ranura.
+- **Contornos con arcos**: el DXF (polilínea con *bulge*), el SVG, el Anidador y el Calcador reciben rectas y arcos en lugar de cientos de tramos rectos, con la tolerancia que se elija (0,05 mm por defecto).
+- **➜ Calcador**: cada pieza se abre en el Calcador de la Suite CNC (en internet o copia local) para programar su G-code, o se guarda como proyecto del Calcador (.json), de una en una o todas.
+
 ## v1.3
 
 - **Perfiles clave en el 3D**: se dibujan como líneas y se seleccionan pinchándolos (el que se edita, en naranja). Casilla «Perfiles» para mostrarlos u ocultarlos.

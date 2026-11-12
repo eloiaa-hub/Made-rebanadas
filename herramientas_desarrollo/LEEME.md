@@ -24,6 +24,7 @@ No hacen falta para usar el programa: solo para cambiarlo.
 | `07_fabricacion.js` | Maqueta a escala, colocación en tableros, DXF, SVG, despiece y CSV |
 | `07b_plano.js` | Escritor de PDF propio y plano de montaje |
 | `07c_anidador.js` | Ventana del Anidador y paso de las costillas (formato .json del Calcador) |
+| `07d_cnc.js` | Hueso de perro, ajuste de rectas y arcos (bulge) y paso de piezas al Calcador (`calcador.html#desdeGenerador`, mensajes `calcador-listo` / `proyecto-generador`) |
 | `08_archivo.js` | Ventanas, deshacer, guardar, abrir, ejemplos |
 | `09_inicio.js` | Arranque, botones y teclado |
 
@@ -43,4 +44,5 @@ No hacen falta para usar el programa: solo para cambiarlo.
 - `radial`: Ø del tubo, holgura, número y radio de los discos (0 = automático), holgura de las ranuras.
 - `pared`: número, alto, grueso, margen y holgura de los rastreles.
 - `reticula`: número de largueros, margen, vuelo, holgura de la ranura y si las ranuras de las costillas van desde arriba.
+- `cnc`: Ø de la fresa, hueso de perro, contornos con arcos y su tolerancia.
 - `maqueta`: activa, escala, grosor, diámetro de la varilla y holgura.

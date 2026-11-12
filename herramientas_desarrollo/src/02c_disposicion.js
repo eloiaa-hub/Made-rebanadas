@@ -41,7 +41,10 @@ const ejeGrosor = m => [-m.Au[2], 0, m.Au[0]];           // perpendicular a la c
 function hacerRanuraLat(poly, r, w) {
   const tr = poly.map(p => [p[1], p[0]]).reverse();
   const res = hacerRanura(tr, { c: r.c, mid: r.mid, borde: r.borde, arriba: false }, w);
-  return res ? res.map(p => [p[1], p[0]]).reverse() : null;
+  if (!res) return null;
+  const out = res.map(p => [p[1], p[0]]).reverse();
+  out.esq = res.esq.map(p => out.find(q => q[0] === p[1] && q[1] === p[0]));
+  return out;
 }
 // tramos horizontales [u0, u1] en los que la recta v = y corta al polígono
 function intervalosH(poly, y) { return intervalosV(poly.map(p => [p[1], p[0]]), y); }
@@ -119,14 +122,16 @@ function radialExtras(res) {
 }
 // disco con una ranura radial por costilla, desde el borde hasta mid, de ancho w
 function poligonoDisco(rD, mid, angulosGrados, w) {
-  const ts = angulosGrados.map(a => a * Math.PI / 180).sort((a, b) => a - b), dl = Math.asin(Math.min(0.99, (w / 2) / rD)), out = [];
+  const ts = angulosGrados.map(a => a * Math.PI / 180).sort((a, b) => a - b), dl = Math.asin(Math.min(0.99, (w / 2) / rD)), out = [], esq = [];
   ts.forEach((t, i) => {
     const tPrev = (i ? ts[i - 1] : ts[ts.length - 1] - PI2) + dl, t0 = t - dl;
     const nArc = Math.max(1, Math.ceil((t0 - tPrev) / (Math.PI / 60)));
     for (let k = 0; k <= nArc; k++) { const a = tPrev + (t0 - tPrev) * k / nArc; out.push([rD * Math.cos(a), rD * Math.sin(a)]); }
     const c = [Math.cos(t), Math.sin(t)], pp = [-Math.sin(t), Math.cos(t)];
-    out.push([mid * c[0] - w / 2 * pp[0], mid * c[1] - w / 2 * pp[1]], [mid * c[0] + w / 2 * pp[0], mid * c[1] + w / 2 * pp[1]]);
+    const e1 = [mid * c[0] - w / 2 * pp[0], mid * c[1] - w / 2 * pp[1]], e2 = [mid * c[0] + w / 2 * pp[0], mid * c[1] + w / 2 * pp[1]];
+    out.push(e1, e2); esq.push(e1, e2);
   });
+  out.esq = esq;
   return out;
 }
 

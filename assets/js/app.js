@@ -8,7 +8,7 @@
 'use strict';
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
-const VERSION = '1.3';
+const VERSION = '1.4';
 const T = window.THREE;
 
 /* ===================== UTILIDADES ===================== */
@@ -77,7 +77,8 @@ function proyectoBase() {
     costillas: { grosor: 18, modo: 'separacion', separacion: 60, numero: 25, base: true, tope: false, topeAlt: 400, material: 'abedul', color: '#f2efe8' },
     varillas: { tipo: 'roscada', diam: 10, holgura: 0.5, margen: 20, tramo: 'todas', separadores: true, sepD: 22, sobra: 12, autoN: 3, lista: [] },
     vista: { explosion: 0, fantasma: false, varillas: true, resalta: true, claves: true },
-    maqueta: { activa: false, escala: 5, grosor: 3, diam: 3, holgura: 0.2 },
+    maqueta: { activa: false, escala: 5, grosor: 3, diam: 3, holgura: 0.2, fresa: 0 },
+    cnc: { fresa: 6, hueso: true, arcos: true, tolArco: 0.05 },
     reticula: { num: 4, margen: 40, holgura: 0.3, xArriba: true, vuelo: 25 },
     planta: { forma: 'recta', radio: 2500, sentido: 1, amplitud: 150, ondas: 1 },
     radial: { tubo: 20, holguraTubo: 0.5, discos: 2, rDisco: 0, holgura: 0.3 },
@@ -448,17 +449,19 @@ function hacerRanura(poly, r, w) {
   if (((seg.i - pri.i + n) % n) > n / 2) return null;
   const out = [];
   for (let k = seg.i + 1; ; k++) { const idx = k % n; out.push(poly[idx]); if (idx === pri.i) break; }
-  out.push([xp, pri.v], [xp, r.mid], [xs, r.mid], [xs, seg.v]);
+  const e1 = [xp, r.mid], e2 = [xs, r.mid];
+  out.push([xp, pri.v], e1, e2, [xs, seg.v]);
+  out.esq = [e1, e2];                      // esquinas interiores (para el hueso de perro)
   return out;
 }
 // aplica las ranuras de una pieza con un ancho dado (en sus coordenadas); devuelve el polígono y las que fallan
 function ranurar(base, ranuras, w) {
-  let poly = base; const fallan = [];
+  let poly = base; const fallan = [], esq = [];
   for (const r of ranuras) {
     const ww = r.ancho != null ? r.ancho : w, nuevo = r.lat ? hacerRanuraLat(poly, r, ww) : hacerRanura(poly, r, ww);
-    if (nuevo) poly = nuevo; else fallan.push(r);
+    if (nuevo) { poly = nuevo; if (nuevo.esq) esq.push(...nuevo.esq); } else fallan.push(r);
   }
-  return { poly, fallan };
+  return { poly, fallan, esq };
 }
 
 function reticula(res) {
@@ -603,7 +606,10 @@ const ejeGrosor = m => [-m.Au[2], 0, m.Au[0]];           // perpendicular a la c
 function hacerRanuraLat(poly, r, w) {
   const tr = poly.map(p => [p[1], p[0]]).reverse();
   const res = hacerRanura(tr, { c: r.c, mid: r.mid, borde: r.borde, arriba: false }, w);
-  return res ? res.map(p => [p[1], p[0]]).reverse() : null;
+  if (!res) return null;
+  const out = res.map(p => [p[1], p[0]]).reverse();
+  out.esq = res.esq.map(p => out.find(q => q[0] === p[1] && q[1] === p[0]));
+  return out;
 }
 // tramos horizontales [u0, u1] en los que la recta v = y corta al polígono
 function intervalosH(poly, y) { return intervalosV(poly.map(p => [p[1], p[0]]), y); }
@@ -681,14 +687,16 @@ function radialExtras(res) {
 }
 // disco con una ranura radial por costilla, desde el borde hasta mid, de ancho w
 function poligonoDisco(rD, mid, angulosGrados, w) {
-  const ts = angulosGrados.map(a => a * Math.PI / 180).sort((a, b) => a - b), dl = Math.asin(Math.min(0.99, (w / 2) / rD)), out = [];
+  const ts = angulosGrados.map(a => a * Math.PI / 180).sort((a, b) => a - b), dl = Math.asin(Math.min(0.99, (w / 2) / rD)), out = [], esq = [];
   ts.forEach((t, i) => {
     const tPrev = (i ? ts[i - 1] : ts[ts.length - 1] - PI2) + dl, t0 = t - dl;
     const nArc = Math.max(1, Math.ceil((t0 - tPrev) / (Math.PI / 60)));
     for (let k = 0; k <= nArc; k++) { const a = tPrev + (t0 - tPrev) * k / nArc; out.push([rD * Math.cos(a), rD * Math.sin(a)]); }
     const c = [Math.cos(t), Math.sin(t)], pp = [-Math.sin(t), Math.cos(t)];
-    out.push([mid * c[0] - w / 2 * pp[0], mid * c[1] - w / 2 * pp[1]], [mid * c[0] + w / 2 * pp[0], mid * c[1] + w / 2 * pp[1]]);
+    const e1 = [mid * c[0] - w / 2 * pp[0], mid * c[1] - w / 2 * pp[1]], e2 = [mid * c[0] + w / 2 * pp[0], mid * c[1] + w / 2 * pp[1]];
+    out.push(e1, e2); esq.push(e1, e2);
   });
+  out.esq = esq;
   return out;
 }
 
@@ -2041,10 +2049,15 @@ function geoFab(c) {
   const k = escalaFab();
   // las ranuras se rehacen con el grosor de fabricación (el de la maqueta, si lo es)
   const wF = (grosorFab() + holguraRanuraFab()) / k;
-  const base = c.generar ? c.generar(wF) : c.ranuras && c.ranuras.length ? ranurar(c.base, c.ranuras, wF).poly : c.poly;
+  let base = c.poly, esq = [];
+  if (c.generar) { base = c.generar(wF); esq = base.esq || []; }
+  else if (c.ranuras && c.ranuras.length) { const rr = ranurar(c.base, c.ranuras, wF); base = rr.poly; esq = rr.esq; }
+  // hueso de perro en las esquinas interiores de ranuras y muescas (radio de la fresa)
+  let huesosMal = 0, nHuesos = 0;
+  if (conHueso() && esq.length) { const h = huesoDePerro(base, esq, fresaFab() / 2 / k); base = h.poly; huesosMal = h.fallan; nHuesos = esq.length - h.fallan; }
   const poly = base.map(p => [p[0] * k, p[1] * k]);
   return {
-    c, poly, caja: cajaDe(poly), r: radioFab(), area: Math.abs(c.area) * k * k,
+    c, poly, caja: cajaDe(poly), r: radioFab(), area: Math.abs(c.area) * k * k, huesosMal, nHuesos, nEsq: esq.length,
     // agujeros [x, y, radio]: los de las varillas y los propios de la pieza (el tubo en los discos)
     agujeros: c.agujeros.map(j => [P.varillas.lista[j][0] * k, P.varillas.lista[j][1] * k, radioFab()]).concat((c.huecos || []).map(h => [h.x * k, h.y * k, h.r * k])),
     etiqueta: puntoEtiqueta(c).map(v => v * k),
@@ -2122,24 +2135,32 @@ function abrirFabricar() {
         <label class="fila" title="Espacio entre piezas: al menos el diámetro de la fresa más unos milímetros (en láser, 2 a 4 mm)">Separación entre piezas (mm) <input type="number" id="fS" value="${f.sep}" min="0" step="1"></label>
         <label class="fila chk"><input type="checkbox" id="fG" ${f.girar ? 'checked' : ''}> Permitir girar 90° (cuida la veta)</label>
         <label class="fila chk"><input type="checkbox" id="fN" ${f.numeros ? 'checked' : ''}> Grabar el número (o la letra) en cada pieza</label>
+        <h4>CNC</h4>
+        <label class="fila" title="${enMaqueta() ? 'En láser, 0 (sin hueso de perro)' : 'Diámetro de la fresa de corte'}">Ø de la fresa${enMaqueta() ? ' (maqueta)' : ''} (mm) <input type="number" id="fFresa" value="${fresaFab()}" min="0" step="0.5"></label>
+        <label class="fila chk" title="Círculos en las esquinas interiores de ranuras y muescas, para que la pieza que entra llegue al fondo"><input type="checkbox" id="fHueso" ${P.cnc.hueso ? 'checked' : ''}> Hueso de perro en ranuras y muescas</label>
+        <label class="fila chk" title="El contorno sale en rectas y arcos (G01, G02, G03) en vez de muchos tramos rectos"><input type="checkbox" id="fArcos" ${P.cnc.arcos ? 'checked' : ''}> Contornos con arcos</label>
+        <label class="fila" title="Lo que se puede separar el arco de la curva original">Tolerancia de los arcos (mm) <input type="number" id="fTol" value="${P.cnc.tolArco}" min="0.005" max="1" step="0.01"></label>
         <div class="info" id="fInfo"></div>
         <p class="nota" style="margin-top:10px">El DXF lleva las capas <b>CORTE</b> (contornos, con las ranuras), <b>TALADROS</b> (agujeros de las varillas), <b>GRABADO</b> (números) y <b>TABLERO</b> (borde del tablero).</p>
-        <p class="nota">Esta colocación usa el rectángulo de cada costilla. Para encajarlas por su forma real, usa <b>🧩 Anidador</b>.</p>
+        <p class="nota">Esta colocación usa el rectángulo de cada costilla. Para encajarlas por su forma real, usa <b>🧩 Anidador</b>. Para programar una pieza en G-code, <b>➜ Calcador</b>.</p>
       </div>
       <div><canvas id="fPrev" width="900" height="520"></canvas></div>
     </div>`,
-    [['🧩 Anidador', () => { cerrarModal(); abrirAnidador(); }], ['⬇ CSV de cortes', () => exportarCSVCortes()], ['📄 SVG', () => exportarSVG()], ['📐 DXF', () => exportarDXF(), true]], true);
+    [['➜ Calcador', () => { cerrarModal(); dialogoCalcador(); }], ['🧩 Anidador', () => { cerrarModal(); abrirAnidador(); }], ['⬇ CSV de cortes', () => exportarCSVCortes()], ['📄 SVG', () => exportarSVG()], ['📐 DXF', () => exportarDXF(), true]], true);
   const leer = () => {
     const t = $('#fTab').value;
     if (t !== 'otro') { const [a, h] = t.split('x').map(Number); $('#fA').value = a; $('#fH').value = h; }
     f.ancho = Math.max(50, +$('#fA').value); f.alto = Math.max(50, +$('#fH').value);
     f.borde = Math.max(0, +$('#fB').value); f.sep = Math.max(0, +$('#fS').value);
     f.girar = $('#fG').checked; f.numeros = $('#fN').checked; f.modo = $('#fModo').value;
+    const fr = Math.max(0, +$('#fFresa').value || 0); if (enMaqueta()) P.maqueta.fresa = fr; else P.cnc.fresa = fr;
+    P.cnc.hueso = $('#fHueso').checked; P.cnc.arcos = $('#fArcos').checked; P.cnc.tolArco = clamp(+$('#fTol').value || 0.05, 0.005, 1);
+    UI.sucio = true;
     previsualizarFab();
   };
   $('#fModo').value = f.modo;
   if (!lista.some(t => t.a === f.ancho && t.h === f.alto)) $('#fTab').value = 'otro';
-  ['#fTab', '#fB', '#fS', '#fG', '#fN', '#fModo'].forEach(s => $(s).onchange = leer);
+  ['#fTab', '#fB', '#fS', '#fG', '#fN', '#fModo', '#fFresa', '#fHueso', '#fArcos', '#fTol'].forEach(s => $(s).onchange = leer);
   ['#fA', '#fH'].forEach(s => $(s).onchange = () => { $('#fTab').value = 'otro'; leer(); });
   previsualizarFab();
 }
@@ -2186,6 +2207,15 @@ function previsualizarFab() {
     info.push(`<b>${col.tableros.length}</b> tablero${col.tableros.length === 1 ? '' : 's'} de ${fmt(f.ancho)} × ${fmt(f.alto)} mm · aprovechamiento <b>${fmt(col.uso * 100)} %</b>.`);
     if (col.grandes.length) info.push(`<span style="color:var(--peligro)">No caben en el tablero: ${col.grandes.map(p => p.c.nombre).join(', ')}.</span>`);
   }
+  // CNC: huesos de perro, arcos y si la fresa cabe en las ranuras
+  const ps = col.tableros.flatMap(t => t.piezas), nH = ps.reduce((a, p) => a + p.g.nHuesos, 0), mH = ps.reduce((a, p) => a + p.g.huesosMal, 0), nE = ps.reduce((a, p) => a + p.g.nEsq, 0);
+  const fr = fresaFab(), anchoR = grosorFab() + holguraRanuraFab();
+  if (nE) {
+    if (conHueso()) info.push(`Hueso de perro de Ø ${fmt(fr, 1)} mm en ${nH} esquinas` + (mH ? ` <span style="color:var(--peligro)">(${mH} no caben: ranura demasiado estrecha para la fresa)</span>` : '') + '.');
+    else info.push(`<span style="color:#b26b00">${nE} esquinas interiores en ranuras y muescas sin hueso de perro: con fresa quedarán redondeadas y no encajarán del todo.</span>`);
+    if (fr && P.tipo === 'reticula' && fr > anchoR - 0.2) info.push(`<span style="color:var(--peligro)">La fresa de Ø ${fmt(fr, 1)} mm no cabe en las ranuras de ${fmt(anchoR, 2)} mm.</span>`);
+  }
+  if (P.cnc.arcos && ps.length) { const p0 = ps[0], cc = contornoCNC(p0.g.poly); info.push(`Contornos con arcos: la ${esc(p0.c.nombre.toLowerCase())} pasa de ${p0.g.poly.length} puntos a ${cc.pts.length} tramos (${cc.b.filter(v => v).length} arcos).`); }
   info.push(P.tipo === 'reticula' ? `Ranuras de ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm · grosor del tablero ${fmt(grosorFab(), 1)} mm.` : `Agujeros: Ø ${fmt(2 * radioFab(), 2)} mm · grosor del tablero ${fmt(grosorFab(), 1)} mm.`);
   $('#fInfo').innerHTML = info.join('<br>');
 }
@@ -2200,16 +2230,17 @@ function dxf() {
   [['CORTE', 7], ['TALADROS', 1], ['GRABADO', 5], ['TABLERO', 8]].forEach(([nom, c]) => { g(0, 'LAYER'); g(2, nom); g(70, 0); g(62, c); g(6, 'CONTINUOUS'); });
   g(0, 'ENDTAB'); g(0, 'ENDSEC');
   g(0, 'SECTION'); g(2, 'ENTITIES');
-  const poli = (capa, pts) => {
+  const poli = (capa, pts, bs) => {
     g(0, 'POLYLINE'); g(8, capa); g(66, 1); g(10, 0); g(20, 0); g(30, 0); g(70, 1);
-    pts.forEach(p => { g(0, 'VERTEX'); g(8, capa); g(10, n(p[0])); g(20, n(p[1])); g(30, 0); });
+    pts.forEach((p, i) => { g(0, 'VERTEX'); g(8, capa); g(10, n(p[0])); g(20, n(p[1])); g(30, 0); if (bs && bs[i]) g(42, (Math.round(bs[i] * 1e6) / 1e6).toString()); });
     g(0, 'SEQEND'); g(8, capa);
   };
   col.tableros.forEach((t, b) => {
     const ox = b * ((f.modo === 'fila' ? t.ancho : f.ancho) + 200);
     if (f.modo !== 'fila') poli('TABLERO', [[ox, 0], [ox + f.ancho, 0], [ox + f.ancho, f.alto], [ox, f.alto]]);
     t.piezas.forEach(pz => {
-      poli('CORTE', simplificaCerrado(pz.g.poly, 0.05).map(p => { const q = aTablero(pz, p); return [ox + q[0], q[1]]; }));
+      const cc = contornoCNC(pz.g.poly);
+      poli('CORTE', cc.pts.map(p => { const q = aTablero(pz, p); return [ox + q[0], q[1]]; }), cc.b);
       pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); g(0, 'CIRCLE'); g(8, 'TALADROS'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(a[2])); });
       if (f.numeros) {
         const q = aTablero(pz, pz.g.etiqueta), h = altoTexto(pz.g);
@@ -2232,7 +2263,15 @@ function svg() {
     const Y = y => th - y, n = v => Math.round(v * 100) / 100;
     if (f.modo !== 'fila') partes.push(`<rect x="${ox}" y="0" width="${tw}" height="${th}" fill="none" stroke="#999" stroke-width="0.5"/>`);
     t.piezas.forEach(pz => {
-      const d = simplificaCerrado(pz.g.poly, 0.05).map((p, i) => { const q = aTablero(pz, p); return (i ? 'L' : 'M') + n(ox + q[0]) + ' ' + n(Y(q[1])); }).join(' ') + ' Z';
+      const cc = contornoCNC(pz.g.poly), qs = cc.pts.map(p => aTablero(pz, p));
+      let d = 'M' + n(ox + qs[0][0]) + ' ' + n(Y(qs[0][1]));
+      qs.forEach((q, i) => {
+        const r2 = qs[(i + 1) % qs.length], bu = cc.b[i];
+        if (!bu) { if (i + 1 < qs.length) d += ' L' + n(ox + r2[0]) + ' ' + n(Y(r2[1])); return; }
+        const cu = Math.hypot(r2[0] - q[0], r2[1] - q[1]), Rr = cu * (1 + bu * bu) / (4 * Math.abs(bu));
+        d += ` A${n(Rr)} ${n(Rr)} 0 ${Math.abs(bu) > 1 ? 1 : 0} ${bu > 0 ? 0 : 1} ${n(ox + r2[0])} ${n(Y(r2[1]))}`;
+      });
+      d += ' Z';
       partes.push(`<path d="${d}" fill="none" stroke="#000" stroke-width="0.2"/>`);
       pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); partes.push(`<circle cx="${n(ox + q[0])}" cy="${n(Y(q[1]))}" r="${n(a[2])}" fill="none" stroke="#d00" stroke-width="0.2"/>`); });
       if (f.numeros) { const q = aTablero(pz, pz.g.etiqueta); partes.push(`<text x="${n(ox + q[0])}" y="${n(Y(q[1]))}" font-family="Arial" font-size="${n(altoTexto(pz.g))}" text-anchor="middle" dominant-baseline="middle" fill="#00f">${pz.c.etq}</text>`); }
@@ -2803,8 +2842,8 @@ function hojaPared(D, cabecera, tabla, o) {
 const PUENTES0 = { n: 0, ancho: 5, alto: 2 };
 function piezaCalcador(c) {
   const g = geoFab(c), b = g.caja, r3 = v => +v.toFixed(3);
-  const ext = simplificaCerrado(g.poly, 0.05).map(p => ({ x: r3(p[0] - b.x0), y: r3(p[1] - b.y0) }));
-  const contornos = [{ pts: ext, b: ext.map(() => 0), cerrado: true, tipo: 'exterior', mec: { op: 'corte', prof: null, puentes: { ...PUENTES0 } } }];
+  const cc = contornoCNC(g.poly), ext = cc.pts.map(p => ({ x: r3(p[0] - b.x0), y: r3(p[1] - b.y0) }));
+  const contornos = [{ pts: ext, b: cc.b.map(v => +v.toFixed(6)), cerrado: true, tipo: 'exterior', mec: { op: 'corte', prof: null, puentes: { ...PUENTES0 } } }];
   // cada agujero: círculo de dos medias vueltas (bulge 1)
   g.agujeros.forEach(a => {
     const x = a[0] - b.x0, y = a[1] - b.y0;
@@ -2839,6 +2878,172 @@ window.addEventListener('message', e => {
     tablero: { largo: f.ancho, ancho: f.alto, grosor: grosorFab(), margen: f.borde, modo: 'forma' },
   }, '*');
 });
+
+/* ===================== CNC: HUESO DE PERRO, ARCOS Y CALCADOR =====================
+   - Hueso de perro: en las esquinas interiores de ranuras y muescas, un círculo del radio de la fresa
+     para que la pieza que entra llegue al fondo (la fresa redonda no deja esquinas vivas).
+   - Arcos: el contorno de muchos tramos rectos se convierte en rectas y arcos (bulge), con una tolerancia.
+   - Calcador: cada pieza se puede abrir en el Calcador de la Suite CNC o guardar como su proyecto (.json). */
+
+const fresaFab = () => enMaqueta() ? (+P.maqueta.fresa || 0) : (+P.cnc.fresa || 0);
+const conHueso = () => P.cnc.hueso && fresaFab() > 0;
+
+// Sustituye cada esquina interior marcada por un arco de radio r que pasa por ella (centro dentro del hueco)
+function huesoDePerro(poly, esq, r) {
+  if (!esq || !esq.length || !(r > 0)) return { poly, fallan: 0 };
+  const n = poly.length, cerca = (a, b) => Math.abs(a[0] - b[0]) < 1e-6 && Math.abs(a[1] - b[1]) < 1e-6;
+  const marcas = new Set(); poly.forEach((p, i) => { if (esq.some(e => e && cerca(e, p))) marcas.add(i); });
+  const out = []; let fallan = 0;
+  for (let i = 0; i < n; i++) {
+    const C = poly[i];
+    if (!marcas.has(i)) { out.push(C); continue; }
+    const A0 = poly[(i - 1 + n) % n], B0 = poly[(i + 1) % n];
+    let da = [C[0] - A0[0], C[1] - A0[1]], db = [B0[0] - C[0], B0[1] - C[1]];
+    const la = Math.hypot(...da), lb = Math.hypot(...db);
+    da = [da[0] / la, da[1] / la]; db = [db[0] / lb, db[1] / lb];
+    if (da[0] * db[1] - da[1] * db[0] >= 0) { out.push(C); continue; }  // no es una esquina hacia dentro
+    let w = [da[0] - db[0], da[1] - db[1]]; const lw = Math.hypot(...w); w = [w[0] / lw, w[1] / lw];
+    const Q = [C[0] - r * w[0], C[1] - r * w[1]];
+    const tA = 2 * r * (w[0] * da[0] + w[1] * da[1]), tB = -2 * r * (w[0] * db[0] + w[1] * db[1]);
+    if (!(tA > 0 && tB > 0) || tA > la - 0.01 || tB > lb - 0.01) { out.push(C); fallan++; continue; }
+    const A = [C[0] - tA * da[0], C[1] - tA * da[1]], B = [C[0] + tB * db[0], C[1] + tB * db[1]];
+    // arco de A a B alrededor de Q pasando por C
+    const ang = p => Math.atan2(p[1] - Q[1], p[0] - Q[0]), aA = ang(A), aB = ang(B), aC = ang(C);
+    const norm = x => ((x % PI2) + PI2) % PI2;
+    let barrido = norm(aB - aA); if (norm(aC - aA) > barrido) barrido -= PI2;   // el sentido que pasa por C
+    out.push(A);
+    const k = Math.max(6, Math.ceil(Math.abs(barrido) / (Math.PI / 16)));
+    for (let m = 1; m < k; m++) { const a = aA + barrido * m / k; out.push([Q[0] + r * Math.cos(a), Q[1] + r * Math.sin(a)]); }
+    out.push(B);
+  }
+  return { poly: out, fallan };
+}
+
+/* ---------- ajuste de rectas y arcos ---------- */
+function ajusteRecta(pts, tol) {
+  const a = pts[0], b = pts[pts.length - 1];
+  for (let i = 1; i < pts.length - 1; i++) if (distSeg(pts[i][0], pts[i][1], a, b) > tol) return false;
+  return true;
+}
+// arco por el primer, el del medio y el último punto; devuelve el bulge o null si no se ajusta
+function ajusteArco(pts, tol) {
+  if (pts.length < 3) return null;
+  const a = pts[0], m = pts[Math.floor(pts.length / 2)], b = pts[pts.length - 1];
+  const d = 2 * (a[0] * (m[1] - b[1]) + m[0] * (b[1] - a[1]) + b[0] * (a[1] - m[1]));
+  if (Math.abs(d) < 1e-9) return null;
+  const a2 = a[0] * a[0] + a[1] * a[1], m2 = m[0] * m[0] + m[1] * m[1], b2 = b[0] * b[0] + b[1] * b[1];
+  const cx = (a2 * (m[1] - b[1]) + m2 * (b[1] - a[1]) + b2 * (a[1] - m[1])) / d, cy = (a2 * (b[0] - m[0]) + m2 * (a[0] - b[0]) + b2 * (m[0] - a[0])) / d;
+  const Rr = Math.hypot(a[0] - cx, a[1] - cy);
+  if (Rr > 20000) return null;
+  const ccw = (m[0] - a[0]) * (b[1] - a[1]) - (m[1] - a[1]) * (b[0] - a[0]) > 0;  // sentido antihorario
+  const ang = p => Math.atan2(p[1] - cy, p[0] - cx), norm = x => ((x % PI2) + PI2) % PI2;
+  const a0 = ang(a); let prev = 0;
+  for (let i = 1; i < pts.length; i++) {
+    if (Math.abs(Math.hypot(pts[i][0] - cx, pts[i][1] - cy) - Rr) > tol) return null;
+    const s = ccw ? norm(ang(pts[i]) - a0) : norm(a0 - ang(pts[i]));
+    if (s + 1e-9 < prev && i < pts.length - 1) return null;      // los puntos tienen que avanzar por el arco
+    prev = s;
+  }
+  // el arco no puede pasar de la semirrecta de cierre ni ser casi una vuelta
+  if (prev > PI2 * 0.97) return null;
+  const barrido = ccw ? prev : -prev;
+  // también tiene que quedar cerca de la cuerda entre puntos seguidos
+  for (let i = 1; i < pts.length; i++) {
+    const q = [(pts[i][0] + pts[i - 1][0]) / 2, (pts[i][1] + pts[i - 1][1]) / 2];
+    if (Math.abs(Math.hypot(q[0] - cx, q[1] - cy) - Rr) > tol * 4 + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]) ** 2 / (8 * Rr) + 0.01) return null;
+  }
+  return Math.tan(barrido / 4);
+}
+// polígono cerrado → { pts, b } con rectas (b = 0) y arcos (b = bulge del tramo que empieza en ese punto)
+function ajustarArcos(poly, tol) {
+  const n0 = poly.length;
+  if (n0 < 5) return { pts: poly.slice(), b: new Array(n0).fill(0) };
+  // empezar en la esquina más viva, para no partir un arco por la mitad
+  let ini = 0, maxG = -1;
+  for (let i = 0; i < n0; i++) {
+    const a = poly[(i - 1 + n0) % n0], p = poly[i], c = poly[(i + 1) % n0];
+    const u = [p[0] - a[0], p[1] - a[1]], v = [c[0] - p[0], c[1] - p[1]], lu = Math.hypot(...u), lv = Math.hypot(...v);
+    if (lu < 1e-9 || lv < 1e-9) continue;
+    const g = Math.acos(clamp((u[0] * v[0] + u[1] * v[1]) / lu / lv, -1, 1));
+    if (g > maxG) { maxG = g; ini = i; }
+  }
+  const P0 = poly.slice(ini).concat(poly.slice(0, ini)), n = P0.length, en = k => P0[k % n];
+  const pts = [], b = [];
+  let i = 0;
+  while (i < n) {
+    let mejor = { j: i + 1, b: 0 }, fallos = 0;
+    for (let j = i + 2; j <= n && j - i <= 160 && fallos < 4; j++) {
+      const tramo = []; for (let k = i; k <= j; k++) tramo.push(en(k));
+      if (ajusteRecta(tramo, tol)) { mejor = { j, b: 0 }; fallos = 0; continue; }
+      const bu = ajusteArco(tramo, tol);
+      if (bu !== null) { mejor = { j, b: bu }; fallos = 0; } else fallos++;
+    }
+    pts.push(en(i)); b.push(mejor.b); i = mejor.j;
+  }
+  return { pts, b };
+}
+// puntos de un arco con bulge (para dibujarlo o comprobarlo)
+function puntosBulge(p, q, bu, cada = 4) {
+  if (!bu) return [q];
+  const d = Math.hypot(q[0] - p[0], q[1] - p[1]), th = 4 * Math.atan(bu), u = [(q[0] - p[0]) / d, (q[1] - p[1]) / d], nn = [-u[1], u[0]];
+  const h = (d / 2) * (1 - bu * bu) / (2 * bu), c = [(p[0] + q[0]) / 2 + nn[0] * h, (p[1] + q[1]) / 2 + nn[1] * h];
+  const r = Math.hypot(p[0] - c[0], p[1] - c[1]), a1 = Math.atan2(p[1] - c[1], p[0] - c[0]), k = Math.max(4, Math.ceil(Math.abs(th) * r / cada));
+  const out = []; for (let i = 1; i <= k; i++) { const a = a1 + th * i / k; out.push([c[0] + r * Math.cos(a), c[1] + r * Math.sin(a)]); }
+  return out;
+}
+// contorno de fabricación: con arcos (si está activado) o como polilínea simplificada
+function contornoCNC(poly) {
+  if (P.cnc.arcos) return ajustarArcos(poly, Math.max(0.005, +P.cnc.tolArco || 0.05));
+  const s = simplificaCerrado(poly, 0.05); return { pts: s, b: new Array(s.length).fill(0) };
+}
+
+/* ---------- Calcador de la Suite CNC ---------- */
+const CALCADOR_DEF = 'https://eloiaa-hub.github.io/Suite-CNC/calcador.html';
+const urlCalcador = () => lsGet('made-rebanadas.calcador', CALCADOR_DEF);
+function proyectoCalcador(c) {
+  const pz = piezaCalcador(c), e = grosorFab(), f = fresaFab();
+  return {
+    version: 7, nombre: `${P.nombre} - ${c.nombre}`,
+    calcador: {
+      version: 4, escala: 10, origen: { x: 0, y: 0 }, contornos: pz.calcador.contornos.map((k, i) => ({ ...k, uid: 'mr' + i + '_' + Math.random().toString(36).slice(2, 6) })),
+      cotasAjuste: {}, cotasManuales: [], cfgCotas: { ver: true, cero: true, entrada: true, sentido: true }, aux: [],
+      cfgHoja: { titulo: `${P.nombre} - ${c.nombre}`, material: `${enMaqueta() ? 'Maqueta' : MATERIALES[P.costillas.material].nombre} ${fmt(e, 1)} mm`, herramienta: f ? `Fresa Ø${fmt(f, 1)}` : '' },
+      cfgMec: { prof: +(e + 0.5).toFixed(2) },
+    },
+  };
+}
+function guardarJSONCalcador(c) {
+  const d = proyectoCalcador(c);
+  descargar(nombreArchivo(P.nombre + '_' + c.nombre) + sufijoFab() + '.json', JSON.stringify(d, null, 1), 'application/json');
+}
+function guardarTodasCalcador() {
+  const ps = piezasFab(); if (!ps.length) return;
+  aviso(`Guardando ${ps.length} archivos .json del Calcador…`, 4000);
+  ps.forEach((c, i) => setTimeout(() => guardarJSONCalcador(c), i * 350));
+}
+let paraCalcador = null, ventanaCalcador = null;
+function abrirEnCalcador(c) {
+  if (!c || !c.ok) { aviso('Selecciona antes una pieza.'); return; }
+  const json = JSON.stringify(proyectoCalcador(c));
+  try { localStorage.setItem('suiteCNC:paraCalcador', JSON.stringify({ t: Date.now(), json })); } catch (e) { /* irá por mensaje */ }
+  paraCalcador = json;
+  ventanaCalcador = window.open(urlCalcador() + '#desdeGenerador', '_blank');
+  if (!ventanaCalcador) aviso('El navegador ha bloqueado la pestaña nueva: permite las ventanas emergentes, o usa «⬇ .json del Calcador» y ábrelo allí.', 6000);
+  else aviso(`Abriendo ${esc(c.nombre)} en el Calcador…`);
+}
+window.addEventListener('message', e => {
+  const d = e.data; if (!d || typeof d !== 'object' || d.tipo !== 'calcador-listo' || !paraCalcador || !e.source) return;
+  e.source.postMessage({ tipo: 'proyecto-generador', json: paraCalcador }, '*'); paraCalcador = null;
+});
+function dialogoCalcador() {
+  const c = piezaSel();
+  modal('➜ Calcador de la Suite CNC', `
+    <p class="nota">Abre la pieza seleccionada (<b>${c ? esc(c.nombre) : '—'}</b>) en el Calcador, con su contorno${P.cnc.arcos ? ' en rectas y arcos' : ''}, los agujeros y las ranuras, para programar su G-code. El cero pieza es la esquina de abajo a la izquierda de la pieza.</p>
+    <label class="fila">Dirección del Calcador <input type="text" id="calUrl" value="${esc(urlCalcador())}" style="width:62%"></label>
+    <p class="nota">Puede ser la Suite en internet o tu copia local (por ejemplo <code>file:///C:/Suite-CNC/calcador.html</code>). Si el Calcador no recibe la pieza, guárdala como <b>.json</b> y ábrela allí con 📂 Abrir.</p>`,
+    [['↺ Por defecto', () => { $('#calUrl').value = CALCADOR_DEF; }], ['⬇ .json de todas', () => guardarTodasCalcador()], ['⬇ .json de esta pieza', () => c && guardarJSONCalcador(c)],
+     ['➜ Abrir en el Calcador', () => { lsSet('made-rebanadas.calcador', $('#calUrl').value.trim() || CALCADOR_DEF); cerrarModal(); abrirEnCalcador(c); }, true]]);
+}
 
 /* ===================== VENTANAS, ARCHIVOS, DESHACER, EJEMPLOS ===================== */
 function modal(titulo, html, botones = [], ancha = false) {
@@ -2908,6 +3113,7 @@ function validarProyecto(o) {
   p.varillas = Object.assign(proyectoBase().varillas, o.varillas || {});
   p.vista = Object.assign(proyectoBase().vista, o.vista || {});
   p.maqueta = Object.assign(proyectoBase().maqueta, o.maqueta || {});
+  p.cnc = Object.assign(proyectoBase().cnc, o.cnc || {});
   p.reticula = Object.assign(proyectoBase().reticula, o.reticula || {});
   ['planta', 'radial', 'pared'].forEach(k => p[k] = Object.assign(proyectoBase()[k], o[k] || {}));
   if (!['reticula', 'radial', 'pared'].includes(p.tipo)) p.tipo = 'costillas';
@@ -2978,6 +3184,7 @@ function iniciar() {
   $('#bFabricar').onclick = abrirFabricar;
   $('#bImagen').onclick = imagenPNG;
   $('#bPlano').onclick = exportarPlano;
+  $('#bCalcador').onclick = dialogoCalcador;
   $('#bAnidador').onclick = abrirAnidador;
   $('#anidCerrar').onclick = cerrarAnidador;
   $('#bTema').onclick = () => ponerTema(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
@@ -3008,7 +3215,7 @@ function iniciar() {
   requestAnimationFrame(() => { ajustar3D(); VP.ajustar(); VC.ajustar(); cargarProyecto(P, true); });
 }
 // para las pruebas automáticas
-window.MadeRebanadas = { get P() { return P; }, get R() { return R; }, cargar: o => cargarProyecto(validarProyecto(o)), dxf: () => dxf(), svg: () => svg(), plano: () => planoPDF(), pieza: i => piezaCalcador(R.costillas[i]), camara: t => camara(t), selCostilla: i => selCostilla(i),
+window.MadeRebanadas = { get P() { return P; }, get R() { return R; }, cargar: o => cargarProyecto(validarProyecto(o)), dxf: () => dxf(), svg: () => svg(), plano: () => planoPDF(), pieza: i => piezaCalcador(R.costillas[i]), calcador: i => proyectoCalcador([...R.costillas, ...R.otras][i]), geo: i => geoFab([...R.costillas, ...R.otras][i]), camara: t => camara(t), selCostilla: i => selCostilla(i),
   pantallaPunto: i => { const k = claveActual().pts[i], r = $('#cPerfil').getBoundingClientRect(), q = VP.aPantalla(k[0], k[1]); return [r.left + q[0], r.top + q[1]]; },
   pantallaVarilla: i => { const k = P.varillas.lista[i], r = $('#cPerfil').getBoundingClientRect(), q = VP.aPantalla(k[0], k[1]); return [r.left + q[0], r.top + q[1]]; } };
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();
