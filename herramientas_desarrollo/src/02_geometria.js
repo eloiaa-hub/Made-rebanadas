@@ -139,14 +139,16 @@ function contornoDe(ctrl) {
 
 /* ===================== COSTILLAS Y VARILLAS ===================== */
 function grosor() { return P.costillas.grosor; }
+// en la retícula, las costillas de los extremos se meten hacia dentro el «vuelo» de los largueros
+const vueloRet = () => P.tipo === 'reticula' ? clamp(P.reticula.vuelo || 0, 0, P.largo / 4) : 0;
 function reparto() {
-  const e = grosor(), L = P.largo, c = P.costillas;
+  const e = grosor(), v = vueloRet(), L = P.largo - 2 * v, c = P.costillas;
   let n;
   if (c.modo === 'numero') n = Math.max(2, Math.round(c.numero));
   else n = Math.max(2, Math.round((L - e) / Math.max(1, c.separacion)) + 1);
   n = Math.min(n, 600);
   const s = (L - e) / (n - 1);
-  return { n, s, hueco: s - e };
+  return { n, s, hueco: s - e, ini: v };
 }
 function radioAgujero() { return (P.varillas.diam + P.varillas.holgura) / 2; }
 
@@ -154,11 +156,13 @@ function calcular() {
   const e = grosor(), rep = reparto(), V = P.varillas;
   const res = { n: rep.n, sep: rep.s, hueco: rep.hueco, costillas: [], varillas: [], avisos: [] };
   for (let i = 0; i < rep.n; i++) {
-    const x = e / 2 + i * rep.s, ctrl = perfilEn(x), poly = contornoDe(ctrl);
+    const x = rep.ini + e / 2 + i * rep.s, ctrl = perfilEn(x), poly = contornoDe(ctrl);
     const ok = poly.length >= 3 && Math.abs(areaFirmada(poly)) > 25;
     const caja = ok ? cajaDe(poly) : { x0: 0, y0: 0, x1: 0, y1: 0, w: 0, h: 0 };
-    res.costillas.push({ i, x, poly: ok ? poly : [], ok, caja, area: ok ? areaFirmada(poly) : 0, agujeros: [], nVar: 0 });
+    res.costillas.push({ i, x, poly: ok ? poly : [], base: ok ? poly : [], ok, caja, area: ok ? areaFirmada(poly) : 0, agujeros: [], nVar: 0, ranuras: [], etq: String(i + 1), nombre: 'Costilla ' + (i + 1) });
   }
+  res.largueros = []; res.cruces = [];
+  if (P.tipo === 'reticula') { reticula(res); avisosReticula(res); return res; }
   // varillas: ¿caben en cada costilla?
   const need = radioAgujero() + V.margen;
   V.lista.forEach((p, k) => {
@@ -221,8 +225,12 @@ function avisosDe(res, need) {
   }
   const alto = res.costillas.filter(c => c.ok && c.caja.y0 > 1).map(c => c.i);
   if (P.costillas.base && alto.length && alto.length < res.n) add('info', `No llegan al suelo (cuelgan de las varillas): ${cst(alto)}.`, alto[0]);
-  // maqueta a escala
-  const M = P.maqueta;
+  avisosMaqueta(res, add);
+  if (!A.some(a => a.tipo === 'error' || a.tipo === 'atencion')) add('ok', 'Todo correcto: las varillas caben y todas las costillas están sujetas.');
+}
+// maqueta a escala
+function avisosMaqueta(res, add) {
+  const M = P.maqueta, e = grosor(), V = P.varillas;
   if (M && M.activa) {
     const k = 1 / M.escala, huecoM = res.sep * k - M.grosor, rM = (M.diam + M.holgura) / 2;
     if (huecoM < -0.01) add('error', `Maqueta 1:${M.escala}: las costillas de ${fmt(M.grosor, 1)} mm se pisan (separación ${fmt(res.sep * k, 1)} mm). Baja el grosor de la maqueta o la escala.`);
@@ -230,8 +238,8 @@ function avisosDe(res, need) {
     res.costillas.forEach(c => { if (!c.ok) return; for (const j of c.agujeros) if (distBorde(c.poly, V.lista[j][0], V.lista[j][1]) * k - rM < 1.5) { justas.push(c.i); break; } });
     if (justas.length) add('atencion', `Maqueta 1:${M.escala}: queda menos de 1,5 mm de material alrededor de algún agujero en ${cstLa(justas)}.`, justas[0]);
     if (Math.abs(M.grosor * M.escala - e) > e * 0.2) add('info', `Maqueta 1:${M.escala}: ${fmt(M.grosor, 1)} mm equivalen a ${fmt(M.grosor * M.escala)} mm reales (el tablero real es de ${fmt(e, 1)} mm): la maqueta se verá ${M.grosor * M.escala > e ? 'más llena' : 'más calada'}.`);
+    if (P.tipo === 'reticula' && res.sep / M.escala - M.grosor < 0.5) add('error', `Maqueta 1:${M.escala}: con ${fmt(M.grosor, 1)} mm las costillas se tocan.`);
   }
-  if (!A.some(a => a.tipo === 'error' || a.tipo === 'atencion')) add('ok', 'Todo correcto: las varillas caben y todas las costillas están sujetas.');
 }
 
 // Busca sitio para n varillas que atraviesen las costillas, lo más separadas posible

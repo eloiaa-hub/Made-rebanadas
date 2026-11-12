@@ -8,7 +8,7 @@
 'use strict';
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
-const VERSION = '1.1';
+const VERSION = '1.2';
 const T = window.THREE;
 
 /* ===================== UTILIDADES ===================== */
@@ -61,7 +61,7 @@ const UI = {
   clave: 0,            // índice de la clave que se edita
   punto: -1,           // punto de control seleccionado
   varilla: -1,         // varilla seleccionada
-  costilla: 0,         // costilla seleccionada
+  costilla: 0,         // pieza seleccionada: 0…n-1 costillas, n… largueros (retícula)
   modo: 'normal',      // 'normal' | 'varilla' (colocar varilla con un clic)
   sucio: false,        // cambios sin guardar
 };
@@ -69,7 +69,7 @@ const UI = {
 function proyectoBase() {
   return {
     app: 'Made-rebanadas', version: 1, versionPrograma: VERSION,
-    nombre: 'Mueble', plantilla: 'banco', params: {}, editado: false,
+    nombre: 'Mueble', tipo: 'costillas', plantilla: 'banco', params: {}, editado: false,
     largo: 1600,
     esquinas: [],                // por punto de control: true = esquina, false = curva
     claves: [],                  // [{ x: mm a lo largo, pts: [[u, v], …] }]
@@ -78,6 +78,7 @@ function proyectoBase() {
     varillas: { tipo: 'roscada', diam: 10, holgura: 0.5, margen: 20, tramo: 'todas', separadores: true, sepD: 22, sobra: 12, autoN: 3, lista: [] },
     vista: { explosion: 0, fantasma: false, varillas: true, resalta: true },
     maqueta: { activa: false, escala: 5, grosor: 3, diam: 3, holgura: 0.2 },
+    reticula: { num: 4, margen: 40, holgura: 0.3, xArriba: true, vuelo: 25 },
   };
 }
 
@@ -221,14 +222,16 @@ function contornoDe(ctrl) {
 
 /* ===================== COSTILLAS Y VARILLAS ===================== */
 function grosor() { return P.costillas.grosor; }
+// en la retícula, las costillas de los extremos se meten hacia dentro el «vuelo» de los largueros
+const vueloRet = () => P.tipo === 'reticula' ? clamp(P.reticula.vuelo || 0, 0, P.largo / 4) : 0;
 function reparto() {
-  const e = grosor(), L = P.largo, c = P.costillas;
+  const e = grosor(), v = vueloRet(), L = P.largo - 2 * v, c = P.costillas;
   let n;
   if (c.modo === 'numero') n = Math.max(2, Math.round(c.numero));
   else n = Math.max(2, Math.round((L - e) / Math.max(1, c.separacion)) + 1);
   n = Math.min(n, 600);
   const s = (L - e) / (n - 1);
-  return { n, s, hueco: s - e };
+  return { n, s, hueco: s - e, ini: v };
 }
 function radioAgujero() { return (P.varillas.diam + P.varillas.holgura) / 2; }
 
@@ -236,11 +239,13 @@ function calcular() {
   const e = grosor(), rep = reparto(), V = P.varillas;
   const res = { n: rep.n, sep: rep.s, hueco: rep.hueco, costillas: [], varillas: [], avisos: [] };
   for (let i = 0; i < rep.n; i++) {
-    const x = e / 2 + i * rep.s, ctrl = perfilEn(x), poly = contornoDe(ctrl);
+    const x = rep.ini + e / 2 + i * rep.s, ctrl = perfilEn(x), poly = contornoDe(ctrl);
     const ok = poly.length >= 3 && Math.abs(areaFirmada(poly)) > 25;
     const caja = ok ? cajaDe(poly) : { x0: 0, y0: 0, x1: 0, y1: 0, w: 0, h: 0 };
-    res.costillas.push({ i, x, poly: ok ? poly : [], ok, caja, area: ok ? areaFirmada(poly) : 0, agujeros: [], nVar: 0 });
+    res.costillas.push({ i, x, poly: ok ? poly : [], base: ok ? poly : [], ok, caja, area: ok ? areaFirmada(poly) : 0, agujeros: [], nVar: 0, ranuras: [], etq: String(i + 1), nombre: 'Costilla ' + (i + 1) });
   }
+  res.largueros = []; res.cruces = [];
+  if (P.tipo === 'reticula') { reticula(res); avisosReticula(res); return res; }
   // varillas: ¿caben en cada costilla?
   const need = radioAgujero() + V.margen;
   V.lista.forEach((p, k) => {
@@ -303,8 +308,12 @@ function avisosDe(res, need) {
   }
   const alto = res.costillas.filter(c => c.ok && c.caja.y0 > 1).map(c => c.i);
   if (P.costillas.base && alto.length && alto.length < res.n) add('info', `No llegan al suelo (cuelgan de las varillas): ${cst(alto)}.`, alto[0]);
-  // maqueta a escala
-  const M = P.maqueta;
+  avisosMaqueta(res, add);
+  if (!A.some(a => a.tipo === 'error' || a.tipo === 'atencion')) add('ok', 'Todo correcto: las varillas caben y todas las costillas están sujetas.');
+}
+// maqueta a escala
+function avisosMaqueta(res, add) {
+  const M = P.maqueta, e = grosor(), V = P.varillas;
   if (M && M.activa) {
     const k = 1 / M.escala, huecoM = res.sep * k - M.grosor, rM = (M.diam + M.holgura) / 2;
     if (huecoM < -0.01) add('error', `Maqueta 1:${M.escala}: las costillas de ${fmt(M.grosor, 1)} mm se pisan (separación ${fmt(res.sep * k, 1)} mm). Baja el grosor de la maqueta o la escala.`);
@@ -312,8 +321,8 @@ function avisosDe(res, need) {
     res.costillas.forEach(c => { if (!c.ok) return; for (const j of c.agujeros) if (distBorde(c.poly, V.lista[j][0], V.lista[j][1]) * k - rM < 1.5) { justas.push(c.i); break; } });
     if (justas.length) add('atencion', `Maqueta 1:${M.escala}: queda menos de 1,5 mm de material alrededor de algún agujero en ${cstLa(justas)}.`, justas[0]);
     if (Math.abs(M.grosor * M.escala - e) > e * 0.2) add('info', `Maqueta 1:${M.escala}: ${fmt(M.grosor, 1)} mm equivalen a ${fmt(M.grosor * M.escala)} mm reales (el tablero real es de ${fmt(e, 1)} mm): la maqueta se verá ${M.grosor * M.escala > e ? 'más llena' : 'más calada'}.`);
+    if (P.tipo === 'reticula' && res.sep / M.escala - M.grosor < 0.5) add('error', `Maqueta 1:${M.escala}: con ${fmt(M.grosor, 1)} mm las costillas se tocan.`);
   }
-  if (!A.some(a => a.tipo === 'error' || a.tipo === 'atencion')) add('ok', 'Todo correcto: las varillas caben y todas las costillas están sujetas.');
 }
 
 // Busca sitio para n varillas que atraviesen las costillas, lo más separadas posible
@@ -372,6 +381,157 @@ function puntoEtiqueta(c) {
     if (d > md) { md = d; mejor = [x, y]; }
   }
   return mejor;
+}
+
+/* ===================== RETÍCULA ENTRELAZADA (WAFFLE) =====================
+   Además de las costillas (planos perpendiculares a X), unos «largueros»: planos perpendiculares
+   a Z, en el plano (x, v), que se sacan cortando el volumen. En cada cruce, ranura a media madera:
+   la costilla desde arriba y el larguero desde abajo (o al revés). */
+const LETRAS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const letra = k => k < 26 ? LETRAS[k] : LETRAS[Math.floor(k / 26) - 1] + LETRAS[k % 26];
+
+// tramos [v0, v1] en los que la recta vertical h = x corta al polígono (coordenadas [h, v])
+function intervalosV(poly, x) {
+  const vs = [];
+  for (let i = 0, n = poly.length; i < n; i++) {
+    const p = poly[i], q = poly[(i + 1) % n];
+    if ((p[0] < x) !== (q[0] < x)) vs.push(p[1] + (x - p[0]) / (q[0] - p[0]) * (q[1] - p[1]));
+  }
+  vs.sort((a, b) => a - b);
+  const out = [];
+  for (let i = 0; i + 1 < vs.length; i += 2) if (vs[i + 1] - vs[i] > 0.3) out.push([vs[i], vs[i + 1]]);
+  return out;
+}
+// ranura que entra por el borde de arriba (o de abajo) del polígono, centrada en h = c, de ancho w, hasta v = vMid
+function hacerRanura(poly, r, w) {
+  const n = poly.length, a = r.c - w / 2, b = r.c + w / 2, arriba = r.arriba;
+  const cruce = x => {
+    let mejor = null, md = Infinity;
+    for (let i = 0; i < n; i++) {
+      const p = poly[i], q = poly[(i + 1) % n];
+      if ((p[0] < x) === (q[0] < x)) continue;
+      const dir = q[0] - p[0];
+      if (arriba ? dir > 0 : dir < 0) continue;      // arriba: el borde va hacia -h; abajo: hacia +h (sentido antihorario)
+      const v = p[1] + (x - p[0]) / (q[0] - p[0]) * (q[1] - p[1]), d = Math.abs(v - r.borde);
+      if (d < md) { md = d; mejor = { i, v }; }
+    }
+    return mejor;
+  };
+  const A = cruce(a), B = cruce(b);
+  if (!A || !B) return null;
+  const pri = arriba ? B : A, seg = arriba ? A : B, xp = arriba ? b : a, xs = arriba ? a : b;
+  if ((arriba ? pri.v < r.mid : pri.v > r.mid) || (arriba ? seg.v < r.mid : seg.v > r.mid)) return null;
+  if (((seg.i - pri.i + n) % n) > n / 2) return null;
+  const out = [];
+  for (let k = seg.i + 1; ; k++) { const idx = k % n; out.push(poly[idx]); if (idx === pri.i) break; }
+  out.push([xp, pri.v], [xp, r.mid], [xs, r.mid], [xs, seg.v]);
+  return out;
+}
+// aplica las ranuras de una pieza con un ancho dado (en sus coordenadas); devuelve el polígono y las que fallan
+function ranurar(base, ranuras, w) {
+  let poly = base; const fallan = [];
+  for (const r of ranuras) { const nuevo = hacerRanura(poly, r, w); if (nuevo) poly = nuevo; else fallan.push(r); }
+  return { poly, fallan };
+}
+
+function reticula(res) {
+  const Rt = P.reticula, e = grosor(), L = P.largo;
+  const cs = res.costillas.filter(c => c.ok);
+  if (!cs.length) return;
+  // posiciones de los largueros en el fondo (u)
+  // dentro de la zona común a las costillas principales (las de al menos el 70 % del fondo mayor),
+  // para que los largueros no caigan donde el frente o la espalda ondulan
+  const wMax = Math.max(...cs.map(c => c.caja.w)), princ = cs.filter(c => c.caja.w >= 0.7 * wMax);
+  let u0 = -Infinity, u1 = Infinity; princ.forEach(c => { u0 = Math.max(u0, c.caja.x0); u1 = Math.min(u1, c.caja.x1); });
+  if (!(u1 - u0 > 2 * e)) { u0 = Math.min(...cs.map(c => c.caja.x0)); u1 = Math.max(...cs.map(c => c.caja.x1)); }
+  const n = Math.max(1, Math.round(Rt.num)), m = clamp(Rt.margen, 0, (u1 - u0) / 2 - 1);
+  const us = n === 1 ? [(u0 + u1) / 2] : Array.from({ length: n }, (_, j) => u0 + m + j * (u1 - u0 - 2 * m) / (n - 1));
+  // perfiles en columnas a lo largo de x (compartidos por todos los largueros)
+  const NX = clamp(Math.round(L / 5), 80, 420), xs = Array.from({ length: NX + 1 }, (_, i) => L * i / NX);
+  const cols = xs.map(x => contornoDe(perfilEn(x)));
+  res.largueros = []; res.cruces = []; res.partidos = [];
+  us.forEach((u, j) => {
+    // seguir los tramos verticales columna a columna; cada tramo seguido es una pieza
+    let activos = []; const piezas = [];
+    xs.forEach((x, ix) => {
+      const ints = cols[ix].length >= 3 ? intervalosV(cols[ix], u) : [];
+      const usados = new Set(), nuevos = [];
+      ints.forEach(I => {
+        const cand = activos.filter(A => A.ult[0] < I[1] && I[0] < A.ult[1]);
+        const otros = cand.length === 1 ? ints.filter(J => J !== I && cand[0].ult[0] < J[1] && J[0] < cand[0].ult[1]) : [];
+        if (cand.length === 1 && !otros.length && !usados.has(cand[0])) {
+          const A = cand[0]; usados.add(A); A.abajo.push([x, I[0]]); A.arriba.push([x, I[1]]); A.ult = I; nuevos.push(A);
+        } else nuevos.push({ abajo: [[x, I[0]]], arriba: [[x, I[1]]], ult: I });
+      });
+      activos.forEach(A => { if (!nuevos.includes(A)) piezas.push(A); });
+      activos = nuevos;
+    });
+    piezas.push(...activos);
+    // los trozos demasiado bajos o cortos para encajar en las costillas se descartan
+    const validas = [];
+    piezas.filter(p => p.abajo.length >= 2).forEach(p => {
+      let poly = simplificaCerrado(p.abajo.concat(p.arriba.slice().reverse()), 0.02);
+      if (areaFirmada(poly) < 0) poly.reverse();
+      const b = cajaDe(poly);
+      if (b.h < 4 * e || b.w < Math.min(2 * res.sep, L / 2)) { res.descartados = (res.descartados || 0) + 1; return; }
+      validas.push(poly);
+    });
+    if (validas.length > 1) res.partidos.push(j);
+    validas.forEach((poly, ip) => {
+      const k = res.largueros.length, et = letra(j) + (validas.length > 1 ? (ip + 1) : '');
+      res.largueros.push({ i: res.n + k, k, j, u, z: true, etq: et, nombre: 'Larguero ' + et, base: poly, poly, ok: Math.abs(areaFirmada(poly)) > 25, caja: cajaDe(poly), area: areaFirmada(poly), agujeros: [], ranuras: [], nVar: 0, x: u });
+    });
+  });
+  // cruces y ranuras a media madera
+  const xArriba = Rt.xArriba !== false;
+  res.costillas.forEach(c => {
+    if (!c.ok) return;
+    res.largueros.forEach(z => {
+      if (!z.ok) return;
+      const ix = intervalosV(c.poly, z.u), iz = intervalosV(z.base, c.x);
+      ix.forEach(I => iz.forEach(J => {
+        const a = Math.max(I[0], J[0]), b = Math.min(I[1], J[1]);
+        if (b - a < 0.5) return;
+        const mid = (a + b) / 2;
+        c.ranuras.push({ c: z.u, mid, borde: xArriba ? I[1] : I[0], arriba: xArriba, z: z.k });
+        z.ranuras.push({ c: c.x, mid, borde: xArriba ? J[0] : J[1], arriba: !xArriba, x: c.i });
+        res.cruces.push({ i: c.i, k: z.k, a, b });
+      }));
+    });
+  });
+  // ranuras con el ancho real (grosor + holgura)
+  const w = e + Rt.holgura;
+  res.ranurasMal = [];
+  [...res.costillas, ...res.largueros].forEach(p => {
+    if (!p.ok || !p.ranuras.length) return;
+    const r = ranurar(p.base, p.ranuras, w);
+    p.poly = r.poly; p.caja = cajaDe(p.poly); p.area = areaFirmada(p.poly);
+    if (r.fallan.length) res.ranurasMal.push(p);
+  });
+}
+
+function avisosReticula(res) {
+  const A = res.avisos, e = grosor(), add = (tipo, txt, cost) => A.push({ tipo, txt, cost });
+  if (res.hueco < 0.5) add('error', `Retícula: la separación de las costillas (${fmt(res.sep, 1)} mm) tiene que ser mayor que el grosor (${fmt(e, 1)} mm).`);
+  const vacias = res.costillas.filter(c => !c.ok).map(c => c.i);
+  if (vacias.length) add('error', `Sin forma tras los recortes: ${cst(vacias)}.`, vacias[0]);
+  if (!res.largueros.length) { add('error', 'Retícula: no sale ningún larguero. Revisa el número de largueros y el margen.'); return; }
+  // separación entre largueros
+  const us = [...new Set(res.largueros.map(z => z.u))].sort((a, b) => a - b);
+  for (let i = 1; i < us.length; i++) if (us[i] - us[i - 1] < e + 0.5) { add('error', `Retícula: dos largueros están a ${fmt(us[i] - us[i - 1], 1)} mm (menos que el grosor): se pisan.`); break; }
+  res.ranurasMal.forEach(p => add('error', `No se pudo hacer alguna ranura en ${p.z ? 'el larguero ' + p.etq : 'la costilla ' + p.etq} (el borde es casi vertical en el cruce).`, p.i));
+  const sinCruce = res.costillas.filter(c => c.ok && !c.ranuras.length).map(c => c.i);
+  if (sinCruce.length) add('error', `Sueltas, sin ningún larguero que las cruce: ${cst(sinCruce)}.`, sinCruce[0]);
+  const zPocos = res.largueros.filter(z => z.ok && z.ranuras.length < 2);
+  if (zPocos.length) add('atencion', `Largueros que cruzan menos de 2 costillas: ${zPocos.map(z => z.etq).join(', ')}.`, zPocos[0].i);
+  const debiles = [...new Set(res.cruces.filter(c => c.b - c.a < 2.5 * e).map(c => c.i))];
+  if (debiles.length) add('atencion', `Cruces muy bajos (menos de ${fmt(2.5 * e)} mm de madera en común): unión floja en ${cstLa(debiles)}.`, debiles[0]);
+  if (res.descartados) add('info', `Se han quitado ${res.descartados} trozo${res.descartados > 1 ? 's' : ''} de larguero demasiado pequeño${res.descartados > 1 ? 's' : ''} para encajar (cerca de un lateral inclinado). Si quieres ese larguero, cambia el margen.`);
+  if (res.partidos.length) add('info', `Largueros partidos en varias piezas porque la forma tiene huecos: ${res.partidos.map(letra).join(', ')}.`);
+  const alto = res.costillas.filter(c => c.ok && c.caja.y0 > 1).map(c => c.i);
+  if (P.costillas.base && alto.length && alto.length < res.n) add('info', `No llegan al suelo (las sujetan los largueros): ${cst(alto)}.`, alto[0]);
+  avisosMaqueta(res, add);
+  if (!A.some(a => a.tipo === 'error' || a.tipo === 'atencion')) add('ok', `Todo correcto: ${res.cruces.length} cruces a media madera entre ${res.costillas.filter(c => c.ok).length} costillas y ${res.largueros.length} largueros.`);
 }
 
 /* ===================== PLANTILLAS PARAMÉTRICAS =====================
@@ -661,8 +821,8 @@ function dibujarPerfil(ctx, V) {
   ctx.lineWidth = 1; ctx.strokeStyle = colorCostilla(.16);
   R.costillas.forEach(c => { if (c.ok) { V.camino(ctx, c.poly); ctx.stroke(); } });
   // costilla seleccionada
-  const cs = R.costillas[UI.costilla];
-  if (cs && cs.ok) { ctx.setLineDash([6, 4]); ctx.strokeStyle = colorCostilla(.75); ctx.lineWidth = 1.4; V.camino(ctx, cs.poly); ctx.stroke(); ctx.setLineDash([]); }
+  const cs = piezaSel();
+  if (cs && cs.ok && !cs.z) { ctx.setLineDash([6, 4]); ctx.strokeStyle = colorCostilla(.75); ctx.lineWidth = 1.4; V.camino(ctx, cs.poly); ctx.stroke(); ctx.setLineDash([]); }
   // otras claves
   ctx.strokeStyle = cssVar('--ejes'); ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
   C.forEach(o => { if (o !== k) { V.camino(ctx, curvaCerrada(o.pts, P.esquinas)); ctx.stroke(); } });
@@ -684,7 +844,18 @@ function dibujarPerfil(ctx, V) {
   V.camino(ctx, k.pts); ctx.stroke(); ctx.setLineDash([]);
   // varillas
   const r = radioAgujero(), Vv = P.varillas;
-  Vv.lista.forEach((p, i) => {
+  // retícula: posición de los largueros
+  if (P.tipo === 'reticula') {
+    const vistos = new Set();
+    R.largueros.forEach(z => {
+      if (vistos.has(z.u)) return; vistos.add(z.u);
+      const [x] = V.aPantalla(z.u, 0), sel = cs && cs.z && cs.u === z.u;
+      ctx.strokeStyle = sel ? cssVar('--acento') : '#5f6b78'; ctx.lineWidth = sel ? 2 : 1; ctx.setLineDash([7, 4]);
+      ctx.beginPath(); ctx.moveTo(x, 30); ctx.lineTo(x, V.h); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = ctx.strokeStyle; ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center'; ctx.fillText(letra(z.j), x, 58); ctx.textAlign = 'left';
+    });
+  }
+  if (P.tipo !== 'reticula') Vv.lista.forEach((p, i) => {
     const info = R.varillas[i], mal = info && (!info.usada || info.fallan.length), [x, y] = V.aPantalla(p[0], p[1]);
     const col = mal ? cssVar('--peligro') : '#5f6b78';
     ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
@@ -723,6 +894,7 @@ function puntoCerca(mx, my) {
   return mejor;
 }
 function varillaCerca(mx, my) {
+  if (P.tipo === 'reticula') return -1;
   let mejor = -1, md = Infinity; const r = radioAgujero();
   P.varillas.lista.forEach((p, i) => { const [x, y] = VP.aPantalla(p[0], p[1]), d = Math.hypot(x - mx, y - my); if (d < Math.max(9, r * VP.sc + 4) && d < md) { md = d; mejor = i; } });
   return mejor;
@@ -832,7 +1004,7 @@ function encuadrarPerfil() {
 function dibujarCostilla(ctx, V) {
   V.rejilla(ctx);
   if (!R) return;
-  const c = R.costillas[UI.costilla]; if (!c || !c.ok) return;
+  const c = piezaSel(); if (!c || !c.ok) return;
   ctx.fillStyle = colorCostilla(.28); ctx.strokeStyle = colorCostilla(1); ctx.lineWidth = 2;
   V.camino(ctx, c.poly); ctx.fill(); ctx.stroke();
   const r = radioAgujero();
@@ -842,35 +1014,40 @@ function dibujarCostilla(ctx, V) {
   });
   // varillas que no caben en esta costilla
   R.varillas.forEach(rv => {
-    if (rv.usada && rv.fallan.includes(c.i)) {
+    if (rv.usada && !c.z && rv.fallan.includes(c.i)) {
       const [x, y] = V.aPantalla(rv.u, rv.v); ctx.strokeStyle = cssVar('--peligro'); ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(x, y, Math.max(4, r * V.sc), 0, PI2); ctx.stroke(); ctx.strokeStyle = colorCostilla(1);
     }
   });
   const [lx, ly] = V.aPantalla(...puntoEtiqueta(c));
   ctx.fillStyle = colorCostilla(1); ctx.font = 'bold ' + clamp(30 * V.sc, 11, 26) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(String(c.i + 1), lx, ly); ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+  ctx.fillText(c.etq, lx, ly); ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
   V.cota(ctx, [c.caja.x0, c.caja.y0], [c.caja.x1, c.caja.y0], 18, fmt(c.caja.w) + ' mm', false);
   V.cota(ctx, [c.caja.x1, c.caja.y0], [c.caja.x1, c.caja.y1], 20, fmt(c.caja.h) + ' mm', true);
 }
 function selCostilla(i, encuadrar) {
   if (!R) return;
-  UI.costilla = clamp(i, 0, R.n - 1);
+  UI.costilla = clamp(i, 0, nPiezas() - 1);
   refrescarCostilla();
   if (encuadrar !== false) encuadrarCostilla();
   VP.pintar(); resaltar3D();
   const li = $('#listaCost').children[UI.costilla]; if (li) li.scrollIntoView({ block: 'nearest' });
 }
-function encuadrarCostilla() { const c = R.costillas[UI.costilla]; if (c && c.ok) VC.encuadrar(c.caja, 40); else VC.pintar(); }
+// pieza seleccionada: costilla o larguero (retícula)
+const nPiezas = () => R.n + (R.largueros ? R.largueros.length : 0);
+const piezaSel = () => R ? (UI.costilla < R.n ? R.costillas[UI.costilla] : R.largueros[UI.costilla - R.n]) : null;
+function encuadrarCostilla() { const c = piezaSel(); if (c && c.ok) VC.encuadrar(c.caja, 40); else VC.pintar(); }
 function refrescarCostilla() {
-  const c = R.costillas[UI.costilla]; if (!c) return;
-  $('#numCost').textContent = c.i + 1;
-  $('#infoCost').textContent = `de ${R.n} · x = ${fmt(c.x)} mm · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm`;
+  const c = piezaSel(); if (!c) return;
+  $('#tipoPieza').textContent = c.z ? 'Larguero' : 'Costilla';
+  $('#numCost').textContent = c.etq;
+  $('#infoCost').textContent = c.z ? `z = ${fmt(c.u)} mm · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm · ${c.ranuras.length} ranuras`
+    : `de ${R.n} · x = ${fmt(c.x)} mm · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm` + (c.ranuras.length ? ` · ${c.ranuras.length} ranuras` : '');
   $$('#listaCost li').forEach((li, i) => li.classList.toggle('sel', i === UI.costilla));
 }
 
 /* ===================== VISTA 3D ===================== */
-const G = { renderer: null, scene: null, cam: null, ctl: null, modelo: null, fantasma: null, costillas: [], varillas: [], separadores: [], tuercas: [], suelo: null, rejilla: null, luz: null, pend: false, cacheTex: {}, cacheMat: {} };
+const G = { renderer: null, scene: null, cam: null, ctl: null, modelo: null, fantasma: null, costillas: [], largueros: [], varillas: [], separadores: [], tuercas: [], suelo: null, rejilla: null, luz: null, pend: false, cacheTex: {}, cacheMat: {} };
 
 function textura(clave, mm) {
   const ck = clave + ':' + mm; if (G.cacheTex[ck]) return G.cacheTex[ck];
@@ -927,7 +1104,7 @@ function iniciar3D() {
     if (!abajo || Math.hypot(ev.clientX - abajo[0], ev.clientY - abajo[1]) > 4 || ev.button !== 0) return;
     const rc = cv.getBoundingClientRect(), ray = new T.Raycaster();
     ray.setFromCamera(new T.Vector2((ev.clientX - rc.left) / rc.width * 2 - 1, -(ev.clientY - rc.top) / rc.height * 2 + 1), G.cam);
-    const hit = ray.intersectObjects(G.costillas.filter(Boolean), false)[0];
+    const hit = ray.intersectObjects([...G.costillas, ...G.largueros].filter(Boolean), false)[0];
     if (hit) selCostilla(hit.object.userData.i);
   });
   $$('[data-cam]').forEach(b => b.onclick = () => camara(b.dataset.cam));
@@ -962,12 +1139,12 @@ function limpiar(obj) {
 }
 
 // desplazamiento por la vista explosionada
-function xExpl(x) { const k = (P.vista.explosion || 0) * 1.4; return x + (x - P.largo / 2) * k; }
+function xExpl(x) { const k = P.tipo === 'reticula' ? 0 : (P.vista.explosion || 0) * 1.4; return x + (x - P.largo / 2) * k; }
 
 function construir3D() {
   if (!G.scene || !R) return;
   limpiar(G.modelo); G.modelo.clear();
-  G.costillas = []; G.varillas = []; G.separadores = []; G.tuercas = [];
+  G.costillas = []; G.largueros = []; G.varillas = []; G.separadores = []; G.tuercas = [];
   const e = grosor(), mats = materialesTablero(), rh = radioAgujero(), V = P.varillas;
   // centro del mueble en el fondo (u)
   let u0 = Infinity, u1 = -Infinity, alto = 0;
@@ -985,6 +1162,14 @@ function construir3D() {
     m.rotation.y = Math.PI / 2; m.castShadow = m.receiveShadow = true;
     m.userData = { i: c.i, x: c.x };
     G.modelo.add(m); G.costillas.push(m);
+  });
+  // retícula: largueros en el plano (x, v), con su grosor hacia el fondo
+  (R.largueros || []).forEach(z => {
+    if (!z.ok) return;
+    const geo = new T.ExtrudeGeometry(new T.Shape(z.poly.map(p => new T.Vector2(p[0], p[1]))), { depth: e, bevelEnabled: false, curveSegments: 24 });
+    const m = new T.Mesh(geo, mats); m.castShadow = m.receiveShadow = true;
+    m.userData = { i: z.i, u: z.u, z: true };
+    G.modelo.add(m); G.largueros.push(m);
   });
   // varillas, separadores y tuercas
   const tv = VARILLA_TIPOS[V.tipo] || VARILLA_TIPOS.roscada;
@@ -1025,7 +1210,9 @@ function construir3D() {
 }
 function colocarExplosion() {
   const e = grosor(), k = (P.vista.explosion || 0) * 1.4;
-  G.costillas.forEach(m => { if (m) m.position.set(xExpl(m.userData.x) - e / 2, 0, 0); });
+  G.costillas.forEach(m => { if (m) m.position.set(P.tipo === 'reticula' ? m.userData.x - e / 2 : xExpl(m.userData.x) - e / 2, 0, 0); });
+  // en la retícula, la explosión levanta los largueros (así se ve cómo encajan)
+  G.largueros.forEach(m => m.position.set(0, (P.vista.explosion || 0) * (G.alto || 400) * 1.1, -(m.userData.u + e / 2)));
   G.varillas.forEach(m => {
     const d = m.userData, xa = xExpl(d.xa + P.varillas.sobra) - P.varillas.sobra, xb = xExpl(d.xb - P.varillas.sobra) + P.varillas.sobra;
     m.scale.y = (xb - xa) / (d.xb - d.xa); m.position.set((xa + xb) / 2, d.v, -d.u);
@@ -1057,7 +1244,7 @@ function construirFantasma() {
 }
 function resaltar3D() {
   const base = materialesTablero();
-  G.costillas.forEach(m => {
+  [...G.costillas, ...G.largueros].forEach(m => {
     if (!m) return;
     const sel = P.vista.resalta && m.userData.i === UI.costilla;
     if (sel) { if (!m.userData.matSel) m.userData.matSel = materialSel(base); m.material = m.userData.matSel; }
@@ -1067,7 +1254,8 @@ function resaltar3D() {
 }
 function camara(tipo) {
   // distancia para que quepa la esfera que envuelve el mueble, con el campo de visión más estrecho
-  const L = P.largo * (1 + 1.4 * (P.vista.explosion || 0)), F = G.fondo || 500, H = G.alto || 500, y = H * 0.45;
+  const ex = P.vista.explosion || 0, ret = P.tipo === 'reticula';
+  const L = P.largo * (ret ? 1 : 1 + 1.4 * ex), F = G.fondo || 500, H = (G.alto || 500) * (ret ? 1 + 1.1 * ex : 1), y = H * 0.45;
   const radio = 0.5 * Math.sqrt(L * L + F * F + H * H);
   const fv = G.cam.fov * Math.PI / 180, fh = 2 * Math.atan(Math.tan(fv / 2) * G.cam.aspect);
   const d = radio / Math.sin(Math.min(fv, fh) / 2) * 1.04;
@@ -1086,7 +1274,7 @@ let tRecalc = 0;
 // recalcula costillas y lo dibuja todo
 function recalcular() {
   R = calcular();
-  UI.costilla = clamp(UI.costilla, 0, R.n - 1);
+  UI.costilla = clamp(UI.costilla, 0, nPiezas() - 1);
   if (UI.varilla >= P.varillas.lista.length) UI.varilla = -1;
   construir3D();
   refrescarListas();
@@ -1190,6 +1378,19 @@ function iniciarPanel() {
   };
   $('#bVarMas').onclick = () => { UI.modo = UI.modo === 'varilla' ? 'normal' : 'varilla'; VP.pintar(); };
   $('#bVarQuitar').onclick = () => { if (!V().lista.length) return; V().lista = []; UI.varilla = -1; cambio('Varillas quitadas'); };
+  // tipo de mueble y retícula
+  enlazar('#sTipo', () => {
+    P.tipo = $('#sTipo').value;
+    if (P.tipo === 'reticula' && P.costillas.modo === 'separacion' && P.costillas.separacion < 3 * grosor()) { P.costillas.separacion = Math.round(Math.max(100, 6 * grosor())); ponerControles(); }
+    if (P.tipo !== 'reticula' && !P.varillas.lista.length) { R = calcular(); autoVarillas(P.varillas.autoN); }
+    UI.costilla = Math.min(UI.costilla, R.n - 1);
+    cambio(P.tipo === 'reticula' ? 'Retícula entrelazada' : 'Costillas con varillas');
+  });
+  enlazar('#rNum', () => { P.reticula.num = clamp(Math.round(+$('#rNum').value || 1), 1, 20); cambio(P.reticula.num + ' largueros'); });
+  enlazar('#rMargen', () => { P.reticula.margen = Math.max(0, +$('#rMargen').value || 0); cambio(); });
+  enlazar('#rVuelo', () => { P.reticula.vuelo = Math.max(0, +$('#rVuelo').value || 0); cambio(); });
+  enlazar('#rHolgura', () => { P.reticula.holgura = clamp(+$('#rHolgura').value || 0, 0, 3); cambio(); });
+  enlazar('#rArriba', () => { P.reticula.xArriba = $('#rArriba').value === '1'; cambio(); });
   // maqueta
   enlazar('#mActiva', () => { P.maqueta.activa = $('#mActiva').checked; cambio(P.maqueta.activa ? 'Maqueta 1:' + P.maqueta.escala : 'Tamaño real'); });
   enlazar('#mEscala', () => { P.maqueta.escala = +$('#mEscala').value; cambio('Maqueta 1:' + P.maqueta.escala); });
@@ -1202,7 +1403,8 @@ function iniciarPanel() {
     UI.clave = clavesOrdenadas().indexOf(k); cambio('Clave movida');
   };
   $('#bClaveMas').onclick = () => {
-    const c = R.costillas[UI.costilla], x = Math.round(c.x * 10) / 10;
+    const c = piezaSel(); if (!c || c.z) { aviso('Selecciona antes una costilla (no un larguero).'); return; }
+    const x = Math.round(c.x * 10) / 10;
     if (P.claves.some(k => Math.abs(k.x - x) < 1)) { aviso('Ya hay un perfil clave en esa costilla.'); return; }
     const nueva = { x, pts: perfilEn(x).map(p => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]) };
     P.claves.push(nueva); P.editado = true; UI.clave = clavesOrdenadas().indexOf(nueva); cambio('Clave añadida en la costilla ' + (c.i + 1));
@@ -1246,6 +1448,7 @@ function ponerControles() {
   $('#vTramo').value = V.tramo; $('#vSep').checked = V.separadores; $('#vSepD').value = V.sepD; $('#vSobra').value = V.sobra; $('#vAutoN').value = V.autoN;
   $('#filaSepD').classList.toggle('oculto', !V.separadores);
   $('#kInterp').value = P.interp;
+  $('#sTipo').value = P.tipo; const Rt = P.reticula; $('#rNum').value = Rt.num; $('#rMargen').value = Rt.margen; $('#rVuelo').value = Rt.vuelo; $('#rHolgura').value = Rt.holgura; $('#rArriba').value = Rt.xArriba !== false ? '1' : '0';
   const M = P.maqueta; $('#mActiva').checked = M.activa; $('#mEscala').value = String(M.escala); $('#mGrosor').value = M.grosor; $('#mDiam').value = M.diam; $('#mHolgura').value = M.holgura;
   $('#rExplosion').value = P.vista.explosion; $('#cFantasma').checked = P.vista.fantasma; $('#cVarillas3d').checked = P.vista.varillas; $('#cResalta').checked = P.vista.resalta;
   construirParams();
@@ -1273,14 +1476,16 @@ function refrescarClaves() {
 function refrescarListas() {
   // resumen del reparto
   $('#resCost').innerHTML = `<b>${R.n}</b> costillas · separación <b>${fmt(R.sep, 1)}</b> mm · hueco <b>${fmt(Math.max(0, R.hueco), 1)}</b> mm`;
-  // costillas
-  $('#nCost').textContent = R.n;
+  // costillas y largueros
+  const ret = P.tipo === 'reticula';
+  $('#nCost').textContent = R.n + (ret ? ' + ' + R.largueros.length : '');
   const malas = new Set(); R.avisos.forEach(a => { if (a.tipo === 'error') R.varillas.forEach(v => v.fallan.forEach(i => malas.add(i))); });
-  R.costillas.forEach(c => { if (!c.ok || (P.varillas.lista.length && c.nVar === 0)) malas.add(c.i); });
+  if (!ret) R.costillas.forEach(c => { if (!c.ok || (P.varillas.lista.length && c.nVar === 0)) malas.add(c.i); });
+  else { R.costillas.forEach(c => { if (!c.ok || !c.ranuras.length) malas.add(c.i); }); (R.ranurasMal || []).forEach(p => malas.add(p.i)); }
   const ul = $('#listaCost'); ul.innerHTML = '';
-  R.costillas.forEach(c => {
+  [...R.costillas, ...R.largueros].forEach(c => {
     const li = document.createElement('li'); li.className = c.i === UI.costilla ? 'sel' : '';
-    li.innerHTML = `<span class="icono">${malas.has(c.i) ? '<span class="mal">!</span>' : '▮'}</span><span class="nom">Costilla ${c.i + 1}</span><span class="med">${c.ok ? fmt(c.caja.w) + ' × ' + fmt(c.caja.h) : 'vacía'}</span>`;
+    li.innerHTML = `<span class="icono">${malas.has(c.i) ? '<span class="mal">!</span>' : c.z ? '▬' : '▮'}</span><span class="nom">${c.nombre}</span><span class="med">${c.ok ? fmt(c.caja.w) + ' × ' + fmt(c.caja.h) : 'vacía'}</span>`;
     li.onclick = () => selCostilla(c.i);
     ul.appendChild(li);
   });
@@ -1288,7 +1493,7 @@ function refrescarListas() {
   const av = $('#avisos'); av.innerHTML = '';
   R.avisos.forEach(a => {
     const li = document.createElement('li'); li.className = a.tipo; li.textContent = a.txt;
-    if (a.cost != null) { li.dataset.cost = a.cost; li.title = 'Ver la costilla ' + (a.cost + 1); li.onclick = () => selCostilla(a.cost); }
+    if (a.cost != null) { li.dataset.cost = a.cost; li.title = 'Ver la pieza'; li.onclick = () => selCostilla(a.cost); }
     av.appendChild(li);
   });
   $('#nAvisos').textContent = R.avisos.filter(a => a.tipo === 'error' || a.tipo === 'atencion').length;
@@ -1299,11 +1504,17 @@ function refrescarListas() {
     <tr><td>Costillas</td><td>${R.n} de ${fmt(grosor(), 1)} mm</td></tr>
     <tr><td>Superficie de tablero</td><td>${fmt(cm.area / 1e6, 2)} m²</td></tr>
     <tr><td>Tableros ${fmt(cm.tablero[0])}×${fmt(cm.tablero[1])}</td><td>${cm.nTableros}</td></tr>
+    ${ret ? `<tr><td>Largueros</td><td>${R.largueros.length} de ${fmt(grosor(), 1)} mm</td></tr>
+    <tr><td>Cruces a media madera</td><td>${R.cruces.length}</td></tr>
+    <tr><td>Ancho de las ranuras</td><td>${fmt(grosor() + P.reticula.holgura, 2)} mm</td></tr>` : `
     <tr><td>${esc(VARILLA_TIPOS[P.varillas.tipo].nombre)} Ø${P.varillas.diam}</td><td>${cm.varillas.length} · ${fmt(largoV)} mm</td></tr>
     ${cm.nSep ? `<tr><td>Separadores Ø${P.varillas.sepD} × ${fmt(cm.hueco, 1)}</td><td>${cm.nSep}</td></tr>` : ''}
     ${cm.nTuercas ? `<tr><td>Tuercas y arandelas M${P.varillas.diam}</td><td>${cm.nTuercas}</td></tr>` : ''}
-    <tr><td>Broca para los agujeros</td><td>Ø ${fmt(P.varillas.diam + P.varillas.holgura, 1)} mm</td></tr>
+    <tr><td>Broca para los agujeros</td><td>Ø ${fmt(P.varillas.diam + P.varillas.holgura, 1)} mm</td></tr>`}
   </table>`;
+  $('#secVarillas').classList.toggle('oculto', ret);
+  $('#secReticula').classList.toggle('oculto', !ret);
+  if (ret) { const mz = R.largueros.reduce((m, z) => Math.max(m, z.caja.w), 0); $('#resRet').innerHTML = `<b>${R.largueros.length}</b> largueros (hasta ${fmt(mz)} mm de largo) · <b>${R.cruces.length}</b> cruces · ranura de <b>${fmt(grosor() + P.reticula.holgura, 2)}</b> mm`; }
   // maqueta
   const M = P.maqueta;
   $('#secMaqueta').classList.toggle('activa', M.activa);
@@ -1348,8 +1559,14 @@ const grosorFab = () => enMaqueta() ? P.maqueta.grosor : grosor();
 const diamVarFab = () => enMaqueta() ? P.maqueta.diam : P.varillas.diam;
 const textoEscala = () => enMaqueta() ? 'maqueta 1:' + P.maqueta.escala : 'tamaño real';
 // medidas de una costilla tal y como se fabrica (a escala si es maqueta)
+// todas las piezas que se cortan: costillas y, en la retícula, largueros
+const piezasFab = () => [...R.costillas, ...(R.largueros || [])].filter(c => c.ok);
+const holguraRanuraFab = () => enMaqueta() ? P.maqueta.holgura : P.reticula.holgura;
 function geoFab(c) {
-  const k = escalaFab(), poly = c.poly.map(p => [p[0] * k, p[1] * k]);
+  const k = escalaFab();
+  // las ranuras se rehacen con el grosor de fabricación (el de la maqueta, si lo es)
+  const base = c.ranuras && c.ranuras.length ? ranurar(c.base, c.ranuras, (grosorFab() + holguraRanuraFab()) / k).poly : c.poly;
+  const poly = base.map(p => [p[0] * k, p[1] * k]);
   return {
     c, poly, caja: cajaDe(poly), r: radioFab(), area: Math.abs(c.area) * k * k,
     agujeros: c.agujeros.map(j => [P.varillas.lista[j][0] * k, P.varillas.lista[j][1] * k]),
@@ -1367,7 +1584,7 @@ function fabActual() {
 
 // colocación por estantes (piezas por su rectángulo envolvente)
 function colocarEnTableros(f) {
-  const piezas = R.costillas.filter(c => c.ok).map(c => {
+  const piezas = piezasFab().map(c => {
     const g = geoFab(c);
     let w = g.caja.w, h = g.caja.h, rot = false;
     if (f.girar && h > w) { rot = true; [w, h] = [h, w]; }
@@ -1427,9 +1644,9 @@ function abrirFabricar() {
         <label class="fila" title="Margen sin piezas en todo el borde del tablero">Margen al borde (mm) <input type="number" id="fB" value="${f.borde}" min="0" step="1"></label>
         <label class="fila" title="Espacio entre piezas: al menos el diámetro de la fresa más unos milímetros (en láser, 2 a 4 mm)">Separación entre piezas (mm) <input type="number" id="fS" value="${f.sep}" min="0" step="1"></label>
         <label class="fila chk"><input type="checkbox" id="fG" ${f.girar ? 'checked' : ''}> Permitir girar 90° (cuida la veta)</label>
-        <label class="fila chk"><input type="checkbox" id="fN" ${f.numeros ? 'checked' : ''}> Grabar el número en cada costilla</label>
+        <label class="fila chk"><input type="checkbox" id="fN" ${f.numeros ? 'checked' : ''}> Grabar el número (o la letra) en cada pieza</label>
         <div class="info" id="fInfo"></div>
-        <p class="nota" style="margin-top:10px">El DXF lleva las capas <b>CORTE</b> (contornos), <b>TALADROS</b> (agujeros de las varillas), <b>GRABADO</b> (números) y <b>TABLERO</b> (borde del tablero).</p>
+        <p class="nota" style="margin-top:10px">El DXF lleva las capas <b>CORTE</b> (contornos, con las ranuras), <b>TALADROS</b> (agujeros de las varillas), <b>GRABADO</b> (números) y <b>TABLERO</b> (borde del tablero).</p>
         <p class="nota">Esta colocación usa el rectángulo de cada costilla. Para encajarlas por su forma real, usa <b>🧩 Anidador</b>.</p>
       </div>
       <div><canvas id="fPrev" width="900" height="520"></canvas></div>
@@ -1473,7 +1690,7 @@ function dibujarTableros(ctx, col, f, Wc, opciones = {}) {
       pz.g.agujeros.forEach(q => { const [x, y] = P2(...aTablero(pz, q)); ctx.beginPath(); ctx.arc(x, y, Math.max(1.2, pz.g.r * sc), 0, PI2); ctx.strokeStyle = '#c0392b'; ctx.stroke(); });
       if (f.numeros) {
         const [x, y] = P2(...aTablero(pz, pz.g.etiqueta));
-        ctx.fillStyle = '#1f4f8a'; ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(pz.c.i + 1, x, y);
+        ctx.fillStyle = '#1f4f8a'; ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(pz.c.etq, x, y);
         ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
       }
     });
@@ -1487,12 +1704,12 @@ function previsualizarFab() {
   cv.width = Wc * d; cv.height = Hc * d; cv.style.height = Hc + 'px'; ctx.setTransform(d, 0, 0, d, 0, 0);
   dibujarTableros(ctx, col, f, Wc);
   const info = [];
-  if (f.modo === 'fila') info.push(`${R.costillas.filter(c => c.ok).length} costillas en fila: ${fmt(col.tableros[0] ? col.tableros[0].ancho : 0)} × ${fmt(col.tableros[0] ? col.tableros[0].alto : 0)} mm.`);
+  if (f.modo === 'fila') info.push(`${piezasFab().length} piezas en fila: ${fmt(col.tableros[0] ? col.tableros[0].ancho : 0)} × ${fmt(col.tableros[0] ? col.tableros[0].alto : 0)} mm.`);
   else {
     info.push(`<b>${col.tableros.length}</b> tablero${col.tableros.length === 1 ? '' : 's'} de ${fmt(f.ancho)} × ${fmt(f.alto)} mm · aprovechamiento <b>${fmt(col.uso * 100)} %</b>.`);
-    if (col.grandes.length) info.push(`<span style="color:var(--peligro)">No caben en el tablero: ${cst(col.grandes.map(p => p.c.i))}.</span>`);
+    if (col.grandes.length) info.push(`<span style="color:var(--peligro)">No caben en el tablero: ${col.grandes.map(p => p.c.nombre).join(', ')}.</span>`);
   }
-  info.push(`Agujeros: Ø ${fmt(2 * radioFab(), 2)} mm · grosor del tablero ${fmt(grosorFab(), 1)} mm.`);
+  info.push(P.tipo === 'reticula' ? `Ranuras de ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm · grosor del tablero ${fmt(grosorFab(), 1)} mm.` : `Agujeros: Ø ${fmt(2 * radioFab(), 2)} mm · grosor del tablero ${fmt(grosorFab(), 1)} mm.`);
   $('#fInfo').innerHTML = info.join('<br>');
 }
 
@@ -1519,7 +1736,7 @@ function dxf() {
       pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); g(0, 'CIRCLE'); g(8, 'TALADROS'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(pz.g.r)); });
       if (f.numeros) {
         const q = aTablero(pz, pz.g.etiqueta), h = altoTexto(pz.g);
-        g(0, 'TEXT'); g(8, 'GRABADO'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(h)); g(1, String(pz.c.i + 1)); g(72, 1); g(11, n(ox + q[0])); g(21, n(q[1] - h / 2)); g(31, 0);
+        g(0, 'TEXT'); g(8, 'GRABADO'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(h)); g(1, pz.c.etq); g(72, 1); g(11, n(ox + q[0])); g(21, n(q[1] - h / 2)); g(31, 0);
       }
     });
   });
@@ -1541,7 +1758,7 @@ function svg() {
       const d = simplificaCerrado(pz.g.poly, 0.05).map((p, i) => { const q = aTablero(pz, p); return (i ? 'L' : 'M') + n(ox + q[0]) + ' ' + n(Y(q[1])); }).join(' ') + ' Z';
       partes.push(`<path d="${d}" fill="none" stroke="#000" stroke-width="0.2"/>`);
       pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); partes.push(`<circle cx="${n(ox + q[0])}" cy="${n(Y(q[1]))}" r="${n(pz.g.r)}" fill="none" stroke="#d00" stroke-width="0.2"/>`); });
-      if (f.numeros) { const q = aTablero(pz, pz.g.etiqueta); partes.push(`<text x="${n(ox + q[0])}" y="${n(Y(q[1]))}" font-family="Arial" font-size="${n(altoTexto(pz.g))}" text-anchor="middle" dominant-baseline="middle" fill="#00f">${pz.c.i + 1}</text>`); }
+      if (f.numeros) { const q = aTablero(pz, pz.g.etiqueta); partes.push(`<text x="${n(ox + q[0])}" y="${n(Y(q[1]))}" font-family="Arial" font-size="${n(altoTexto(pz.g))}" text-anchor="middle" dominant-baseline="middle" fill="#00f">${pz.c.etq}</text>`); }
     });
     W += tw + 200;
   });
@@ -1553,12 +1770,12 @@ function exportarSVG() { descargar(nombreArchivo(P.nombre) + '_costillas' + sufi
 // ---------- despiece y lista de compra ----------
 function calcularCompraFab() { // como calcularCompra, pero con las medidas de fabricación (maqueta o real)
   const V = P.varillas, k = escalaFab(), f = fabActual(), col = colocarEnTableros(f);
-  const usadas = R.varillas.filter(v => v.usada);
+  const usadas = P.tipo === 'reticula' ? [] : R.varillas.filter(v => v.usada);
   const sepF = R.sep * k, hueco = sepF - grosorFab(), sobra = enMaqueta() ? Math.max(2, V.sobra * k) : V.sobra;
   let nSep = 0;
-  if (V.separadores && hueco > 0.5) usadas.forEach(v => { for (let i = v.a; i < v.b; i++) if (v.cabe[i] && v.cabe[i + 1]) nSep++; });
+  if (V.separadores && hueco > 0.5 && P.tipo !== 'reticula') usadas.forEach(v => { for (let i = v.a; i < v.b; i++) if (v.cabe[i] && v.cabe[i + 1]) nSep++; });
   return {
-    area: R.costillas.reduce((s, c) => s + (c.ok ? Math.abs(c.area) * k * k : 0), 0), nSep, hueco, sep: sepF,
+    area: piezasFab().reduce((s, c) => s + Math.abs(c.area) * k * k, 0), nSep, hueco, sep: sepF,
     varillas: usadas.map(v => ({ k: v.k, largo: (v.b - v.a) * sepF + grosorFab() + 2 * sobra })),
     nTuercas: V.tipo === 'madera' || enMaqueta() ? 0 : usadas.length * 2,
     tablero: [f.ancho, f.alto], nTableros: col.tableros.length, colocacion: col,
@@ -1566,10 +1783,18 @@ function calcularCompraFab() { // como calcularCompra, pero con las medidas de f
 }
 function filasDespiece() {
   const mat = enMaqueta() ? `Maqueta ${fmt(P.maqueta.grosor, 1)} mm` : MATERIALES[P.costillas.material].nombre;
-  return R.costillas.map(c => { const g = geoFab(c); return { n: c.i + 1, x: c.x * escalaFab(), w: g.caja.w, h: g.caja.h, e: grosorFab(), area: g.area, ag: c.agujeros.length, dA: fmt(2 * g.r, 2), mat }; });
+  return piezasFab().map(c => { const g = geoFab(c); return { n: c.etq, nombre: c.nombre, x: (c.z ? c.u : c.x) * escalaFab(), eje: c.z ? 'z' : 'x', ranuras: c.ranuras.length, w: g.caja.w, h: g.caja.h, e: grosorFab(), area: g.area, ag: c.agujeros.length, dA: fmt(2 * g.r, 2), mat }; });
 }
 function listaCompra() {
   const cm = calcularCompraFab(), V = P.varillas, tv = VARILLA_TIPOS[V.tipo], L = [];
+  if (P.tipo === 'reticula') {
+    const nX = R.costillas.filter(c => c.ok).length, nZ = (R.largueros || []).filter(z => z.ok).length;
+    L.push([enMaqueta() ? `Tablero de maqueta de ${fmt(P.maqueta.grosor, 1)} mm` : `${MATERIALES[P.costillas.material].nombre}, ${fmt(grosor(), 1)} mm`, `${cm.nTableros} tablero${cm.nTableros === 1 ? '' : 's'} de ${fmt(cm.tablero[0])} × ${fmt(cm.tablero[1])} mm (${enMaqueta() ? fmt(cm.area / 100, 0) + ' cm²' : fmt(cm.area / 1e6, 2) + ' m²'} de piezas)`]);
+    L.push(['Piezas', `${nX} costillas y ${nZ} largueros, con ${R.cruces.length} cruces`]);
+    L.push(['Ranuras a media madera', `${fmt(grosorFab() + holguraRanuraFab(), 2)} mm de ancho`]);
+    L.push(['Herrajes', 'ninguno (cola en los cruces, si se quiere fijo)']);
+    return L;
+  }
   if (enMaqueta()) {
     L.push([`Tablero de maqueta (DM, contrachapado…) de ${fmt(P.maqueta.grosor, 1)} mm`, `${cm.nTableros} de ${fmt(cm.tablero[0])} × ${fmt(cm.tablero[1])} mm (${fmt(cm.area / 100, 0)} cm² de piezas)`]);
     cm.varillas.forEach(v => L.push([`Varilla de Ø ${fmt(P.maqueta.diam, 1)} mm (bambú, madera o alambre) — varilla ${v.k + 1}`, fmt(v.largo) + ' mm']));
@@ -1589,8 +1814,8 @@ function abrirDespiece() {
   const F = filasDespiece(), L = listaCompra();
   modal('📋 Despiece y lista de compra' + (enMaqueta() ? ' · maqueta 1:' + P.maqueta.escala : ''), `
     <h4>Costillas</h4>
-    <div style="max-height:46vh;overflow:auto"><table class="tabla"><tr><th class="n">Nº</th><th class="n">Posición x</th><th class="n">Ancho</th><th class="n">Alto</th><th class="n">Grosor</th><th class="n">Superficie</th><th class="n">Agujeros</th></tr>
-    ${F.map(f => `<tr><td class="n">${f.n}</td><td class="n">${fmt(f.x)} mm</td><td class="n">${fmt(f.w, enMaqueta() ? 1 : 0)}</td><td class="n">${fmt(f.h, enMaqueta() ? 1 : 0)}</td><td class="n">${fmt(f.e, 1)}</td><td class="n">${fmt(f.area / 100)} cm²</td><td class="n">${f.ag} × Ø${f.dA}</td></tr>`).join('')}
+    <div style="max-height:46vh;overflow:auto"><table class="tabla"><tr><th class="n">Pieza</th><th class="n">Posición</th><th class="n">Ancho</th><th class="n">Alto</th><th class="n">Grosor</th><th class="n">Superficie</th><th class="n">Agujeros / ranuras</th></tr>
+    ${F.map(f => `<tr><td class="n">${esc(f.nombre)}</td><td class="n">${f.eje} = ${fmt(f.x)} mm</td><td class="n">${fmt(f.w, enMaqueta() ? 1 : 0)}</td><td class="n">${fmt(f.h, enMaqueta() ? 1 : 0)}</td><td class="n">${fmt(f.e, 1)}</td><td class="n">${fmt(f.area / 100)} cm²</td><td class="n">${f.ranuras ? f.ranuras + ' ranuras' : f.ag + ' × Ø' + f.dA}</td></tr>`).join('')}
     </table></div>
     <h4>Lista de compra</h4>
     <table class="tabla">${L.map(l => `<tr><td>${esc(l[0])}</td><td class="n">${esc(l[1])}</td></tr>`).join('')}</table>`,
@@ -1599,8 +1824,8 @@ function abrirDespiece() {
 const csvQ = v => '"' + String(v).replace(/"/g, '""') + '"';
 const csvN = (v, d = 1) => fmt(v, d).replace(/\./g, '');
 function exportarCSV() {
-  const filas = [['Nº', 'Posición x (mm)', 'Ancho (mm)', 'Alto (mm)', 'Grosor (mm)', 'Superficie (cm²)', 'Agujeros', 'Ø agujero (mm)', 'Material'].map(csvQ).join(';')];
-  filasDespiece().forEach(f => filas.push([f.n, csvN(f.x), csvN(f.w), csvN(f.h), csvN(f.e), csvN(f.area / 100, 0), f.ag, f.dA, csvQ(f.mat)].join(';')));
+  const filas = [['Pieza', 'Eje', 'Posición (mm)', 'Ancho (mm)', 'Alto (mm)', 'Grosor (mm)', 'Superficie (cm²)', 'Agujeros', 'Ø agujero (mm)', 'Ranuras', 'Material'].map(csvQ).join(';')];
+  filasDespiece().forEach(f => filas.push([csvQ(f.nombre), f.eje, csvN(f.x), csvN(f.w), csvN(f.h), csvN(f.e), csvN(f.area / 100, 0), f.ag, f.dA, f.ranuras, csvQ(f.mat)].join(';')));
   filas.push('', csvQ('Lista de compra (' + textoEscala() + ')'));
   listaCompra().forEach(l => filas.push(csvQ(l[0]) + ';' + csvQ(l[1])));
   descargar(nombreArchivo(P.nombre) + '_despiece' + sufijoFab() + '.csv', '﻿' + filas.join('\r\n'), 'text/csv');
@@ -1609,7 +1834,7 @@ function exportarCSV() {
 // cada costilla con su rectángulo envolvente, para abrirla en el Anidador o en una hoja de cálculo
 function exportarCSVCortes() {
   const filas = ['nombre;largo;ancho;cantidad;veta;canto largo;canto ancho;tipo de canto'];
-  R.costillas.filter(c => c.ok).forEach(c => { const g = geoFab(c); filas.push([`Costilla ${c.i + 1}`, csvN(g.caja.w, 1), csvN(g.caja.h, 1), 1, 'no', 0, 0, ''].join(';')); });
+  piezasFab().forEach(c => { const g = geoFab(c); filas.push([c.nombre, csvN(g.caja.w, 1), csvN(g.caja.h, 1), 1, 'no', 0, 0, ''].join(';')); });
   descargar(nombreArchivo(P.nombre) + '_cortes' + sufijoFab() + '.csv', '﻿' + filas.join('\r\n') + '\r\n', 'text/csv');
   aviso('CSV de cortes guardado');
 }
@@ -1726,7 +1951,7 @@ function captura3D() {
 }
 
 function planoPDF() {
-  const D = new PDFDoc(), k = escalaFab(), W = 297, H = 210, M = 12, maq = enMaqueta();
+  const ret = P.tipo === 'reticula', D = new PDFDoc(), k = escalaFab(), W = 297, H = 210, M = 12, maq = enMaqueta();
   const e = grosorFab(), cm = calcularCompraFab(), V = P.varillas, fecha = new Date().toLocaleDateString('es-ES');
   const gris = [110, 116, 125], azul = [31, 79, 138], madera = [168, 116, 63], rojo = [192, 57, 43];
   const hojas = [];
@@ -1763,16 +1988,19 @@ function planoPDF() {
     ['Separación entre centros', `${fmt(cm.sep, 1)} mm`],
     ['Hueco entre costillas', `${fmt(Math.max(0, cm.hueco), 1)} mm`],
     ['Material', maq ? `Maqueta de ${fmt(P.maqueta.grosor, 1)} mm` : MATERIALES[P.costillas.material].nombre],
+    ...(ret ? [['Largueros', `${R.largueros.length} de ${fmt(e, 1)} mm`], ['Cruces a media madera', `${R.cruces.length}, ranura de ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm`]] : [
     ['Varillas', maq ? `${cm.varillas.length} de Ø ${fmt(P.maqueta.diam, 1)} mm` : `${cm.varillas.length} × ${VARILLA_TIPOS[V.tipo].nombre} Ø ${V.diam}`],
-    ['Agujeros', `Ø ${fmt(2 * radioFab(), 2)} mm`],
+    ['Agujeros', `Ø ${fmt(2 * radioFab(), 2)} mm`]]),
   ]);
   y = tabla(x2, y + 4, a2, [{ titulo: 'Lista de compra' }, ...listaCompra()]);
   const aviso1 = R.avisos.filter(a => a.tipo === 'error');
   if (aviso1.length) D.parrafo(M, M + 22 + ih, iw, '¡Atención! El proyecto tiene errores: ' + aviso1.map(a => a.txt).join(' '), { pt: 8.5, col: rojo });
 
+  const cs = R.costillas.filter(c => c.ok);
+  if (ret) hojaReticula(D, cabecera, tabla, { M, W, H, k, e, maq, gris, azul, madera, rojo });
+  else {
   // ---- hoja 2: vista lateral (orden de montaje) y perfil con las varillas ----
   cabecera('2. Orden de montaje y posición de las varillas');
-  const cs = R.costillas.filter(c => c.ok);
   // vista lateral: X a lo largo, Y alto
   const zona1 = { x: M + 8, y: M + 24, w: W - 2 * M - 16, h: 70 };
   const sobra = maq ? Math.max(2, V.sobra * k) : V.sobra;
@@ -1819,6 +2047,7 @@ function planoPDF() {
   filasV.push(['Agujero en las costillas', `Ø ${fmt(2 * radioFab(), 2)} mm`]);
   if (cm.nSep) filasV.push(['Separadores', `${cm.nSep} de ${fmt(cm.hueco, 1)} mm`]);
   tabla(zona2.x + zona2.w + 14, zona2.y - 6, W - M - (zona2.x + zona2.w + 14), filasV, { c1: 70 });
+  }
 
   // ---- hojas de costillas: 4 × 2 por hoja, todas a la misma escala ----
   const porHoja = 8, cols = 4, filas = 2, cw = (W - 2 * M) / cols, ch = (H - 2 * M - 22) / filas;
@@ -1831,16 +2060,37 @@ function planoPDF() {
       D.trazo([225, 225, 225]).grosor(0.2).rect(cx + 1, cy + 1, cw - 2, ch - 2);
       const ox = cx + (cw - c.caja.w * s3) / 2, oy = cy + ch - 9;
       const PX = u => ox + (u - c.caja.x0) * s3, PY = v => oy - (v - c.caja.y0) * s3;
-      D.relleno([240, 228, 208]).trazo(madera).grosor(0.35).poli(simplificaCerrado(c.poly, 0.2).map(p => [PX(p[0]), PY(p[1])]), true, 'b');
+      D.relleno([240, 228, 208]).trazo(madera).grosor(0.35).poli(simplificaCerrado(c.poly, 0.05).map(p => [PX(p[0]), PY(p[1])]), true, 'b');
       D.relleno([255, 255, 255]).trazo(rojo).grosor(0.25);
       c.agujeros.forEach(j2 => D.circulo(PX(V.lista[j2][0]), PY(V.lista[j2][1]), Math.max(0.6, radioAgujero() * s3), 'b'));
       D.relleno([0, 0, 0]).trazo();
       const et = puntoEtiqueta(c);
-      D.texto(PX(et[0]), PY(et[1]) + 2.2, String(c.i + 1), { pt: 14, b: true, al: 'c', col: azul });
+      D.texto(PX(et[0]), PY(et[1]) + 2.2, c.etq, { pt: 14, b: true, al: 'c', col: azul });
       D.texto(cx + 3, cy + 6, `Costilla ${c.i + 1}`, { pt: 9, b: true });
       D.texto(cx + cw - 3, cy + 6, `${fmt(g.caja.w, maq ? 1 : 0)} × ${fmt(g.caja.h, maq ? 1 : 0)} mm`, { pt: 8.5, al: 'r', col: gris });
-      D.texto(cx + 3, cy + ch - 3.5, `x = ${fmt(c.x * k)} mm · ${c.agujeros.length} agujeros`, { pt: 7.5, col: gris });
+      D.texto(cx + 3, cy + ch - 3.5, `x = ${fmt(c.x * k)} mm · ` + (ret ? `${c.ranuras.length} ranuras` : `${c.agujeros.length} agujeros`), { pt: 7.5, col: gris });
     });
+  }
+
+  // ---- largueros (retícula): 3 por hoja, a lo ancho ----
+  const zs = (R.largueros || []).filter(z => z.ok);
+  if (ret && zs.length) {
+    const zw = W - 2 * M - 10, zh = (H - 2 * M - 26) / 3;
+    const s5 = Math.min(zw / Math.max(...zs.map(z => z.caja.w)), (zh - 14) / Math.max(...zs.map(z => z.caja.h)));
+    for (let h0 = 0; h0 < zs.length; h0 += 3) {
+      cabecera(`3b. Largueros ${zs[h0].etq} a ${zs[Math.min(zs.length, h0 + 3) - 1].etq} (a la misma escala, 1:${fmt(k / s5, 0)} aprox.)`);
+      zs.slice(h0, h0 + 3).forEach((z, j) => {
+        const g = geoFab(z), cy = M + 20 + j * zh, ox = M + 5, oy = cy + zh - 6;
+        const PX = x => ox + (x - z.caja.x0) * s5, PY = v => oy - (v - z.caja.y0) * s5;
+        D.relleno([240, 228, 208]).trazo(madera).grosor(0.35).poli(simplificaCerrado(z.poly, 0.05).map(p => [PX(p[0]), PY(p[1])]), true, 'b');
+        D.relleno([0, 0, 0]).trazo();
+        z.ranuras.forEach(rr => D.texto(PX(rr.c), rr.arriba ? PY(z.caja.y1) - 1.2 : PY(z.caja.y0) + 3.2, String(rr.x + 1), { pt: 6, al: 'c', col: gris }));
+        const et = puntoEtiqueta(z);
+        D.texto(PX(et[0]), PY(et[1]) + 2.2, z.etq, { pt: 14, b: true, al: 'c', col: azul });
+        D.texto(M, cy + 3, `Larguero ${z.etq}`, { pt: 9, b: true });
+        D.texto(W - M, cy + 3, `${fmt(g.caja.w, maq ? 1 : 0)} × ${fmt(g.caja.h, maq ? 1 : 0)} mm · z = ${fmt(z.u * k)} mm desde atrás · ${z.ranuras.length} ranuras (números: costilla que encaja)`, { pt: 8, al: 'r', col: gris });
+      });
+    }
   }
 
   // ---- tableros ----
@@ -1857,7 +2107,7 @@ function planoPDF() {
         D.relleno([244, 235, 218]).trazo([168, 139, 92]).grosor(0.3).rect(BX(0), BY(f.alto), f.ancho * s4, f.alto * s4, 'b');
         t.piezas.forEach(pz => {
           D.relleno([226, 205, 172]).trazo(madera).grosor(0.2).poli(simplificaCerrado(pz.g.poly, 0.3 * (maq ? 0.2 : 1)).map(p => { const q = aTablero(pz, p); return [BX(q[0]), BY(q[1])]; }), true, 'b');
-          const q = aTablero(pz, pz.g.etiqueta); D.texto(BX(q[0]), BY(q[1]) + 1.2, String(pz.c.i + 1), { pt: 6.5, b: true, al: 'c', col: azul });
+          const q = aTablero(pz, pz.g.etiqueta); D.texto(BX(q[0]), BY(q[1]) + 1.2, pz.c.etq, { pt: 6.5, b: true, al: 'c', col: azul });
         });
         D.relleno([0, 0, 0]);
       });
@@ -1866,7 +2116,15 @@ function planoPDF() {
 
   // ---- montaje paso a paso ----
   cabecera('5. Montaje paso a paso');
-  const pasos = maq ? [
+  const wR = fmt(grosorFab() + holguraRanuraFab(), 2), nZ = (R.largueros || []).length, ultZ = nZ ? R.largueros[nZ - 1].etq : '';
+  const pasos = ret ? [
+    `Corta las ${R.n} costillas (1 a ${R.n}) y los ${nZ} largueros (A a ${ultZ}) en ${maq ? 'tablero de ' + fmt(P.maqueta.grosor, 1) + ' mm' : MATERIALES[P.costillas.material].nombre.toLowerCase() + ' de ' + fmt(grosor(), 1) + ' mm'}. Las ranuras son de ${wR} mm: ${maq ? 'prueba antes una en un retal' : 'en la CNC, con una fresa menor que el ancho de la ranura, y repasa las esquinas interiores con formón o lima (o déjalas en «hueso de perro»)'}.`,
+    'Lija los cantos y comprueba con un retal que una ranura entra en otra sin forzar: tiene que entrar a mano, con un poco de roce.',
+    `Pon las costillas de pie, en orden de la 1 a la ${R.n}, con sus ranuras ${P.reticula.xArriba !== false ? 'hacia arriba' : 'hacia abajo'}, más o menos a su distancia.`,
+    `Encaja los largueros ${P.reticula.xArriba !== false ? 'desde arriba' : 'desde abajo'}, de uno en uno (A, B…): mete primero los extremos y baja el larguero poco a poco, costilla a costilla. Un mazo de goma ayuda.`,
+    'Comprueba que todas las costillas quedan a escuadra y que el mueble apoya bien. Si se quiere fijo, pon cola en los cruces.',
+    maq ? 'Mira la maqueta desde todos los lados antes de cortar el mueble real.' : 'Acabado: aceite, cera o barniz (mejor antes de montar, para llegar a todas las caras).',
+  ] : maq ? [
     `Corta las ${R.n} costillas en tablero de ${fmt(P.maqueta.grosor, 1)} mm (DXF o SVG en «Fabricar»). Haz los agujeros de Ø ${fmt(2 * radioFab(), 2)} mm antes que el contorno.`,
     `Corta ${cm.varillas.length} varillas de Ø ${fmt(P.maqueta.diam, 1)} mm al largo de la tabla de la hoja 2.` + (cm.nSep ? ` Prepara ${cm.nSep} separadores de ${fmt(cm.hueco, 1)} mm (tubito, pajita o arandela de cartón).` : ''),
     `Ensarta las costillas en orden, de la 1 a la ${R.n}, con un separador entre cada dos en cada varilla.`,
@@ -1888,7 +2146,7 @@ function planoPDF() {
     D.texto(M + 4, yp + 0.1, String(i + 1), { pt: 9, b: true, al: 'c', col: [255, 255, 255] });
     yp = D.parrafo(M + 11, yp, 170, t, { pt: 10 }) + 3;
   });
-  D.texto(M, H - M - 4, 'Herramientas: ' + (maq ? 'cortadora láser o cúter, cola blanca.' : `CNC o sierra de calar, broca de Ø ${fmt(2 * radioFab(), 1)}, lija, llaves para las tuercas M${V.diam}.`), { pt: 9, col: gris });
+  D.texto(M, H - M - 4, 'Herramientas: ' + (ret ? (maq ? 'cortadora láser o cúter, lija fina.' : 'CNC (fresa menor que la ranura), formón o lima, mazo de goma, lija.') : maq ? 'cortadora láser o cúter, cola blanca.' : `CNC o sierra de calar, broca de Ø ${fmt(2 * radioFab(), 1)}, lija, llaves para las tuercas M${V.diam}.`), { pt: 9, col: gris });
 
   // pies de página
   hojas.forEach((p, i) => { D.p = p; D.trazo([200, 200, 200]).grosor(0.2).linea(M, H - 8, W - M, H - 8); D.texto(M, H - 4.5, 'Made-rebanadas', { pt: 7.5, col: gris }); D.texto(W - M, H - 4.5, `Hoja ${i + 1} de ${hojas.length}`, { pt: 7.5, al: 'r', col: gris }); });
@@ -1901,6 +2159,44 @@ function exportarPlano() {
     descargar(nombreArchivo(P.nombre) + '_plano_montaje' + sufijoFab() + '.pdf', new Blob([b], { type: 'application/pdf' }));
     aviso('Plano de montaje guardado (PDF)');
   } catch (e) { console.error(e); aviso('⚠ No se pudo crear el PDF: ' + esc(e.message), 5000); }
+}
+
+// hoja 2 de la retícula: planta con la retícula y alzado de un larguero con las costillas
+function hojaReticula(D, cabecera, tabla, o) {
+  const { M, W, k, e, gris, azul, madera } = o;
+  cabecera('2. La retícula: planta y orden de montaje');
+  const cs = R.costillas.filter(c => c.ok), zs = R.largueros.filter(z => z.ok);
+  let u0 = Infinity, u1 = -Infinity; cs.forEach(c => { u0 = Math.min(u0, c.caja.x0); u1 = Math.max(u1, c.caja.x1); });
+  // planta: X horizontal, fondo (u) hacia abajo, delante abajo
+  const zona = { x: M + 10, y: M + 24, w: W - 2 * M - 20, h: 62 };
+  const s = Math.min(zona.w / P.largo, zona.h / (u1 - u0)), PX = x => zona.x + x * s, PU = u => zona.y + (u - u0) * s;
+  D.texto(zona.x, zona.y - 4, `Planta: ${R.n} costillas (números) y ${zs.length} largueros (letras), vistos desde arriba. Medidas en mm.`, { pt: 8.5, col: gris });
+  D.relleno([226, 205, 172]).trazo(madera).grosor(0.15);
+  cs.forEach(c => D.rect(PX(c.x - grosor() / 2), PU(c.caja.x0), Math.max(0.3, grosor() * s), (c.caja.x1 - c.caja.x0) * s, 'b'));
+  D.relleno([200, 170, 130]);
+  zs.forEach(z => D.rect(PX(z.caja.x0), PU(z.u - grosor() / 2), z.caja.w * s, Math.max(0.3, grosor() * s), 'b'));
+  D.relleno([0, 0, 0]);
+  const paso = Math.max(1, Math.ceil(cs.length / Math.floor(zona.w / 5)));
+  cs.forEach((c, i) => { if (i % paso === 0 || i === cs.length - 1) D.texto(PX(c.x), PU(u0) - 1.5, c.etq, { pt: 6.5, al: 'c', col: azul }); });
+  const vistos = new Set();
+  zs.forEach(z => { if (vistos.has(z.u)) return; vistos.add(z.u); D.texto(PX(P.largo) + 3, PU(z.u) + 1.2, letra(z.j), { pt: 8, b: true, col: azul }); });
+  // alzado del primer larguero, con las costillas que lo cruzan
+  const z0 = zs.reduce((m, z) => z.ranuras.length > m.ranuras.length ? z : m, zs[0]);
+  if (z0) {
+    const zona2 = { x: M + 10, y: M + 104, w: 160, h: 66 };
+    const s2 = Math.min(zona2.w / z0.caja.w, zona2.h / z0.caja.y1), AX = x => zona2.x + (x - z0.caja.x0) * s2, AY = v => zona2.y + zona2.h - v * s2;
+    D.texto(zona2.x, zona2.y - 4, `Larguero ${z0.etq} visto de lado, con las costillas que encajan en él.`, { pt: 8.5, col: gris });
+    D.trazo([215, 195, 165]).grosor(0.15);
+    cs.forEach(c => D.rect(AX(c.x - grosor() / 2), AY(c.caja.y1), Math.max(0.3, grosor() * s2), (c.caja.y1 - c.caja.y0) * s2));
+    D.relleno([240, 228, 208]).trazo(madera).grosor(0.35).poli(simplificaCerrado(z0.poly, 0.1).map(p => [AX(p[0]), AY(p[1])]), true, 'b');
+    D.relleno([0, 0, 0]).trazo([150, 150, 150]).grosor(0.3).linea(zona2.x - 3, AY(0), zona2.x + zona2.w + 3, AY(0)).trazo();
+  }
+  const filas = [{ titulo: 'Largueros (z: distancia desde la parte trasera)' }];
+  zs.forEach(z => filas.push([`${z.etq}: z = ${fmt(z.u * k, 1)} mm`, `${fmt(z.caja.w * k)} × ${fmt(z.caja.h * k)} mm · ${z.ranuras.length} ranuras`]));
+  filas.push(['Ranuras', `${fmt(grosorFab() + holguraRanuraFab(), 2)} mm de ancho, hasta la mitad del cruce`]);
+  filas.push(['Costillas', P.reticula.xArriba !== false ? 'ranuras desde arriba' : 'ranuras desde abajo']);
+  filas.push(['Largueros', P.reticula.xArriba !== false ? 'ranuras desde abajo' : 'ranuras desde arriba']);
+  tabla(M + 184, M + 98, W - M - (M + 184), filas, { c1: 38 });
 }
 
 /* ===================== ANIDADOR DE TABLEROS (assets/anidador) =====================
@@ -1916,15 +2212,15 @@ function piezaCalcador(c) {
     const x = a[0] - b.x0, y = a[1] - b.y0;
     contornos.push({ pts: [{ x: r3(x + g.r), y: r3(y) }, { x: r3(x - g.r), y: r3(y) }], b: [1, 1], cerrado: true, tipo: 'interior', mec: { op: 'corte', prof: null, puentes: { ...PUENTES0 } } });
   });
-  return { nombre: `Costilla ${c.i + 1}`, cantidad: 1, veta: false, calcador: { contornos } };
+  return { nombre: c.nombre, cantidad: 1, veta: false, calcador: { contornos } };
 }
 let tAnid = 0;
 function abrirAnidador() {
   if (!R) return;
-  const n = R.costillas.filter(c => c.ok).length;
+  const n = piezasFab().length;
   if (!n) { aviso('No hay costillas que colocar.'); return; }
   UI.anidListo = false;
-  $('#anidInfo').textContent = `${P.nombre}: ${n} costillas · ${textoEscala()} · tablero de ${fmt(grosorFab(), 1)} mm`;
+  $('#anidInfo').textContent = `${P.nombre}: ${n} piezas · ${textoEscala()} · tablero de ${fmt(grosorFab(), 1)} mm`;
   const caja = $('#anidCaja'); caja.innerHTML = '';
   const fr = document.createElement('iframe'); fr.src = 'assets/anidador/anidador.html?desde=rebanadas'; fr.title = 'Anidador de tableros';
   caja.appendChild(fr); UI.anidFrame = fr;
@@ -1941,7 +2237,7 @@ window.addEventListener('message', e => {
   e.source.postMessage({
     tipo: 'rebanadas-piezas',
     nombre: P.nombre + (enMaqueta() ? ` (maqueta 1:${P.maqueta.escala})` : ''),
-    piezas: R.costillas.filter(c => c.ok).map(piezaCalcador),
+    piezas: piezasFab().map(piezaCalcador),
     tablero: { largo: f.ancho, ancho: f.alto, grosor: grosorFab(), margen: f.borde, modo: 'forma' },
   }, '*');
 });
@@ -1986,6 +2282,8 @@ function proyectoDePlantilla(id, extra) {
     if (extra.params) Object.assign(p.params, extra.params);
     if (extra.costillas) Object.assign(p.costillas, extra.costillas);
     if (extra.varillas) Object.assign(p.varillas, extra.varillas);
+    if (extra.reticula) Object.assign(p.reticula, extra.reticula);
+    if (extra.tipo) p.tipo = extra.tipo;
     if (extra.nombre) p.nombre = extra.nombre;
   }
   return p;
@@ -1994,7 +2292,7 @@ function cargarProyecto(p, autoVar) {
   P = p; UI.clave = 0; UI.punto = -1; UI.varilla = -1; UI.costilla = 0;
   if (!P.claves || !P.claves.length) aplicarPlantilla();
   R = calcular();
-  if (autoVar && !P.varillas.lista.length) { autoVarillas(P.varillas.autoN); }
+  if (autoVar && P.tipo !== 'reticula' && !P.varillas.lista.length) { autoVarillas(P.varillas.autoN); }
   HIST.pila = []; HIST.pos = -1; guardarHistoria();
   ponerControles(); recalcular(); refrescarClaves();
   // edita de entrada el perfil clave más cercano al centro del mueble
@@ -2011,6 +2309,8 @@ function validarProyecto(o) {
   p.varillas = Object.assign(proyectoBase().varillas, o.varillas || {});
   p.vista = Object.assign(proyectoBase().vista, o.vista || {});
   p.maqueta = Object.assign(proyectoBase().maqueta, o.maqueta || {});
+  p.reticula = Object.assign(proyectoBase().reticula, o.reticula || {});
+  if (p.tipo !== 'reticula') p.tipo = 'costillas';
   if (!PLANTILLAS[p.plantilla]) p.plantilla = 'libre';
   p.params = Object.assign(paramsDefecto(p.plantilla), o.params || {});
   const n = p.claves[0].pts.length;

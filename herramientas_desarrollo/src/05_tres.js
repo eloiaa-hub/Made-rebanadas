@@ -1,6 +1,6 @@
 
 /* ===================== VISTA 3D ===================== */
-const G = { renderer: null, scene: null, cam: null, ctl: null, modelo: null, fantasma: null, costillas: [], varillas: [], separadores: [], tuercas: [], suelo: null, rejilla: null, luz: null, pend: false, cacheTex: {}, cacheMat: {} };
+const G = { renderer: null, scene: null, cam: null, ctl: null, modelo: null, fantasma: null, costillas: [], largueros: [], varillas: [], separadores: [], tuercas: [], suelo: null, rejilla: null, luz: null, pend: false, cacheTex: {}, cacheMat: {} };
 
 function textura(clave, mm) {
   const ck = clave + ':' + mm; if (G.cacheTex[ck]) return G.cacheTex[ck];
@@ -57,7 +57,7 @@ function iniciar3D() {
     if (!abajo || Math.hypot(ev.clientX - abajo[0], ev.clientY - abajo[1]) > 4 || ev.button !== 0) return;
     const rc = cv.getBoundingClientRect(), ray = new T.Raycaster();
     ray.setFromCamera(new T.Vector2((ev.clientX - rc.left) / rc.width * 2 - 1, -(ev.clientY - rc.top) / rc.height * 2 + 1), G.cam);
-    const hit = ray.intersectObjects(G.costillas.filter(Boolean), false)[0];
+    const hit = ray.intersectObjects([...G.costillas, ...G.largueros].filter(Boolean), false)[0];
     if (hit) selCostilla(hit.object.userData.i);
   });
   $$('[data-cam]').forEach(b => b.onclick = () => camara(b.dataset.cam));
@@ -92,12 +92,12 @@ function limpiar(obj) {
 }
 
 // desplazamiento por la vista explosionada
-function xExpl(x) { const k = (P.vista.explosion || 0) * 1.4; return x + (x - P.largo / 2) * k; }
+function xExpl(x) { const k = P.tipo === 'reticula' ? 0 : (P.vista.explosion || 0) * 1.4; return x + (x - P.largo / 2) * k; }
 
 function construir3D() {
   if (!G.scene || !R) return;
   limpiar(G.modelo); G.modelo.clear();
-  G.costillas = []; G.varillas = []; G.separadores = []; G.tuercas = [];
+  G.costillas = []; G.largueros = []; G.varillas = []; G.separadores = []; G.tuercas = [];
   const e = grosor(), mats = materialesTablero(), rh = radioAgujero(), V = P.varillas;
   // centro del mueble en el fondo (u)
   let u0 = Infinity, u1 = -Infinity, alto = 0;
@@ -115,6 +115,14 @@ function construir3D() {
     m.rotation.y = Math.PI / 2; m.castShadow = m.receiveShadow = true;
     m.userData = { i: c.i, x: c.x };
     G.modelo.add(m); G.costillas.push(m);
+  });
+  // retícula: largueros en el plano (x, v), con su grosor hacia el fondo
+  (R.largueros || []).forEach(z => {
+    if (!z.ok) return;
+    const geo = new T.ExtrudeGeometry(new T.Shape(z.poly.map(p => new T.Vector2(p[0], p[1]))), { depth: e, bevelEnabled: false, curveSegments: 24 });
+    const m = new T.Mesh(geo, mats); m.castShadow = m.receiveShadow = true;
+    m.userData = { i: z.i, u: z.u, z: true };
+    G.modelo.add(m); G.largueros.push(m);
   });
   // varillas, separadores y tuercas
   const tv = VARILLA_TIPOS[V.tipo] || VARILLA_TIPOS.roscada;
@@ -155,7 +163,9 @@ function construir3D() {
 }
 function colocarExplosion() {
   const e = grosor(), k = (P.vista.explosion || 0) * 1.4;
-  G.costillas.forEach(m => { if (m) m.position.set(xExpl(m.userData.x) - e / 2, 0, 0); });
+  G.costillas.forEach(m => { if (m) m.position.set(P.tipo === 'reticula' ? m.userData.x - e / 2 : xExpl(m.userData.x) - e / 2, 0, 0); });
+  // en la retícula, la explosión levanta los largueros (así se ve cómo encajan)
+  G.largueros.forEach(m => m.position.set(0, (P.vista.explosion || 0) * (G.alto || 400) * 1.1, -(m.userData.u + e / 2)));
   G.varillas.forEach(m => {
     const d = m.userData, xa = xExpl(d.xa + P.varillas.sobra) - P.varillas.sobra, xb = xExpl(d.xb - P.varillas.sobra) + P.varillas.sobra;
     m.scale.y = (xb - xa) / (d.xb - d.xa); m.position.set((xa + xb) / 2, d.v, -d.u);
@@ -187,7 +197,7 @@ function construirFantasma() {
 }
 function resaltar3D() {
   const base = materialesTablero();
-  G.costillas.forEach(m => {
+  [...G.costillas, ...G.largueros].forEach(m => {
     if (!m) return;
     const sel = P.vista.resalta && m.userData.i === UI.costilla;
     if (sel) { if (!m.userData.matSel) m.userData.matSel = materialSel(base); m.material = m.userData.matSel; }
@@ -197,7 +207,8 @@ function resaltar3D() {
 }
 function camara(tipo) {
   // distancia para que quepa la esfera que envuelve el mueble, con el campo de visión más estrecho
-  const L = P.largo * (1 + 1.4 * (P.vista.explosion || 0)), F = G.fondo || 500, H = G.alto || 500, y = H * 0.45;
+  const ex = P.vista.explosion || 0, ret = P.tipo === 'reticula';
+  const L = P.largo * (ret ? 1 : 1 + 1.4 * ex), F = G.fondo || 500, H = (G.alto || 500) * (ret ? 1 + 1.1 * ex : 1), y = H * 0.45;
   const radio = 0.5 * Math.sqrt(L * L + F * F + H * H);
   const fv = G.cam.fov * Math.PI / 180, fh = 2 * Math.atan(Math.tan(fv / 2) * G.cam.aspect);
   const d = radio / Math.sin(Math.min(fv, fh) / 2) * 1.04;

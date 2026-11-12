@@ -8,7 +8,7 @@
 'use strict';
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
-const VERSION = '1.1';
+const VERSION = '1.2';
 const T = window.THREE;
 
 /* ===================== UTILIDADES ===================== */
@@ -61,7 +61,7 @@ const UI = {
   clave: 0,            // índice de la clave que se edita
   punto: -1,           // punto de control seleccionado
   varilla: -1,         // varilla seleccionada
-  costilla: 0,         // costilla seleccionada
+  costilla: 0,         // pieza seleccionada: 0…n-1 costillas, n… largueros (retícula)
   modo: 'normal',      // 'normal' | 'varilla' (colocar varilla con un clic)
   sucio: false,        // cambios sin guardar
 };
@@ -69,7 +69,7 @@ const UI = {
 function proyectoBase() {
   return {
     app: 'Made-rebanadas', version: 1, versionPrograma: VERSION,
-    nombre: 'Mueble', plantilla: 'banco', params: {}, editado: false,
+    nombre: 'Mueble', tipo: 'costillas', plantilla: 'banco', params: {}, editado: false,
     largo: 1600,
     esquinas: [],                // por punto de control: true = esquina, false = curva
     claves: [],                  // [{ x: mm a lo largo, pts: [[u, v], …] }]
@@ -78,5 +78,6 @@ function proyectoBase() {
     varillas: { tipo: 'roscada', diam: 10, holgura: 0.5, margen: 20, tramo: 'todas', separadores: true, sepD: 22, sobra: 12, autoN: 3, lista: [] },
     vista: { explosion: 0, fantasma: false, varillas: true, resalta: true },
     maqueta: { activa: false, escala: 5, grosor: 3, diam: 3, holgura: 0.2 },
+    reticula: { num: 4, margen: 40, holgura: 0.3, xArriba: true, vuelo: 25 },
   };
 }

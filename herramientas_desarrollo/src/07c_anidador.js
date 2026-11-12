@@ -12,15 +12,15 @@ function piezaCalcador(c) {
     const x = a[0] - b.x0, y = a[1] - b.y0;
     contornos.push({ pts: [{ x: r3(x + g.r), y: r3(y) }, { x: r3(x - g.r), y: r3(y) }], b: [1, 1], cerrado: true, tipo: 'interior', mec: { op: 'corte', prof: null, puentes: { ...PUENTES0 } } });
   });
-  return { nombre: `Costilla ${c.i + 1}`, cantidad: 1, veta: false, calcador: { contornos } };
+  return { nombre: c.nombre, cantidad: 1, veta: false, calcador: { contornos } };
 }
 let tAnid = 0;
 function abrirAnidador() {
   if (!R) return;
-  const n = R.costillas.filter(c => c.ok).length;
+  const n = piezasFab().length;
   if (!n) { aviso('No hay costillas que colocar.'); return; }
   UI.anidListo = false;
-  $('#anidInfo').textContent = `${P.nombre}: ${n} costillas · ${textoEscala()} · tablero de ${fmt(grosorFab(), 1)} mm`;
+  $('#anidInfo').textContent = `${P.nombre}: ${n} piezas · ${textoEscala()} · tablero de ${fmt(grosorFab(), 1)} mm`;
   const caja = $('#anidCaja'); caja.innerHTML = '';
   const fr = document.createElement('iframe'); fr.src = 'assets/anidador/anidador.html?desde=rebanadas'; fr.title = 'Anidador de tableros';
   caja.appendChild(fr); UI.anidFrame = fr;
@@ -37,7 +37,7 @@ window.addEventListener('message', e => {
   e.source.postMessage({
     tipo: 'rebanadas-piezas',
     nombre: P.nombre + (enMaqueta() ? ` (maqueta 1:${P.maqueta.escala})` : ''),
-    piezas: R.costillas.filter(c => c.ok).map(piezaCalcador),
+    piezas: piezasFab().map(piezaCalcador),
     tablero: { largo: f.ancho, ancho: f.alto, grosor: grosorFab(), margen: f.borde, modo: 'forma' },
   }, '*');
 });

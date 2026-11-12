@@ -103,8 +103,8 @@ function dibujarPerfil(ctx, V) {
   ctx.lineWidth = 1; ctx.strokeStyle = colorCostilla(.16);
   R.costillas.forEach(c => { if (c.ok) { V.camino(ctx, c.poly); ctx.stroke(); } });
   // costilla seleccionada
-  const cs = R.costillas[UI.costilla];
-  if (cs && cs.ok) { ctx.setLineDash([6, 4]); ctx.strokeStyle = colorCostilla(.75); ctx.lineWidth = 1.4; V.camino(ctx, cs.poly); ctx.stroke(); ctx.setLineDash([]); }
+  const cs = piezaSel();
+  if (cs && cs.ok && !cs.z) { ctx.setLineDash([6, 4]); ctx.strokeStyle = colorCostilla(.75); ctx.lineWidth = 1.4; V.camino(ctx, cs.poly); ctx.stroke(); ctx.setLineDash([]); }
   // otras claves
   ctx.strokeStyle = cssVar('--ejes'); ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
   C.forEach(o => { if (o !== k) { V.camino(ctx, curvaCerrada(o.pts, P.esquinas)); ctx.stroke(); } });
@@ -126,7 +126,18 @@ function dibujarPerfil(ctx, V) {
   V.camino(ctx, k.pts); ctx.stroke(); ctx.setLineDash([]);
   // varillas
   const r = radioAgujero(), Vv = P.varillas;
-  Vv.lista.forEach((p, i) => {
+  // retícula: posición de los largueros
+  if (P.tipo === 'reticula') {
+    const vistos = new Set();
+    R.largueros.forEach(z => {
+      if (vistos.has(z.u)) return; vistos.add(z.u);
+      const [x] = V.aPantalla(z.u, 0), sel = cs && cs.z && cs.u === z.u;
+      ctx.strokeStyle = sel ? cssVar('--acento') : '#5f6b78'; ctx.lineWidth = sel ? 2 : 1; ctx.setLineDash([7, 4]);
+      ctx.beginPath(); ctx.moveTo(x, 30); ctx.lineTo(x, V.h); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = ctx.strokeStyle; ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center'; ctx.fillText(letra(z.j), x, 58); ctx.textAlign = 'left';
+    });
+  }
+  if (P.tipo !== 'reticula') Vv.lista.forEach((p, i) => {
     const info = R.varillas[i], mal = info && (!info.usada || info.fallan.length), [x, y] = V.aPantalla(p[0], p[1]);
     const col = mal ? cssVar('--peligro') : '#5f6b78';
     ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
@@ -165,6 +176,7 @@ function puntoCerca(mx, my) {
   return mejor;
 }
 function varillaCerca(mx, my) {
+  if (P.tipo === 'reticula') return -1;
   let mejor = -1, md = Infinity; const r = radioAgujero();
   P.varillas.lista.forEach((p, i) => { const [x, y] = VP.aPantalla(p[0], p[1]), d = Math.hypot(x - mx, y - my); if (d < Math.max(9, r * VP.sc + 4) && d < md) { md = d; mejor = i; } });
   return mejor;
@@ -274,7 +286,7 @@ function encuadrarPerfil() {
 function dibujarCostilla(ctx, V) {
   V.rejilla(ctx);
   if (!R) return;
-  const c = R.costillas[UI.costilla]; if (!c || !c.ok) return;
+  const c = piezaSel(); if (!c || !c.ok) return;
   ctx.fillStyle = colorCostilla(.28); ctx.strokeStyle = colorCostilla(1); ctx.lineWidth = 2;
   V.camino(ctx, c.poly); ctx.fill(); ctx.stroke();
   const r = radioAgujero();
@@ -284,29 +296,34 @@ function dibujarCostilla(ctx, V) {
   });
   // varillas que no caben en esta costilla
   R.varillas.forEach(rv => {
-    if (rv.usada && rv.fallan.includes(c.i)) {
+    if (rv.usada && !c.z && rv.fallan.includes(c.i)) {
       const [x, y] = V.aPantalla(rv.u, rv.v); ctx.strokeStyle = cssVar('--peligro'); ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(x, y, Math.max(4, r * V.sc), 0, PI2); ctx.stroke(); ctx.strokeStyle = colorCostilla(1);
     }
   });
   const [lx, ly] = V.aPantalla(...puntoEtiqueta(c));
   ctx.fillStyle = colorCostilla(1); ctx.font = 'bold ' + clamp(30 * V.sc, 11, 26) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(String(c.i + 1), lx, ly); ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+  ctx.fillText(c.etq, lx, ly); ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
   V.cota(ctx, [c.caja.x0, c.caja.y0], [c.caja.x1, c.caja.y0], 18, fmt(c.caja.w) + ' mm', false);
   V.cota(ctx, [c.caja.x1, c.caja.y0], [c.caja.x1, c.caja.y1], 20, fmt(c.caja.h) + ' mm', true);
 }
 function selCostilla(i, encuadrar) {
   if (!R) return;
-  UI.costilla = clamp(i, 0, R.n - 1);
+  UI.costilla = clamp(i, 0, nPiezas() - 1);
   refrescarCostilla();
   if (encuadrar !== false) encuadrarCostilla();
   VP.pintar(); resaltar3D();
   const li = $('#listaCost').children[UI.costilla]; if (li) li.scrollIntoView({ block: 'nearest' });
 }
-function encuadrarCostilla() { const c = R.costillas[UI.costilla]; if (c && c.ok) VC.encuadrar(c.caja, 40); else VC.pintar(); }
+// pieza seleccionada: costilla o larguero (retícula)
+const nPiezas = () => R.n + (R.largueros ? R.largueros.length : 0);
+const piezaSel = () => R ? (UI.costilla < R.n ? R.costillas[UI.costilla] : R.largueros[UI.costilla - R.n]) : null;
+function encuadrarCostilla() { const c = piezaSel(); if (c && c.ok) VC.encuadrar(c.caja, 40); else VC.pintar(); }
 function refrescarCostilla() {
-  const c = R.costillas[UI.costilla]; if (!c) return;
-  $('#numCost').textContent = c.i + 1;
-  $('#infoCost').textContent = `de ${R.n} · x = ${fmt(c.x)} mm · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm`;
+  const c = piezaSel(); if (!c) return;
+  $('#tipoPieza').textContent = c.z ? 'Larguero' : 'Costilla';
+  $('#numCost').textContent = c.etq;
+  $('#infoCost').textContent = c.z ? `z = ${fmt(c.u)} mm · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm · ${c.ranuras.length} ranuras`
+    : `de ${R.n} · x = ${fmt(c.x)} mm · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm` + (c.ranuras.length ? ` · ${c.ranuras.length} ranuras` : '');
   $$('#listaCost li').forEach((li, i) => li.classList.toggle('sel', i === UI.costilla));
 }

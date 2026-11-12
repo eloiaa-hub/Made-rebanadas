@@ -49,7 +49,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 
 <header class="port">
   <h1>Made-rebanadas</h1>
-  <p>Manual de uso · versión 1.1 · Muebles orgánicos hechos con costillas de tablero, sin internet · Por Eloi A.A.</p>
+  <p>Manual de uso · versión 1.2 · Muebles orgánicos hechos con costillas de tablero, sin internet · Por Eloi A.A.</p>
 </header>
 
 <figure><img src="img/portada.jpg" alt="Banco ondulado hecho con costillas de contrachapado"></figure>
@@ -63,22 +63,23 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <a href="#perfiles">6. Paso 2 · Retocar los perfiles</a><br>
   <a href="#costillas">7. Paso 3 · Las costillas</a><br>
   <a href="#varillas">8. Paso 4 · Las varillas</a><br>
-  <a href="#comprobar">9. Comprobaciones</a><br>
-  <a href="#vista3d">10. La vista 3D</a><br>
-  <a href="#fabricar">11. Paso 5 · Fabricar: tableros y DXF</a><br>
-  <a href="#despiece">12. Despiece y lista de compra</a><br>
-  <a href="#maqueta">13. Maqueta a escala</a><br>
-  <a href="#plano">14. Plano de montaje en PDF</a><br>
-  <a href="#anidador">15. Anidador de tableros</a><br>
-  <a href="#archivos">16. Guardar, abrir y ejemplos</a><br>
-  <a href="#teclas">17. Atajos de teclado</a><br>
-  <a href="#taller">18. Consejos de taller</a><br>
-  <a href="#limites">19. Limitaciones de esta versión</a>
+  <a href="#reticula">9. Otro tipo: retícula entrelazada</a><br>
+  <a href="#comprobar">10. Comprobaciones</a><br>
+  <a href="#vista3d">11. La vista 3D</a><br>
+  <a href="#fabricar">12. Paso 5 · Fabricar: tableros y DXF</a><br>
+  <a href="#despiece">13. Despiece y lista de compra</a><br>
+  <a href="#maqueta">14. Maqueta a escala</a><br>
+  <a href="#plano">15. Plano de montaje en PDF</a><br>
+  <a href="#anidador">16. Anidador de tableros</a><br>
+  <a href="#archivos">17. Guardar, abrir y ejemplos</a><br>
+  <a href="#teclas">18. Atajos de teclado</a><br>
+  <a href="#taller">19. Consejos de taller</a><br>
+  <a href="#limites">20. Limitaciones de esta versión</a>
 </div>
 
 <h2 id="que">1. Qué es</h2>
 <p><b>Made-rebanadas</b> sirve para diseñar muebles de formas orgánicas (bancos ondulados, tumbonas, poufs, mesas, estanterías) hechos con <b>rebanadas</b>: una serie de piezas planas de tablero, llamadas <b>costillas</b>, puestas una detrás de otra con un pequeño hueco entre ellas. Cada costilla es una <b>sección</b> de la forma 3D, como si cortaras el volumen del mueble en lonchas.</p>
-<p>Las costillas se unen con <b>varillas pasantes</b> (varilla roscada, redondo de madera o tubo) y unos <b>separadores</b> que mantienen el hueco. El programa calcula el contorno de cada costilla, comprueba que las varillas caben en todas, coloca las piezas en los tableros y prepara el <b>DXF</b> para cortarlas en la CNC.</p>
+<p>Hay dos tipos de mueble. En el de <b>costillas con varillas</b>, las costillas se unen con <b>varillas pasantes</b> (varilla roscada, redondo de madera o tubo) y unos <b>separadores</b> que mantienen el hueco. En la <b>retícula entrelazada</b>, unas costillas y unos largueros se cruzan y encajan con ranuras a media madera (sección 9). El programa calcula el contorno de cada pieza, comprueba que las varillas caben en todas, coloca las piezas en los tableros y prepara el <b>DXF</b> para cortarlas en la CNC.</p>
 <p>Funciona en el navegador (Chrome, Edge o Firefox), con doble clic, sin instalar nada y sin conexión a internet.</p>
 
 <h2 id="abrir">2. Abrir el programa</h2>
@@ -183,7 +184,34 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 <p><b>✨ Auto</b> busca sitio para el número de varillas indicado: prueba miles de posiciones y se queda con las que caben en todas las costillas, lo más separadas posible (así el mueble no se retuerce). <b>＋ Varilla</b> añade una: después haz clic en el editor de perfil donde la quieras. Las varillas se arrastran en el editor y se borran con clic derecho o <kbd>Supr</kbd>.</p>
 <div class="caja">El círculo discontinuo alrededor de cada varilla es la <b>zona de seguridad</b> (agujero + madera al borde). Si una varilla se sale de alguna costilla, se pinta en <b>rojo</b> en el editor y en el 3D.</div>
 
-<h2 id="comprobar">9. Comprobaciones</h2>
+<h2 id="reticula">9. Otro tipo de mueble: retícula entrelazada</h2>
+<p>En <b>Forma → Tipo de mueble</b> puedes elegir entre <b>Costillas con varillas</b> (lo explicado hasta aquí) y <b>Retícula (ranuras a media madera)</b>, también llamada <i>waffle</i>. En la retícula, además de las costillas hay unos <b>largueros</b> que van a lo largo del mueble y cruzan todas las costillas. En cada cruce, las dos piezas llevan una ranura hasta la mitad y encajan sin herrajes ni varillas.</p>
+<div class="dos">
+  <figure><img src="img/ret_3d.jpg" alt="Banco en retícula"><figcaption>Banco en retícula: 15 costillas y 4 largueros.</figcaption></figure>
+  <figure><img src="img/ret_expl.jpg" alt="Largueros levantados"><figcaption>💥 Explosión en la retícula: los largueros suben para ver cómo encajan.</figcaption></figure>
+</div>
+<div class="dos">
+  <img src="img/reticula_panel.png" alt="Apartado Retícula: largueros">
+  <div>
+    <ul>
+      <li><b>Número de largueros</b> y <b>margen</b> delante y detrás: los largueros se reparten por igual en el fondo del mueble, dentro de la zona común a las costillas principales.</li>
+      <li><b>Vuelo</b>: lo que sobresalen los largueros por delante de la primera costilla y por detrás de la última, para que sus ranuras no se salgan de la pieza.</li>
+      <li><b>Holgura de la ranura</b>: lo que la ranura es más ancha que el tablero (0,2 a 0,5 mm en CNC; 0 a 0,2 mm en láser).</li>
+      <li><b>Ranuras de las costillas</b>: desde arriba (los largueros, desde abajo, se encajan bajándolos) o al revés.</li>
+    </ul>
+  </div>
+</div>
+<p>El apartado de varillas se oculta. En la lista de piezas aparecen las costillas (con número) y los largueros (con letra: A, B, C…). Si la forma tiene huecos, un larguero puede salir partido en varias piezas (B1, B2…); los trozos demasiado pequeños para encajar se quitan solos.</p>
+<div class="dos">
+  <figure><img src="img/ret_larguero.png" alt="Larguero con sus ranuras"><figcaption>Un larguero, con una ranura desde abajo por cada costilla.</figcaption></figure>
+  <figure><img src="img/ret_perfil.png" alt="Perfil con los largueros"><figcaption>En el editor de perfil, cada larguero es una línea discontinua con su letra.</figcaption></figure>
+</div>
+<p><b>Comprobaciones de la retícula</b>: costillas sin ningún larguero, largueros que cruzan menos de 2 costillas, cruces muy bajos (unión floja), largueros que se pisan y ranuras imposibles (cuando el borde es casi vertical en el cruce: cambia el margen o el número de largueros).</p>
+<p>Fabricar, el DXF, el SVG, el despiece, el CSV de cortes, el Anidador y la maqueta funcionan igual, con las ranuras ya dibujadas en el contorno (capa CORTE). En la maqueta, las ranuras se hacen con el grosor de la maqueta más su holgura. El <b>plano</b> trae la planta de la retícula, los largueros acotados y los pasos de montaje propios:</p>
+<figure><img src="img/ret_plano2.jpg" alt="Plano de la retícula" style="max-width:640px"></figure>
+<div class="caja taller">Las ranuras salen con las esquinas interiores vivas. Con una fresa de radio r quedan redondeadas: usa una fresa bastante más estrecha que la ranura y repasa las esquinas con formón o lima, o déjalas en «hueso de perro» en el programa de CNC.</div>
+
+<h2 id="comprobar">10. Comprobaciones</h2>
 <figure><img src="img/comprobaciones.png" class="estrecha" alt="Comprobaciones"></figure>
 <p>El programa revisa el mueble cada vez que cambias algo y lo indica en el panel <b>Comprobaciones</b>. Haz clic en un aviso para ir a la costilla afectada.</p>
 <table>
@@ -198,7 +226,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 </table>
 <p>En la lista <b>Costillas</b> del panel derecho, las que tienen algún problema llevan un <b style="color:#c0392b">!</b>.</p>
 
-<h2 id="vista3d">10. La vista 3D</h2>
+<h2 id="vista3d">11. La vista 3D</h2>
 <div class="dos">
   <figure><img src="img/explosion.jpg" alt="Vista explosionada"><figcaption>💥 Explosión: separa las costillas para ver el montaje.</figcaption></figure>
   <figure><img src="img/volumen.jpg" alt="Volumen ideal"><figcaption>Volumen: la forma ideal, transparente, para comparar con las costillas.</figcaption></figure>
@@ -209,7 +237,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <li><b>📷 Imagen</b> guarda la vista 3D en PNG a alta resolución.</li>
 </ul>
 
-<h2 id="fabricar">11. Paso 5 · Fabricar: tableros y DXF</h2>
+<h2 id="fabricar">12. Paso 5 · Fabricar: tableros y DXF</h2>
 <figure><img src="img/fabricar.png" alt="Ventana Fabricar"></figure>
 <p><b>🪚 Fabricar</b> coloca todas las costillas en tableros y muestra cuántos hacen falta y el aprovechamiento. Puedes elegir:</p>
 <ul>
@@ -228,14 +256,14 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <tr><td>TABLERO</td><td>Borde del tablero</td><td>Solo de referencia</td></tr>
 </table>
 <p>El <b>SVG</b> tiene lo mismo, en milímetros, para la cortadora láser o para imprimir plantillas a escala 1:1.</p>
-<p><b>⬇ CSV de cortes</b> guarda una línea por costilla (nombre, largo y ancho de su rectángulo, cantidad y veta) con el mismo formato de despiece que lee el <b>Anidador</b> y que abre cualquier hoja de cálculo. <b>🧩 Anidador</b> abre el Anidador con las costillas por su forma real (sección 15).</p>
+<p><b>⬇ CSV de cortes</b> guarda una línea por costilla (nombre, largo y ancho de su rectángulo, cantidad y veta) con el mismo formato de despiece que lee el <b>Anidador</b> y que abre cualquier hoja de cálculo. <b>🧩 Anidador</b> abre el Anidador con las costillas por su forma real (sección 16).</p>
 <div class="caja taller">Taladra y vacía <b>los agujeros antes que el contorno</b>: si cortas primero la pieza, se puede mover al hacer los agujeros. Deja puentes (pestañas) si la pieza es pequeña.</div>
 
-<h2 id="despiece">12. Despiece y lista de compra</h2>
+<h2 id="despiece">13. Despiece y lista de compra</h2>
 <figure><img src="img/despiece.png" alt="Despiece"></figure>
 <p><b>📋 Despiece</b> muestra todas las costillas (posición, ancho, alto, superficie y agujeros) y la <b>lista de compra</b>: tableros, varillas con su largo, separadores con su número y largo, tuercas y arandelas y la broca de los agujeros. <b>⬇ Despiece (CSV)</b> la guarda para abrirla en una hoja de cálculo y <b>⬇ CSV de cortes</b> guarda la lista de cortes para el Anidador. Si está activa la maqueta, todo sale con las medidas de la maqueta.</p>
 
-<h2 id="maqueta">13. Maqueta a escala</h2>
+<h2 id="maqueta">14. Maqueta a escala</h2>
 <div class="dos">
   <img src="img/maqueta.png" alt="Apartado Maqueta a escala">
   <div>
@@ -250,7 +278,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 <p>Con la maqueta activa, <b>Fabricar</b> (con la etiqueta <b>1:5</b> en el botón), el DXF, el SVG, el despiece, el CSV de cortes, el plano y el Anidador salen <b>a escala</b>, con tableros de láser (600 × 400, 900 × 600, A3…). Los archivos llevan <code>_maqueta_1-5</code> en el nombre. El 3D y el panel <b>Resumen</b> siguen a tamaño real.</p>
 <div class="caja">Comprobaciones de la maqueta: avisa si las costillas se pisan (grosor de la maqueta mayor que la separación a escala), si queda menos de 1,5 mm de material alrededor de un agujero, y si el grosor no es proporcional al del tablero real (la maqueta se verá más llena o más calada que el mueble).</div>
 
-<h2 id="plano">14. Plano de montaje en PDF</h2>
+<h2 id="plano">15. Plano de montaje en PDF</h2>
 <p><b>📄 Plano</b> descarga un PDF apaisado (A4) para llevar al taller. Lleva:</p>
 <ol>
   <li><b>Conjunto</b>: el mueble en 3D, sus datos y la lista de compra.</li>
@@ -265,7 +293,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 </div>
 <p>Si está activa la maqueta, el plano sale con las medidas y los pasos de la maqueta.</p>
 
-<h2 id="anidador">15. Anidador de tableros</h2>
+<h2 id="anidador">16. Anidador de tableros</h2>
 <figure><img src="img/anidador.jpg" alt="Anidador dentro de Made-rebanadas"><figcaption>El Anidador dentro de Made-rebanadas, con las costillas de una maqueta 1:5 colocadas por su forma real.</figcaption></figure>
 <p><b>🧩 Anidador</b> (en la barra o en la ventana Fabricar) abre el <b>Anidador de tableros</b> de la Suite CNC dentro del programa. Le llegan solas todas las costillas, cada una con su contorno exterior y los agujeros de las varillas, y las medidas, el grosor y el margen del tablero de Fabricar. Coloca las piezas <b>por su forma real</b>: encaja unas en los huecos de otras y aprovecha mucho mejor el tablero que la colocación de Fabricar.</p>
 <ul>
@@ -276,11 +304,11 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 </ul>
 <div class="caja">El Anidador es un programa aparte de la Suite CNC: está en <code>assets/anidador/anidador.html</code> y también se puede abrir solo. Tiene su propia ayuda (❓).</div>
 
-<h2 id="archivos">16. Guardar, abrir y ejemplos</h2>
+<h2 id="archivos">17. Guardar, abrir y ejemplos</h2>
 <ul>
   <li><b>💾 Guardar</b> (<kbd>Ctrl</kbd>+<kbd>S</kbd>) descarga el proyecto en un archivo <code>.json</code> con todo: perfiles, costillas, varillas y material. <b>📂 Abrir</b> lo carga de nuevo.</li>
   <li><b>↶ ↷</b> (<kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd>) deshacen y rehacen.</li>
-  <li><b>🪑 Ejemplos</b>: banco ondulado de abedul, banco largo de pino, tumbona de jardín, pouf redondo, mesa baja lacada y estantería duna.</li>
+  <li><b>🪑 Ejemplos</b>: banco ondulado de abedul, banco largo de pino, tumbona de jardín, pouf redondo, mesa baja lacada y estantería duna; y en retícula, banco, mesa baja y pouf.</li>
 </ul>
 <div class="dos">
   <img src="img/ej_tumbona.jpg" alt="Tumbona">
@@ -289,7 +317,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <img src="img/ej_estante.jpg" alt="Estantería">
 </div>
 
-<h2 id="teclas">17. Atajos de teclado</h2>
+<h2 id="teclas">18. Atajos de teclado</h2>
 <table>
   <tr><th>Tecla</th><th>Acción</th></tr>
   <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Deshacer / rehacer</td></tr>
@@ -303,9 +331,9 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <tr><td><kbd>Esc</kbd></td><td>Cancelar la colocación de una varilla y quitar la selección</td></tr>
 </table>
 
-<h2 id="taller">18. Consejos de taller</h2>
+<h2 id="taller">19. Consejos de taller</h2>
 <ul>
-  <li>Corta antes una <b>maqueta</b> (sección 13): es barata, se hace en minutos con la láser y descubre los fallos de forma y de montaje.</li>
+  <li>Corta antes una <b>maqueta</b> (sección 14): es barata, se hace en minutos con la láser y descubre los fallos de forma y de montaje.</li>
   <li>Comprueba el <b>grosor real</b> del tablero con el calibre: un contrachapado «de 18» puede medir 17,5. Pon ese valor (Grosor → Otro…).</li>
   <li>Para un asiento, una separación de <b>2,5 a 3,5 veces el grosor</b> queda bien y no pellizca. Para apoyar objetos, mejor más juntas.</li>
   <li>Con <b>3 varillas</b> repartidas en triángulo el mueble no se retuerce. En bancos largos (más de 2 m), pon 4.</li>
@@ -314,9 +342,10 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <li>Lija los cantos de las costillas antes de montar: después no se llega bien a los huecos.</li>
 </ul>
 
-<h2 id="limites">19. Limitaciones de esta versión</h2>
+<h2 id="limites">20. Limitaciones de esta versión</h2>
 <ul>
-  <li>Solo hace <b>costillas separadas</b> en una dirección. Las rebanadas en retícula (con ranuras a media madera) y las radiales quedan para otras versiones.</li>
+  <li>Hace costillas separadas y retícula entrelazada; las rebanadas radiales quedan para otra versión. En la retícula, las costillas son perpendiculares al largo y los largueros paralelos a él (no hay ángulos libres).</li>
+  <li>Las ranuras se dibujan con esquinas vivas: el redondeo de la fresa (hueso de perro) se hace en el programa de CNC.</li>
   <li>Los contornos del DXF son polilíneas de muchos tramos rectos cortos (no arcos), con una tolerancia de 0,05 mm.</li>
   <li>La colocación de <b>Fabricar</b> usa el rectángulo que envuelve cada costilla; para encajarlas por su forma, usa el <b>Anidador</b>.</li>
   <li>Las varillas son rectas y paralelas al largo del mueble.</li>

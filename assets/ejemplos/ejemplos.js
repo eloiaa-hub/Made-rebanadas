@@ -14,4 +14,10 @@ window.MADE_EJEMPLOS = [
     params: {}, costillas: { grosor: 19, separacion: 50, material: 'lacado', color: '#2f3a44' }, varillas: { diam: 10, autoN: 3 } },
   { nombre: 'Estantería duna', plantilla: 'estante', desc: 'Mueble de 90 cm de alto con un hueco corrido y frente ondulado.',
     params: {}, costillas: { grosor: 18, separacion: 60, material: 'nogal' }, varillas: { diam: 10, autoN: 4 } },
+  { nombre: 'Banco en retícula', plantilla: 'banco', tipo: 'reticula', desc: 'El banco ondulado con costillas cada 11 cm y 4 largueros, encajados a media madera, sin herrajes.',
+    params: { largo: 1600, onda: 60, ondas: 1.5 }, costillas: { grosor: 18, separacion: 110, material: 'abedul' }, reticula: { num: 4, margen: 45 } },
+  { nombre: 'Mesa baja en retícula', plantilla: 'mesa', tipo: 'reticula', desc: 'Mesa «ola» de 1,1 m con 4 largueros; tablero plano por arriba.',
+    params: {}, costillas: { grosor: 19, separacion: 100, material: 'roble', tope: false }, reticula: { num: 4, margen: 90 } },
+  { nombre: 'Pouf en retícula', plantilla: 'pouf', tipo: 'reticula', desc: 'Pouf redondo con retícula de 15 mm en las dos direcciones.',
+    params: {}, costillas: { grosor: 15, separacion: 70, material: 'chopo' }, reticula: { num: 5, margen: 50 } },
 ];

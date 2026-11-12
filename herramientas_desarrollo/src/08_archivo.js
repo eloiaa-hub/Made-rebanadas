@@ -39,6 +39,8 @@ function proyectoDePlantilla(id, extra) {
     if (extra.params) Object.assign(p.params, extra.params);
     if (extra.costillas) Object.assign(p.costillas, extra.costillas);
     if (extra.varillas) Object.assign(p.varillas, extra.varillas);
+    if (extra.reticula) Object.assign(p.reticula, extra.reticula);
+    if (extra.tipo) p.tipo = extra.tipo;
     if (extra.nombre) p.nombre = extra.nombre;
   }
   return p;
@@ -47,7 +49,7 @@ function cargarProyecto(p, autoVar) {
   P = p; UI.clave = 0; UI.punto = -1; UI.varilla = -1; UI.costilla = 0;
   if (!P.claves || !P.claves.length) aplicarPlantilla();
   R = calcular();
-  if (autoVar && !P.varillas.lista.length) { autoVarillas(P.varillas.autoN); }
+  if (autoVar && P.tipo !== 'reticula' && !P.varillas.lista.length) { autoVarillas(P.varillas.autoN); }
   HIST.pila = []; HIST.pos = -1; guardarHistoria();
   ponerControles(); recalcular(); refrescarClaves();
   // edita de entrada el perfil clave más cercano al centro del mueble
@@ -64,6 +66,8 @@ function validarProyecto(o) {
   p.varillas = Object.assign(proyectoBase().varillas, o.varillas || {});
   p.vista = Object.assign(proyectoBase().vista, o.vista || {});
   p.maqueta = Object.assign(proyectoBase().maqueta, o.maqueta || {});
+  p.reticula = Object.assign(proyectoBase().reticula, o.reticula || {});
+  if (p.tipo !== 'reticula') p.tipo = 'costillas';
   if (!PLANTILLAS[p.plantilla]) p.plantilla = 'libre';
   p.params = Object.assign(paramsDefecto(p.plantilla), o.params || {});
   const n = p.claves[0].pts.length;

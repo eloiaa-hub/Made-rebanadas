@@ -15,6 +15,7 @@ No hacen falta para usar el programa: solo para cambiarlo.
 |---|---|
 | `01_base.js` | Utilidades, materiales, estado del proyecto |
 | `02_geometria.js` | Curvas de los perfiles, mezcla entre perfiles clave, recortes, costillas, varillas, comprobaciones, colocación automática de varillas |
+| `02b_reticula.js` | Retícula entrelazada: largueros sacados del volumen, cruces y ranuras a media madera, comprobaciones |
 | `03_plantillas.js` | Plantillas paramétricas (banco, tumbona, pouf, mesa, estantería, libre) |
 | `04_editor2d.js` | Editor del perfil clave y vista de la costilla |
 | `05_tres.js` | Vista 3D (Three.js) |
@@ -36,4 +37,6 @@ No hacen falta para usar el programa: solo para cambiarlo.
 - `esquinas`: por punto, `true` = esquina, `false` = curva.
 - `costillas`: grosor, reparto (`separacion` o `numero`), recortes de base y techo, material.
 - `varillas`: tipo, diámetro, holgura, madera al borde, separadores y `lista` de posiciones `[u, v]`.
+- `tipo`: `costillas` (con varillas) o `reticula`.
+- `reticula`: número de largueros, margen, vuelo, holgura de la ranura y si las ranuras de las costillas van desde arriba.
 - `maqueta`: activa, escala, grosor, diámetro de la varilla y holgura.

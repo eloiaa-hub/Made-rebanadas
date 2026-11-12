@@ -1,5 +1,15 @@
 # Novedades de Made-rebanadas
 
+## v1.2
+
+- **Retícula entrelazada (waffle)**: nuevo tipo de mueble. Costillas y largueros que se cruzan con **ranuras a media madera**, sin herrajes. Número de largueros, margen, vuelo, holgura de la ranura y ranuras desde arriba o desde abajo.
+- Los largueros se sacan cortando el volumen; si la forma tiene huecos salen partidos en varias piezas, y los trozos que no pueden encajar se quitan solos.
+- Comprobaciones propias: costillas sin larguero, largueros con menos de 2 cruces, cruces flojos, ranuras imposibles.
+- 3D con los largueros (la explosión los levanta), lista de piezas con costillas (números) y largueros (letras).
+- Fabricar, DXF, SVG, despiece, CSV de cortes, Anidador y maqueta con las ranuras (en la maqueta, con su grosor).
+- Plano en PDF con la planta de la retícula, los largueros acotados y el montaje paso a paso.
+- Tres ejemplos nuevos: banco, mesa baja y pouf en retícula.
+
 ## v1.1
 
 - **Maqueta a escala** (1:2 a 1:20): grosor, varilla y holgura propios; Fabricar, DXF, SVG, despiece, plano y Anidador salen a escala, con tableros de láser. Comprobaciones de la maqueta.

@@ -39,6 +39,8 @@
     <section>
       <h3>Forma</h3>
       <div class="sec-cuerpo">
+        <label class="fila" title="Costillas separadas unidas con varillas, o retícula de costillas y largueros que se cruzan con ranuras a media madera">Tipo de mueble
+          <select id="sTipo"><option value="costillas">Costillas con varillas</option><option value="reticula">Retícula (ranuras a media madera)</option></select></label>
         <label class="fila">Plantilla <select id="sPlantilla"></select></label>
         <p class="nota" id="descPlantilla"></p>
         <div id="params"></div>
@@ -69,7 +71,21 @@
       </div>
     </section>
 
-    <section>
+    <section id="secReticula">
+      <h3>Retícula: largueros</h3>
+      <div class="sec-cuerpo">
+        <p class="nota">Los largueros van a lo largo del mueble y cruzan todas las costillas. En cada cruce, las dos piezas llevan una ranura hasta la mitad y encajan sin herrajes.</p>
+        <label class="fila">Número de largueros <input type="number" id="rNum" min="1" max="20" step="1" value="4"></label>
+        <label class="fila" title="Distancia del primer y el último larguero a la parte delantera y trasera del mueble">Margen delante y detrás (mm) <input type="number" id="rMargen" min="0" step="1" value="40"></label>
+        <label class="fila" title="Lo que sobresalen los largueros por delante de la primera costilla y por detrás de la última">Vuelo de los largueros (mm) <input type="number" id="rVuelo" min="0" step="1" value="25"></label>
+        <label class="fila" title="Lo que la ranura es más ancha que el tablero. En CNC 0,2 a 0,5 mm; en láser 0 a 0,2 mm">Holgura de la ranura (mm) <input type="number" id="rHolgura" min="0" max="3" step="0.05" value="0.3"></label>
+        <label class="fila">Ranuras de las costillas
+          <select id="rArriba"><option value="1">Desde arriba</option><option value="0">Desde abajo</option></select></label>
+        <div class="resumenCost" id="resRet"></div>
+      </div>
+    </section>
+
+    <section id="secVarillas">
       <h3>Uniones: varillas</h3>
       <div class="sec-cuerpo">
         <p class="nota">Las costillas se unen con varillas pasantes y separadores. Arrastra las varillas en el editor de perfil.</p>
@@ -150,7 +166,7 @@
       </div>
       <div class="vista vcost" id="vCost">
         <div class="vtit">
-          <span>Costilla</span>
+          <span id="tipoPieza">Costilla</span>
           <button id="bCostAnt" class="mini" title="Costilla anterior (←)">◀</button>
           <b id="numCost">1</b>
           <button id="bCostSig" class="mini" title="Costilla siguiente (→)">▶</button>
