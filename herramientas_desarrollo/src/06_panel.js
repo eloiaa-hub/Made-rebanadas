@@ -280,7 +280,7 @@ function mostrarSecciones() {
   const rel = relieveActivo(), Rl = P.relieve;
   $('#filaOrigen').classList.toggle('oculto', t !== 'pared');
   $('#filaPlantilla').classList.toggle('oculto', rel); $('#params').classList.toggle('oculto', rel); $('#descPlantilla').classList.toggle('oculto', rel);
-  $('#secRelieve').classList.toggle('oculto', !rel);
+  $('#secRelieve').classList.toggle('oculto', !rel); $('#bConvertirPerfiles').classList.toggle('oculto', !rel);
   $('#relTexto').classList.toggle('oculto', Rl.fuente !== 'texto'); $('#relModelo').classList.toggle('oculto', Rl.fuente !== 'modelo'); $('#relImagen').classList.toggle('oculto', Rl.fuente !== 'imagen');
   $('#secClaves').classList.toggle('oculto', rel);
   $('#sClave').classList.toggle('oculto', rel); $('#bEsquina').classList.toggle('oculto', rel); $('#infoClave').classList.toggle('oculto', rel);
