@@ -18,6 +18,7 @@ No hacen falta para usar el programa: solo para cambiarlo.
 | `02b_reticula.js` | Retícula entrelazada: largueros sacados del volumen, cruces y ranuras a media madera, comprobaciones |
 | `fuentes/` | Modelos de fuera ya reducidos y orientados (Y arriba, mirando a +Z): `busto_mujer.stl`, `nefertiti.stl`; `modelos.py` los incluye |
 | `modelos.py` | Genera los STL y las imágenes en grises de ejemplo (`assets/modelos/modelos.js`, `assets/imagenes/imagenes.js`) (numpy y scikit-image) |
+| `02e_figura.js` | Figuras de pie: malla guardada en el proyecto (int16/uint32 en base64), cortes por planos, unión de trozos con puentes (rejilla) y conversión a perfiles clave |
 | `02d_relieve.js` | Relieve de pared: mapa de alturas desde un texto (canvas) o un modelo STL/OBJ (z-buffer), perfil de cada lama, lamas horizontales |
 | `02c_disposicion.js` | Dónde va cada costilla (recta, curva, radial, pared), varillas curvas, tubo y discos, rastreles, comprobaciones de radial y pared |
 | `03_plantillas.js` | Plantillas paramétricas (banco, tumbona, pouf, mesa, estantería, libre) |
@@ -47,6 +48,8 @@ No hacen falta para usar el programa: solo para cambiarlo.
 - `planta`: forma (`recta`, `arco`, `s`), radio, sentido, amplitud y ondas.
 - `radial`: Ø del tubo, holgura, número y radio de los discos (0 = automático), holgura de las ranuras.
 - `pared`: número, alto, grueso, margen y holgura de los rastreles.
+- `figura`: `activa`, `alto`, `eje` (`x` o `z`), `giro`, `minArea` (%), `unir` y `malla` = `{nombre, k, nv, nt, v64, f64, id}`.
+- `relieve.capa`: texto añadido (`activa`, `texto`, `letra`, `negrita`, `tamLetra`, `relieve`, `x`, `y`, `modo`); `relieve.letras`: letras propias `{nombre, b64}`.
 - `relieve`: `fuente` (`plantilla`, `texto`, `modelo` o `imagen`; la imagen va en `imagen` = `{nombre, w, h, d64}` en grises, con su `gama`), `orient` (`v` u `h`), `ancho`, `alto`, `fondo`, `relieve`, `suavizado`, `invertir`; para texto `texto`, `letra`, `tamLetra`, `negrita`, `interlinea`, `ondaAmp`, `ondas`; para modelo `vista`, `giro`, `base` y `modelo` = `{nombre, w, h, d64}` (mapa de alturas en bytes, base64; el STL no se guarda).
 - `reticula`: número de largueros, margen, vuelo, holgura de la ranura y si las ranuras de las costillas van desde arriba.
 - `cnc`: Ø de la fresa, hueso de perro, contornos con arcos y su tolerancia.

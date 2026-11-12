@@ -43,7 +43,7 @@ function proyectoDePlantilla(id, extra) {
     if (extra.varillas) Object.assign(p.varillas, extra.varillas);
     if (extra.reticula) Object.assign(p.reticula, extra.reticula);
     if (extra.tipo) p.tipo = extra.tipo;
-    ['planta', 'radial', 'pared', 'relieve'].forEach(k => { if (extra[k]) Object.assign(p[k], extra[k]); });
+    ['planta', 'radial', 'pared', 'relieve', 'figura'].forEach(k => { if (extra[k]) Object.assign(p[k], extra[k]); });
     if (extra.nombre) p.nombre = extra.nombre;
   }
   return p;
@@ -60,6 +60,7 @@ function cargarProyecto(p, autoVar) {
   C.forEach((k, i) => { if (Math.abs(k.x - P.largo / 2) < Math.abs(C[mejor].x - P.largo / 2)) mejor = i; });
   UI.clave = mejor; refrescarClaves();
   encuadrarPerfil(); selCostilla(Math.floor(R.n / 2)); camara('tres4'); colores3D();
+  registrarLetras();
   UI.sucio = false;
 }
 function validarProyecto(o) {
@@ -71,7 +72,8 @@ function validarProyecto(o) {
   p.maqueta = Object.assign(proyectoBase().maqueta, o.maqueta || {});
   p.cnc = Object.assign(proyectoBase().cnc, o.cnc || {});
   p.reticula = Object.assign(proyectoBase().reticula, o.reticula || {});
-  ['planta', 'radial', 'pared', 'relieve'].forEach(k => p[k] = Object.assign(proyectoBase()[k], o[k] || {}));
+  ['planta', 'radial', 'pared', 'relieve', 'figura'].forEach(k => p[k] = Object.assign(proyectoBase()[k], o[k] || {}));
+  p.relieve.capa = Object.assign(proyectoBase().relieve.capa, (o.relieve || {}).capa || {});
   if (!['reticula', 'radial', 'pared'].includes(p.tipo)) p.tipo = 'costillas';
   if (!PLANTILLAS[p.plantilla]) p.plantilla = 'libre';
   p.params = Object.assign(paramsDefecto(p.plantilla), o.params || {});
@@ -107,13 +109,24 @@ function dialogoNuevo() {
     cerrarModal(); cargarProyecto(proyectoDePlantilla(b.dataset.nuevo), true);
   });
 }
-function dialogoModelos() {
+async function dialogoModelos(paraFigura) {
+  try { aviso('Cargando los modelos…'); await cargarRecurso('modelos'); } catch (e) { aviso('⚠ ' + esc(e.message), 5000); return; }
   const M = modelosEjemplo();
   const items = M.map(m => `<button data-mod="${m.id}"><b>${esc(m.nombre)}</b><small>${esc(m.desc)} · ${m.triangulos.toLocaleString('es-ES')} triángulos · <a href="assets/modelos/${m.archivo}" download data-stl>${m.archivo}</a></small></button>`).join('');
-  modal('🗿 Modelos 3D de ejemplo', `<p class="nota">Modelos para probar el relieve. Al elegir uno se carga con su vista y unas medidas de panel adecuadas; después cambia la vista, el giro, el relieve o las lamas para ver qué pasa. Los mismos modelos están como STL en <b>assets/modelos</b>.</p><div class="ejemplos">${items || '<p>No se encuentra assets/modelos/modelos.js</p>'}</div>`);
+  modal('🗿 Modelos 3D de ejemplo', `<p class="nota">${paraFigura ? 'Modelos para probar la figura: cada costilla será un corte del modelo. Al elegir uno se carga a 800 mm de alto; después cambia el alto, los cortes, el giro o la separación.' : 'Modelos para probar el relieve. Al elegir uno se carga con su vista y unas medidas de panel adecuadas; después cambia la vista, el giro, el relieve o las lamas para ver qué pasa.'} Los mismos modelos están como STL en <b>assets/modelos</b>.</p><div class="ejemplos">${items || '<p>No se encuentra assets/modelos/modelos.js</p>'}</div>`);
   $$('[data-stl]').forEach(a => a.onclick = e => e.stopPropagation());
   $$('[data-mod]').forEach(b => b.onclick = () => {
     cerrarModal();
+    if (paraFigura) {
+      try {
+        const r = triangulosEjemplo(b.dataset.mod); if (!r) throw new Error('No se encuentra el modelo');
+        cargarFiguraTriangulos(r.tri, r.M.nombre, b.dataset.mod);
+        R = calcular(); if (P.tipo === 'costillas') autoVarillas(P.varillas.autoN);
+        UI.costilla = 0; ponerControles(); cambio('Figura: ' + r.M.nombre); encuadrarSiHaceFalta(); encuadrarPerfil(); camara('tres4');
+        aviso(esc(r.M.nombre));
+      } catch (e) { aviso('⚠ ' + esc(e.message), 5000); }
+      return;
+    }
     try {
       // fuera de un panel de pared, empieza un panel nuevo (preguntando si hay cambios)
       const nuevo = P.tipo !== 'pared';
@@ -127,7 +140,8 @@ function dialogoModelos() {
     } catch (e) { aviso('⚠ ' + esc(e.message), 5000); }
   });
 }
-function dialogoImagenes() {
+async function dialogoImagenes() {
+  try { await cargarRecurso('imagenes'); } catch (e) { aviso('⚠ ' + esc(e.message), 5000); return; }
   const I = imagenesEjemplo();
   const items = I.map(m => `<button data-img="${m.id}" style="display:flex;gap:10px;align-items:center;text-align:left"><img src="${m.png}" alt="" style="width:64px;height:64px;object-fit:contain;background:#000;border-radius:4px;flex:none"><span><b>${esc(m.nombre)}</b><small>${esc(m.desc)} · <a href="assets/imagenes/${m.archivo}" download data-png>${m.archivo}</a></small></span></button>`).join('');
   modal('🖼 Imágenes de ejemplo', `<p class="nota">Imágenes en escala de grises para probar el relieve: <b>lo blanco sale más y lo negro queda en el fondo</b>. Al elegir una se carga con unas medidas de panel adecuadas. Las mismas imágenes están como PNG en <b>assets/imagenes</b>: ábrelas o retócalas en un programa de dibujo y vuelve a cargarlas.</p><div class="ejemplos">${items || '<p>No se encuentra assets/imagenes/imagenes.js</p>'}</div>`);
@@ -150,11 +164,21 @@ function dialogoEjemplos() {
   const E = window.MADE_EJEMPLOS || [];
   const items = E.map((e, i) => `<button data-ej="${i}"><b>${esc(e.nombre)}</b><small>${esc(e.desc)}</small></button>`).join('');
   modal('🪑 Ejemplos', `<p class="nota">Muebles de ejemplo para ver cómo funciona. Se abren como un proyecto nuevo.</p><div class="ejemplos">${items || '<p>No se encuentra assets/ejemplos/ejemplos.js</p>'}</div>`);
-  $$('[data-ej]').forEach(b => b.onclick = () => {
+  $$('[data-ej]').forEach(b => b.onclick = async () => {
     if (UI.sucio && !confirm('Hay cambios sin guardar. ¿Abrir el ejemplo?')) return;
     const e = E[+b.dataset.ej]; cerrarModal();
     const p = proyectoDePlantilla(e.plantilla, e);
-    if (e.modeloEjemplo || e.imagenEjemplo) { const ant = P; P = p; try { if (e.modeloEjemplo) cargarModeloEjemplo(e.modeloEjemplo, false, true); else cargarImagenEjemplo(e.imagenEjemplo); } catch (er) { aviso('⚠ ' + esc(er.message), 5000); } P = ant; }
+    if (e.modeloEjemplo || e.imagenEjemplo || e.figuraEjemplo) {
+      const ant = P;
+      try {
+        if (e.imagenEjemplo) await cargarRecurso('imagenes'); else { aviso('Cargando el modelo…'); await cargarRecurso('modelos'); }
+        P = p;
+        if (e.modeloEjemplo) cargarModeloEjemplo(e.modeloEjemplo, false, true);
+        else if (e.imagenEjemplo) cargarImagenEjemplo(e.imagenEjemplo);
+        else { const r = triangulosEjemplo(e.figuraEjemplo); if (!r) throw new Error('No se encuentra el modelo «' + e.figuraEjemplo + '»'); cargarFiguraTriangulos(r.tri, r.M.nombre, e.figuraEjemplo); }
+      } catch (er) { aviso('⚠ ' + esc(er.message), 5000); }
+      P = ant;
+    }
     cargarProyecto(p, true);
     aviso('Ejemplo: ' + esc(e.nombre));
   });

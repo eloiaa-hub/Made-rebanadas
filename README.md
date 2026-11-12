@@ -20,6 +20,7 @@ Funciona en el navegador (Chrome, Edge o Firefox), sin instalar nada y **sin con
 - **Forma paramétrica**: plantillas de banco ondulado, tumbona, pouf / taburete, mesa baja «ola», estantería «duna» y forma libre, con sus medidas en deslizadores.
 - **Perfiles clave**: la forma se define con unos pocos perfiles a lo largo del mueble; cada costilla es la mezcla suave de los perfiles que tiene a los lados. Se editan a mano (puntos de curva o de esquina).
 - **Cuatro tipos**: costillas unidas con varillas (en planta recta, en **arco** o **en S**), **retícula entrelazada** a media madera, **radiales** (lámparas y columnas alrededor de un tubo, con discos de unión) y **paneles de pared** (lamas sobre rastreles).
+- **Figuras de pie desde un STL/OBJ**: el modelo cortado de verdad en costillas o en retícula (bustos, esculturas).
 - **Modelo 3D**: el mueble montado se guarda en STL u OBJ (para otros programas o impresión 3D).
 - **Arte mural, rótulos y estanterías**: relieve de pared a partir de un **texto** (nombres, logos) o de una **imagen en escala de grises**, o de una **figura STL/OBJ** (caras, labios, formas; trae cinco STL de ejemplo en `assets/modelos`, entre ellos un busto de mujer y Nefertiti), en lamas verticales u horizontales, y estantería de pared ondulada de lamas.
 - **Perfiles clave en el 3D**: se seleccionan pinchándolos.

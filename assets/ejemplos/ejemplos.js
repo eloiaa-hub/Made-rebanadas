@@ -58,4 +58,8 @@ window.MADE_EJEMPLOS = [
   { nombre: 'Nefertiti de perfil', plantilla: 'pared_ondas', tipo: 'pared', modeloEjemplo: 'nefertiti', desc: 'El escaneo del busto de Nefertiti (Neues Museum, Berlín) visto desde un lado, en lamas horizontales de nogal.',
     params: {}, costillas: { grosor: 12, separacion: 16, material: 'nogal' }, pared: { rastreles: 3, margen: 100, grueso: 15 },
     relieve: { fuente: 'modelo', orient: 'h', vista: 'izquierda', giro: 0, ancho: 760, alto: 1000, fondo: 30, relieve: 120, suavizado: 2, base: 0 } },
+  { nombre: 'Busto de rebanadas', plantilla: 'libre', tipo: 'costillas', figuraEjemplo: 'cara', desc: 'Figura de pie: el «Busto de mujer» cortado de verdad en costillas de MDF de 12 mm, unidas con varillas.',
+    params: {}, costillas: { grosor: 12, modo: 'separacion', separacion: 22, material: 'mdf' }, varillas: { diam: 6, margen: 12, autoN: 3, tramo: 'todas' }, figura: { activa: true, alto: 600, eje: 'x', giro: 0, minArea: 6 } },
+  { nombre: 'Busto en retícula', plantilla: 'libre', tipo: 'reticula', figuraEjemplo: 'cara', desc: 'Figura de pie en retícula: el «Busto de mujer» cortado en costillas y largueros de contrachapado de 6 mm que se cruzan a media madera.',
+    params: {}, costillas: { grosor: 6, modo: 'separacion', separacion: 45, material: 'abedul' }, reticula: { num: 5, margen: 40, vuelo: 0 }, figura: { activa: true, alto: 500, eje: 'x', giro: 0, minArea: 6 } },
 ];

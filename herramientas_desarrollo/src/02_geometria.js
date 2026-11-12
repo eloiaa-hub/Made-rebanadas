@@ -161,6 +161,7 @@ function radioAgujero() { return (P.varillas.diam + P.varillas.holgura) / 2; }
 
 function calcular() {
   if (relieveActivo()) P.largo = P.relieve.orient === 'h' ? P.relieve.alto : P.relieve.ancho;
+  else if (figuraActiva()) P.largo = Math.max(50, Math.round(mallaFigura().largo * 10) / 10);
   const e = grosor(), rep = reparto(), V = P.varillas;
   const res = { n: rep.n, sep: rep.s, hueco: rep.hueco, costillas: [], varillas: [], avisos: [] };
   for (let i = 0; i < rep.n; i++) {
@@ -168,6 +169,11 @@ function calcular() {
     const ok = poly.length >= 3 && Math.abs(areaFirmada(poly)) > 25;
     const caja = ok ? cajaDe(poly) : { x0: 0, y0: 0, x1: 0, y1: 0, w: 0, h: 0 };
     res.costillas.push({ i, x, poly: ok ? poly : [], base: ok ? poly : [], ok, caja, area: ok ? areaFirmada(poly) : 0, agujeros: [], nVar: 0, ranuras: [], etq: String(i + 1), nombre: (P.tipo === 'pared' ? 'Lama ' : 'Costilla ') + (i + 1) });
+  }
+  // figura: fuera las costillas muy pequeñas de los extremos (puntas de los hombros, orejas…)
+  if (figuraActiva() && P.figura.minArea > 0) {
+    const amax = Math.max(0, ...res.costillas.map(c => Math.abs(c.area)));
+    res.costillas.forEach(c => { if (c.ok && Math.abs(c.area) < amax * P.figura.minArea / 100) { c.ok = false; c.poly = []; c.base = []; c.pequeña = true; } });
   }
   res.largueros = []; res.cruces = []; res.discos = []; res.rastreles = []; res.ranurasMal = [];
   // centro del fondo de las costillas (en radial y pared, el eje o la pared: 0)
@@ -182,7 +188,9 @@ function calcular() {
   const need = radioAgujero() + V.margen;
   V.lista.forEach((p, k) => {
     const cabe = res.costillas.map(c => c.ok && distBorde(c.poly, p[0], p[1]) >= need - 1e-6);
-    let a = 0, b = rep.n - 1, usada = true;
+    // de la primera a la última costilla que existe (en las figuras, las de los extremos pueden faltar)
+    let a = Math.max(0, res.costillas.findIndex(c => c.ok)), b = rep.n - 1, usada = true;
+    while (b > a && !res.costillas[b].ok) b--;
     if (V.tramo === 'cabe') {
       // el tramo seguido más largo donde cabe
       let mejor = [-1, -2], ini = -1;
@@ -215,7 +223,8 @@ function avisosDe(res, need) {
   if (res.hueco < -0.01) add('error', `La separación (${fmt(res.sep, 1)} mm) es menor que el grosor del tablero (${fmt(e, 1)} mm): las costillas se pisan.`);
   else if (res.hueco < 0.5) add('info', 'Costillas apiladas (sin hueco entre ellas): no hacen falta separadores; conviene encolarlas.');
   const vacias = res.costillas.filter(c => !c.ok).map(c => c.i);
-  if (vacias.length) add('error', `Sin forma tras los recortes: ${cst(vacias)}.`, vacias[0]);
+  if (vacias.length && figuraActiva()) add('info', `Figura: ${cst(vacias)} ${vacias.length > 1 ? 'quedan' : 'queda'} fuera del modelo o ${vacias.length > 1 ? 'son' : 'es'} más pequeña${vacias.length > 1 ? 's' : ''} que el ${P.figura.minArea} % de la mayor: no se ${vacias.length > 1 ? 'fabrican' : 'fabrica'}.`, vacias[0]);
+  else if (vacias.length) add('error', `Sin forma tras los recortes: ${cst(vacias)}.`, vacias[0]);
   if (!V.lista.length) add('atencion', 'No hay varillas: pulsa ✨ Auto o ＋ Varilla para unir las costillas.');
   res.varillas.forEach(r => {
     const nom = 'Varilla ' + (r.k + 1);
@@ -247,6 +256,7 @@ function avisosDe(res, need) {
   }
   const alto = res.costillas.filter(c => c.ok && c.caja.y0 > 1).map(c => c.i);
   if (P.costillas.base && alto.length && alto.length < res.n) add('info', `No llegan al suelo (cuelgan de las varillas): ${cst(alto)}.`, alto[0]);
+  avisosFigura(res, add);
   avisosMaqueta(res, add);
   if (!A.some(a => a.tipo === 'error' || a.tipo === 'atencion')) add('ok', 'Todo correcto: las varillas caben y todas las costillas están sujetas.');
 }

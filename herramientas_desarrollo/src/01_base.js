@@ -27,6 +27,20 @@ function aviso(msg, ms = 2600) {
 }
 function lsGet(k, def) { try { const v = localStorage.getItem(k); return v == null ? def : v; } catch (e) { return def; } }
 function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* sin almacenamiento */ } }
+// carga diferida de los archivos grandes (modelos e imágenes de ejemplo): solo cuando hacen falta
+const VERSION_ARCHIVOS = (() => { try { const m = /[?&]v=([^&]+)/.exec(document.currentScript.src); return m ? m[1] : VERSION; } catch (e) { return VERSION; } })();
+const RECURSOS = { modelos: ['assets/modelos/modelos.js', 'MADE_MODELOS'], imagenes: ['assets/imagenes/imagenes.js', 'MADE_IMAGENES'] };
+const cargandoRecurso = {};
+function cargarRecurso(k) {
+  const [src, glob] = RECURSOS[k];
+  if (window[glob]) return Promise.resolve(window[glob]);
+  if (!cargandoRecurso[k]) cargandoRecurso[k] = new Promise((ok, mal) => {
+    const s = document.createElement('script'); s.src = src + '?v=' + VERSION_ARCHIVOS;
+    s.onload = () => ok(window[glob]); s.onerror = () => { cargandoRecurso[k] = null; mal(new Error('No se puede cargar ' + src)); };
+    document.head.appendChild(s);
+  });
+  return cargandoRecurso[k];
+}
 function descargar(nombre, contenido, tipo) {
   const blob = contenido instanceof Blob ? contenido : new Blob([contenido], { type: tipo || 'text/plain' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre;
@@ -76,7 +90,7 @@ function proyectoBase() {
     interp: 'curva',
     costillas: { grosor: 18, modo: 'separacion', separacion: 60, numero: 25, base: true, tope: false, topeAlt: 400, material: 'mdf', color: '#f2efe8' },
     varillas: { tipo: 'roscada', diam: 10, holgura: 0.5, margen: 20, tramo: 'todas', separadores: true, sepD: 22, sobra: 12, autoN: 3, lista: [] },
-    vista: { explosion: 0, fantasma: false, varillas: true, resalta: true, claves: true },
+    vista: { explosion: 0, fantasma: false, varillas: true, resalta: true, claves: true, rasante: false, rasAng: 30 },
     maqueta: { activa: false, escala: 5, grosor: 3, diam: 3, holgura: 0.2, fresa: 0 },
     cnc: { fresa: 6, hueso: true, arcos: true, tolArco: 0.05 },
     reticula: { num: 4, margen: 40, holgura: 0.3, xArriba: true, vuelo: 25 },
@@ -85,6 +99,9 @@ function proyectoBase() {
     pared: { rastreles: 3, alto: 45, grueso: 20, margen: 120, holgura: 0.5, verPared: true },
     relieve: { fuente: 'plantilla', orient: 'v', ancho: 1200, alto: 500, fondo: 20, relieve: 60, suavizado: 10, invertir: false,
       texto: 'Made', letra: 'Arial Black', tamLetra: 320, negrita: true, interlinea: 1.05, ondaAmp: 0, ondas: 2,
-      vista: 'frente', giro: 0, base: 0.15, modelo: null, gama: 1, imagen: null },
+      vista: 'frente', giro: 0, base: 0.15, modelo: null, gama: 1, imagen: null,
+      letras: [],
+      capa: { activa: false, texto: 'Hola', letra: 'Arial Black', negrita: true, tamLetra: 160, relieve: 30, x: 50, y: 15, modo: 'sale' } },
+    figura: { activa: false, malla: null, alto: 800, eje: 'x', giro: 0, minArea: 2, unir: true },
   };
 }

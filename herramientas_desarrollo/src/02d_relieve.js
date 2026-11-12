@@ -22,13 +22,31 @@ const anchoPerfil = () => medidasPanel()[0];
 
 const CACHE_MAPA = { clave: '', mapa: null };
 function mapaRelieve() {
-  const Rl = P.relieve, clave = JSON.stringify([Rl.fuente, Rl.ancho, Rl.alto, Rl.texto, Rl.letra, Rl.tamLetra, Rl.negrita, Rl.interlinea, Rl.suavizado, Rl.invertir, Rl.ondaAmp, Rl.ondas, Rl.modelo && Rl.modelo.id, Rl.imagen && Rl.imagen.id, Rl.gama]);
+  const Rl = P.relieve, clave = JSON.stringify([Rl.fuente, Rl.ancho, Rl.alto, Rl.texto, Rl.letra, Rl.tamLetra, Rl.negrita, Rl.interlinea, Rl.suavizado, Rl.invertir, Rl.ondaAmp, Rl.ondas, Rl.modelo && Rl.modelo.id, Rl.imagen && Rl.imagen.id, Rl.gama, UI.letrasCargadas || 0]);
   if (CACHE_MAPA.clave === clave) return CACHE_MAPA.mapa;
   let m = Rl.fuente === 'texto' ? mapaTexto(Rl) : Rl.fuente === 'imagen' ? mapaImagen(Rl) : mapaModelo(Rl);
   if (m && Rl.suavizado > 0) m = suavizarMapa(m, Rl.suavizado / m.mm);
   if (m && Rl.invertir) for (let i = 0; i < m.d.length; i++) m.d[i] = 1 - m.d[i];
   CACHE_MAPA.clave = clave; CACHE_MAPA.mapa = m;
   return m;
+}
+// «texto añadido»: un texto encima de cualquier relieve (sale o se hunde)
+const CACHE_CAPA = { clave: '', mapa: null };
+function mapaCapa() {
+  const Rl = P.relieve, C = Rl.capa;
+  if (!C || !C.activa || !String(C.texto || '').trim()) return null;
+  const clave = JSON.stringify([Rl.ancho, Rl.alto, Rl.suavizado, C.texto, C.letra, C.negrita, C.tamLetra, C.x, C.y, UI.letrasCargadas || 0]);
+  if (CACHE_CAPA.clave === clave) return CACHE_CAPA.mapa;
+  let m = mapaTexto(Rl, { texto: C.texto, letra: C.letra, negrita: C.negrita, tamLetra: C.tamLetra, interlinea: 1.05 }, C.x, C.y);
+  if (m && Rl.suavizado > 0) m = suavizarMapa(m, Math.min(Rl.suavizado, C.tamLetra / 8) / m.mm);
+  CACHE_CAPA.clave = clave; CACHE_CAPA.mapa = m;
+  return m;
+}
+function muestraMapa(m, X, Y, alto) {
+  const fx = clamp(X / m.mm, 0, m.w - 1), fy = clamp((alto - Y) / (m.mmY || m.mm), 0, m.h - 1);
+  const x0 = Math.floor(fx), y0 = Math.floor(fy), x1 = Math.min(m.w - 1, x0 + 1), y1 = Math.min(m.h - 1, y0 + 1), tx = fx - x0, ty = fy - y0;
+  const g = (x, y) => m.d[y * m.w + x];
+  return (g(x0, y0) * (1 - tx) + g(x1, y0) * tx) * (1 - ty) + (g(x0, y1) * (1 - tx) + g(x1, y1) * tx) * ty;
 }
 // profundidad (mm) en el punto (X horizontal, Y vertical) del panel
 function profundidadEn(X, Y) {
@@ -41,7 +59,8 @@ function profundidadEn(X, Y) {
     h = (g(x0, y0) * (1 - tx) + g(x1, y0) * tx) * (1 - ty) + (g(x0, y1) * (1 - tx) + g(x1, y1) * tx) * ty;
   }
   const onda = Rl.ondaAmp ? Rl.ondaAmp * (0.5 + 0.5 * Math.sin(PI2 * (Rl.ondas || 1) * X / Rl.ancho)) : 0;
-  return Math.max(2, Rl.fondo + Rl.relieve * h + onda);
+  const mc = mapaCapa(), capa = mc ? (Rl.capa.modo === 'hundir' ? -1 : 1) * Rl.capa.relieve * muestraMapa(mc, X, Y, Rl.alto) : 0;
+  return Math.max(2, Rl.fondo + Rl.relieve * h + onda + capa);
 }
 // contorno de la lama en la posición x (horizontal en lamas verticales, altura en las horizontales)
 function poligonoRelieve(x, denso) {
@@ -53,20 +72,58 @@ function poligonoRelieve(x, denso) {
   return denso ? out : simplificaCerrado(out, 0.02);
 }
 // contorno de la costilla en la posición x, venga de los perfiles clave o del relieve
-function contornoEnX(x) { return relieveActivo() ? poligonoRelieve(x) : contornoDe(perfilEn(x)); }
+function contornoEnX(x) { return relieveActivo() ? poligonoRelieve(x) : figuraActiva() ? poligonoFigura(x) : contornoDe(perfilEn(x)); }
 
 /* ---------- texto ---------- */
 const LETRAS_SISTEMA = ['Arial Black', 'Arial', 'Impact', 'Verdana', 'Tahoma', 'Trebuchet MS', 'Georgia', 'Times New Roman', 'Courier New', 'Comic Sans MS', 'serif', 'sans-serif', 'monospace'];
-function mapaTexto(Rl) {
+// letras propias (.ttf, .otf, .woff): se guardan dentro del proyecto y se registran con FontFace
+const letrasRegistradas = new Set();
+function registrarLetras() {
+  const L = (P && P.relieve && P.relieve.letras) || [];
+  L.forEach(f => {
+    const k = f.nombre + '|' + f.b64.length; if (letrasRegistradas.has(k) || typeof FontFace === 'undefined') return;
+    letrasRegistradas.add(k);
+    try {
+      const ff = new FontFace(f.nombre, bufferDeB64(f.b64));
+      ff.load().then(x => { document.fonts.add(x); UI.letrasCargadas = (UI.letrasCargadas || 0) + 1; if (relieveActivo()) { recalcular(); } })
+        .catch(() => aviso('⚠ No se puede usar la letra «' + esc(f.nombre) + '»', 5000));
+    } catch (e) { aviso('⚠ ' + esc(e.message), 5000); }
+  });
+}
+function cargarLetraArchivo(file) {
+  return file.arrayBuffer().then(buf => {
+    if (buf.byteLength > 3e6) throw new Error('La letra pesa más de 3 MB: busca una versión más ligera.');
+    const nombre = file.name.replace(/\.[^.]+$/, '').replace(/[^\wÀ-ÿ \-]+/g, ' ').trim() || 'Mi letra';
+    const ff = new FontFace(nombre, buf);
+    return ff.load().then(x => {
+      document.fonts.add(x);
+      const L = P.relieve.letras || (P.relieve.letras = []), i = L.findIndex(f => f.nombre === nombre), d = { nombre, b64: b64DeBuffer(buf) };
+      if (i >= 0) L[i] = d; else L.push(d);
+      letrasRegistradas.add(nombre + '|' + d.b64.length); UI.letrasCargadas = (UI.letrasCargadas || 0) + 1;
+      return nombre;
+    });
+  });
+}
+function llenarLetras() {
+  const propias = ((P && P.relieve && P.relieve.letras) || []).map(f => f.nombre);
+  $$('.selLetra').forEach(sel => {
+    const v = sel.value; sel.innerHTML = '';
+    if (propias.length) { const g = document.createElement('optgroup'); g.label = 'Tus letras'; propias.forEach(l => g.appendChild(new Option(l, l))); sel.appendChild(g); }
+    const g2 = document.createElement('optgroup'); g2.label = 'Del ordenador'; LETRAS_SISTEMA.forEach(l => g2.appendChild(new Option(l, l))); sel.appendChild(g2);
+    if (v) sel.value = v;
+  });
+}
+function mapaTexto(Rl, T, cx, cy) {
+  T = T || Rl;   // T: el texto que se dibuja (el principal o el «texto añadido»); cx, cy: centro en % del panel
   const mm = Math.max(1, Math.max(Rl.ancho, Rl.alto) / 700), w = Math.max(8, Math.round(Rl.ancho / mm)), h = Math.max(8, Math.round(Rl.alto / mm));
   if (typeof document === 'undefined') return null;
   const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
   const ctx = cv.getContext('2d'); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
-  const lineas = String(Rl.texto || '').split('\n'), pt = Rl.tamLetra / mm;
-  ctx.font = `${Rl.negrita ? 'bold ' : ''}${pt}px "${Rl.letra}", sans-serif`;
+  const lineas = String(T.texto || '').split('\n'), pt = T.tamLetra / mm;
+  ctx.font = `${T.negrita ? 'bold ' : ''}${pt}px "${T.letra}", sans-serif`;
   ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  const alto = pt * (Rl.interlinea || 1.1);
-  lineas.forEach((l, i) => ctx.fillText(l, w / 2, h / 2 + (i - (lineas.length - 1) / 2) * alto));
+  const alto = pt * (T.interlinea || 1.1), X = w * (cx == null ? 50 : cx) / 100, Y = h * (1 - (cy == null ? 50 : cy) / 100);
+  lineas.forEach((l, i) => ctx.fillText(l, X, Y + (i - (lineas.length - 1) / 2) * alto));
   const px = ctx.getImageData(0, 0, w, h).data, d = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) d[i] = px[i * 4] / 255;
   return { w, h, mm, d };

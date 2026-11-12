@@ -43,8 +43,8 @@
         <label class="fila" title="Costillas separadas unidas con varillas, o retícula de costillas y largueros que se cruzan con ranuras a media madera">Tipo de mueble
           <select id="sTipo"><option value="costillas">Costillas con varillas</option><option value="reticula">Retícula (ranuras a media madera)</option><option value="radial">Radial (lámparas, columnas)</option><option value="pared">Panel de pared (lamas)</option></select></label>
         <label class="fila oculto" id="filaOrigen" title="De dónde sale la forma de las lamas">Origen de la forma
-          <select id="sOrigen"><option value="plantilla">Plantilla</option><option value="texto">Texto en relieve</option><option value="modelo">Modelo 3D (STL / OBJ)</option><option value="imagen">Imagen en grises</option></select></label>
-        <button id="bConvertirPerfiles" class="ancho oculto" style="margin:2px 0 8px" title="Pasa la forma a perfiles clave para retocar a mano los puntos de las lamas">✏ Convertir en perfiles editables…</button>
+          <select id="sOrigen"><option value="plantilla">Plantilla</option><option value="texto">Texto en relieve</option><option value="modelo">Modelo 3D (STL / OBJ)</option><option value="imagen">Imagen en grises</option><option value="figura">Modelo 3D (secciones)</option></select></label>
+        <button id="bConvertirPerfiles" class="ancho oculto" style="margin:2px 0 8px" title="Pasa la forma a perfiles clave para retocar a mano los puntos de las piezas">✏ Convertir en perfiles editables…</button>
         <label class="fila" id="filaPlantilla">Plantilla <select id="sPlantilla"></select></label>
         <p class="nota" id="descPlantilla"></p>
         <div id="params"></div>
@@ -106,7 +106,8 @@
       <div class="sec-cuerpo">
         <div id="relTexto">
           <label class="fila" style="align-items:flex-start">Texto <textarea id="rlTexto" rows="2" style="width:58%;resize:vertical;font:inherit;border:1px solid var(--borde);border-radius:5px;background:var(--panel);padding:4px 6px"></textarea></label>
-          <label class="fila">Letra <select id="rlLetra"></select></label>
+          <label class="fila">Letra <select id="rlLetra" class="selLetra"></select></label>
+          <button class="ancho bLetra" title="Usar una letra tuya (.ttf, .otf, .woff): se guarda dentro del proyecto">🔤 Cargar una letra (.ttf, .otf)…</button>
           <label class="fila chk"><input type="checkbox" id="rlNegrita"> Negrita</label>
           <label class="fila">Alto de la letra (mm) <input type="number" id="rlTam" min="10" step="5"></label>
           <label class="fila">Interlineado <input type="number" id="rlInter" min="0.6" max="3" step="0.05"></label>
@@ -126,6 +127,20 @@
           <button id="bAjustarImagen" class="ancho" title="Pone el alto del panel con las proporciones de la imagen">↕ Alto según la imagen</button>
           <label class="fila" title="Menos de 1: los grises medios salen más. Más de 1: solo sale lo muy claro">Gama <input type="number" id="rlGama" min="0.2" max="5" step="0.1"></label>
         </div>
+        <div class="capaTexto" style="border:1px solid var(--borde);border-radius:6px;padding:6px 8px;margin:6px 0">
+          <label class="fila chk" title="Un texto encima del relieve (de una imagen, un modelo, las ondas o otro texto)"><input type="checkbox" id="caActiva"> ➕ Texto añadido encima</label>
+          <div id="caCampos">
+            <label class="fila" style="align-items:flex-start">Texto <textarea id="caTexto" rows="1" style="width:58%;resize:vertical;font:inherit;border:1px solid var(--borde);border-radius:5px;background:var(--panel);padding:4px 6px"></textarea></label>
+            <label class="fila">Letra <select id="caLetra" class="selLetra"></select></label>
+            <button class="ancho bLetra" title="Usar una letra tuya (.ttf, .otf, .woff): se guarda dentro del proyecto">🔤 Cargar una letra (.ttf, .otf)…</button>
+            <label class="fila chk"><input type="checkbox" id="caNegrita"> Negrita</label>
+            <label class="fila">Alto de la letra (mm) <input type="number" id="caTam" min="10" step="5"></label>
+            <label class="fila">Relieve del texto (mm) <input type="number" id="caRelieve" min="0" step="1"></label>
+            <label class="fila">El texto <select id="caModo"><option value="sale">sale</option><option value="hundir">se hunde</option></select></label>
+            <label class="fila" title="Centro del texto, en % del ancho del panel (0 = izquierda)">Posición horizontal (%) <input type="number" id="caX" min="0" max="100" step="1"></label>
+            <label class="fila" title="Centro del texto, en % del alto del panel (0 = abajo)">Posición vertical (%) <input type="number" id="caY" min="0" max="100" step="1"></label>
+          </div>
+        </div>
         <label class="fila">Ancho del panel (mm) <input type="number" id="rlAncho" min="100" step="10"></label>
         <label class="fila">Alto del panel (mm) <input type="number" id="rlAlto" min="100" step="10"></label>
         <label class="fila" title="Lo que sale la lama donde no hay relieve">Fondo mínimo (mm) <input type="number" id="rlFondo" min="5" step="1"></label>
@@ -134,6 +149,21 @@
         <label class="fila chk"><input type="checkbox" id="rlInvertir"> Invertir (el relieve se hunde)</label>
         <label class="fila" title="Ondas de fondo a lo ancho, sumadas al relieve">Onda de fondo (mm) <input type="number" id="rlOnda" min="0" step="1"></label>
         <label class="fila">Ondas de fondo <input type="number" id="rlOndas" min="0.5" max="10" step="0.5"></label>
+      </div>
+    </section>
+
+    <section id="secFigura">
+      <h3>Figura (modelo 3D)</h3>
+      <div class="sec-cuerpo">
+        <p class="nota" id="fgInfo">Sin modelo. Carga un STL u OBJ: cada costilla será un corte de verdad del modelo.</p>
+        <button id="bFigCargar" class="ancho" title="Cargar un modelo 3D (.stl o .obj) para cortarlo en costillas">📂 Cargar modelo 3D…</button>
+        <button id="bFigEjemplo" class="ancho" title="Busto de mujer, Nefertiti…">🗿 Modelos de ejemplo…</button>
+        <label class="fila" title="Alto de la figura terminada">Alto de la figura (mm) <input type="number" id="fgAlto" min="100" step="10"></label>
+        <label class="fila" title="Por dónde se corta el modelo">Cortes <select id="fgEje"><option value="x">De lado a lado (perfiles)</option><option value="z">De delante a atrás</option></select></label>
+        <label class="fila" title="Gira el modelo alrededor del eje vertical antes de cortarlo">Giro <select id="fgGiro"><option value="0">0°</option><option value="45">45°</option><option value="90">90°</option><option value="135">135°</option><option value="180">180°</option><option value="270">270°</option></select></label>
+        <label class="fila" title="Las costillas más pequeñas que este % de la mayor no se fabrican (puntas, orejas…)">Quitar costillas menores del (%) <input type="number" id="fgMin" min="0" max="60" step="1"></label>
+        <label class="fila chk" title="Si un corte sale en varios trozos (cabeza y hombros, orejas…), se unen con puentes de madera"><input type="checkbox" id="fgUnir"> Unir los trozos sueltos con puentes</label>
+        <p class="nota">El modelo tiene que estar de pie (Y hacia arriba) y mirando al frente (+Z). Si sale tumbado, gíralo antes en otro programa.</p>
       </div>
     </section>
 
@@ -231,6 +261,8 @@
           <label class="chk3d"><input type="checkbox" id="cVarillas3d" checked> Varillas</label>
           <label class="chk3d" title="Colorea la costilla seleccionada"><input type="checkbox" id="cResalta" checked> Resaltar</label>
           <label class="chk3d" title="Dibuja los perfiles clave; pincha uno para editarlo"><input type="checkbox" id="cClaves3d" checked> Perfiles</label>
+          <label class="chk3d" title="Luz muy baja, casi paralela a la superficie, como la de una ventana a media tarde: así se lee el relieve"><input type="checkbox" id="cRasante"> Luz rasante</label>
+          <input type="range" id="rRasante" min="0" max="360" step="5" value="30" title="Dirección de la luz rasante" style="width:90px" class="oculto">
         </div>
       </div>
       <div class="vista vperfil" id="vPerfil">
@@ -315,13 +347,12 @@
 <input type="file" id="fArchivo" class="oculto" accept=".json,application/json">
 <input type="file" id="fModelo" class="oculto" accept=".stl,.obj">
 <input type="file" id="fImagen" class="oculto" accept="image/*">
+<input type="file" id="fLetra" class="oculto" accept=".ttf,.otf,.woff,.woff2">
 <div id="aviso" class="aviso"></div>
 
-<script src="assets/js/three-bundle.js?v=202611130012"></script>
-<script src="assets/texturas/texturas.js?v=202611130012"></script>
-<script src="assets/ejemplos/ejemplos.js?v=202611130012"></script>
-<script src="assets/modelos/modelos.js?v=202611130012"></script>
-<script src="assets/imagenes/imagenes.js?v=202611130012"></script>
-<script src="assets/js/app.js?v=202611130012"></script>
+<script src="assets/js/three-bundle.js?v=202611130045"></script>
+<script src="assets/texturas/texturas.js?v=202611130045"></script>
+<script src="assets/ejemplos/ejemplos.js?v=202611130045"></script>
+<script src="assets/js/app.js?v=202611130045"></script>
 </body>
 </html>

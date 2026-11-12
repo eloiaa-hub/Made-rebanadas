@@ -27,6 +27,20 @@ function aviso(msg, ms = 2600) {
 }
 function lsGet(k, def) { try { const v = localStorage.getItem(k); return v == null ? def : v; } catch (e) { return def; } }
 function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* sin almacenamiento */ } }
+// carga diferida de los archivos grandes (modelos e imágenes de ejemplo): solo cuando hacen falta
+const VERSION_ARCHIVOS = (() => { try { const m = /[?&]v=([^&]+)/.exec(document.currentScript.src); return m ? m[1] : VERSION; } catch (e) { return VERSION; } })();
+const RECURSOS = { modelos: ['assets/modelos/modelos.js', 'MADE_MODELOS'], imagenes: ['assets/imagenes/imagenes.js', 'MADE_IMAGENES'] };
+const cargandoRecurso = {};
+function cargarRecurso(k) {
+  const [src, glob] = RECURSOS[k];
+  if (window[glob]) return Promise.resolve(window[glob]);
+  if (!cargandoRecurso[k]) cargandoRecurso[k] = new Promise((ok, mal) => {
+    const s = document.createElement('script'); s.src = src + '?v=' + VERSION_ARCHIVOS;
+    s.onload = () => ok(window[glob]); s.onerror = () => { cargandoRecurso[k] = null; mal(new Error('No se puede cargar ' + src)); };
+    document.head.appendChild(s);
+  });
+  return cargandoRecurso[k];
+}
 function descargar(nombre, contenido, tipo) {
   const blob = contenido instanceof Blob ? contenido : new Blob([contenido], { type: tipo || 'text/plain' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre;
@@ -76,7 +90,7 @@ function proyectoBase() {
     interp: 'curva',
     costillas: { grosor: 18, modo: 'separacion', separacion: 60, numero: 25, base: true, tope: false, topeAlt: 400, material: 'mdf', color: '#f2efe8' },
     varillas: { tipo: 'roscada', diam: 10, holgura: 0.5, margen: 20, tramo: 'todas', separadores: true, sepD: 22, sobra: 12, autoN: 3, lista: [] },
-    vista: { explosion: 0, fantasma: false, varillas: true, resalta: true, claves: true },
+    vista: { explosion: 0, fantasma: false, varillas: true, resalta: true, claves: true, rasante: false, rasAng: 30 },
     maqueta: { activa: false, escala: 5, grosor: 3, diam: 3, holgura: 0.2, fresa: 0 },
     cnc: { fresa: 6, hueso: true, arcos: true, tolArco: 0.05 },
     reticula: { num: 4, margen: 40, holgura: 0.3, xArriba: true, vuelo: 25 },
@@ -85,7 +99,10 @@ function proyectoBase() {
     pared: { rastreles: 3, alto: 45, grueso: 20, margen: 120, holgura: 0.5, verPared: true },
     relieve: { fuente: 'plantilla', orient: 'v', ancho: 1200, alto: 500, fondo: 20, relieve: 60, suavizado: 10, invertir: false,
       texto: 'Made', letra: 'Arial Black', tamLetra: 320, negrita: true, interlinea: 1.05, ondaAmp: 0, ondas: 2,
-      vista: 'frente', giro: 0, base: 0.15, modelo: null, gama: 1, imagen: null },
+      vista: 'frente', giro: 0, base: 0.15, modelo: null, gama: 1, imagen: null,
+      letras: [],
+      capa: { activa: false, texto: 'Hola', letra: 'Arial Black', negrita: true, tamLetra: 160, relieve: 30, x: 50, y: 15, modo: 'sale' } },
+    figura: { activa: false, malla: null, alto: 800, eje: 'x', giro: 0, minArea: 2, unir: true },
   };
 }
 
@@ -251,6 +268,7 @@ function radioAgujero() { return (P.varillas.diam + P.varillas.holgura) / 2; }
 
 function calcular() {
   if (relieveActivo()) P.largo = P.relieve.orient === 'h' ? P.relieve.alto : P.relieve.ancho;
+  else if (figuraActiva()) P.largo = Math.max(50, Math.round(mallaFigura().largo * 10) / 10);
   const e = grosor(), rep = reparto(), V = P.varillas;
   const res = { n: rep.n, sep: rep.s, hueco: rep.hueco, costillas: [], varillas: [], avisos: [] };
   for (let i = 0; i < rep.n; i++) {
@@ -258,6 +276,11 @@ function calcular() {
     const ok = poly.length >= 3 && Math.abs(areaFirmada(poly)) > 25;
     const caja = ok ? cajaDe(poly) : { x0: 0, y0: 0, x1: 0, y1: 0, w: 0, h: 0 };
     res.costillas.push({ i, x, poly: ok ? poly : [], base: ok ? poly : [], ok, caja, area: ok ? areaFirmada(poly) : 0, agujeros: [], nVar: 0, ranuras: [], etq: String(i + 1), nombre: (P.tipo === 'pared' ? 'Lama ' : 'Costilla ') + (i + 1) });
+  }
+  // figura: fuera las costillas muy pequeñas de los extremos (puntas de los hombros, orejas…)
+  if (figuraActiva() && P.figura.minArea > 0) {
+    const amax = Math.max(0, ...res.costillas.map(c => Math.abs(c.area)));
+    res.costillas.forEach(c => { if (c.ok && Math.abs(c.area) < amax * P.figura.minArea / 100) { c.ok = false; c.poly = []; c.base = []; c.pequeña = true; } });
   }
   res.largueros = []; res.cruces = []; res.discos = []; res.rastreles = []; res.ranurasMal = [];
   // centro del fondo de las costillas (en radial y pared, el eje o la pared: 0)
@@ -272,7 +295,9 @@ function calcular() {
   const need = radioAgujero() + V.margen;
   V.lista.forEach((p, k) => {
     const cabe = res.costillas.map(c => c.ok && distBorde(c.poly, p[0], p[1]) >= need - 1e-6);
-    let a = 0, b = rep.n - 1, usada = true;
+    // de la primera a la última costilla que existe (en las figuras, las de los extremos pueden faltar)
+    let a = Math.max(0, res.costillas.findIndex(c => c.ok)), b = rep.n - 1, usada = true;
+    while (b > a && !res.costillas[b].ok) b--;
     if (V.tramo === 'cabe') {
       // el tramo seguido más largo donde cabe
       let mejor = [-1, -2], ini = -1;
@@ -305,7 +330,8 @@ function avisosDe(res, need) {
   if (res.hueco < -0.01) add('error', `La separación (${fmt(res.sep, 1)} mm) es menor que el grosor del tablero (${fmt(e, 1)} mm): las costillas se pisan.`);
   else if (res.hueco < 0.5) add('info', 'Costillas apiladas (sin hueco entre ellas): no hacen falta separadores; conviene encolarlas.');
   const vacias = res.costillas.filter(c => !c.ok).map(c => c.i);
-  if (vacias.length) add('error', `Sin forma tras los recortes: ${cst(vacias)}.`, vacias[0]);
+  if (vacias.length && figuraActiva()) add('info', `Figura: ${cst(vacias)} ${vacias.length > 1 ? 'quedan' : 'queda'} fuera del modelo o ${vacias.length > 1 ? 'son' : 'es'} más pequeña${vacias.length > 1 ? 's' : ''} que el ${P.figura.minArea} % de la mayor: no se ${vacias.length > 1 ? 'fabrican' : 'fabrica'}.`, vacias[0]);
+  else if (vacias.length) add('error', `Sin forma tras los recortes: ${cst(vacias)}.`, vacias[0]);
   if (!V.lista.length) add('atencion', 'No hay varillas: pulsa ✨ Auto o ＋ Varilla para unir las costillas.');
   res.varillas.forEach(r => {
     const nom = 'Varilla ' + (r.k + 1);
@@ -337,6 +363,7 @@ function avisosDe(res, need) {
   }
   const alto = res.costillas.filter(c => c.ok && c.caja.y0 > 1).map(c => c.i);
   if (P.costillas.base && alto.length && alto.length < res.n) add('info', `No llegan al suelo (cuelgan de las varillas): ${cst(alto)}.`, alto[0]);
+  avisosFigura(res, add);
   avisosMaqueta(res, add);
   if (!A.some(a => a.tipo === 'error' || a.tipo === 'atencion')) add('ok', 'Todo correcto: las varillas caben y todas las costillas están sujetas.');
 }
@@ -548,7 +575,8 @@ function avisosReticula(res) {
   const A = res.avisos, e = grosor(), add = (tipo, txt, cost) => A.push({ tipo, txt, cost });
   if (res.hueco < 0.5) add('error', `Retícula: la separación de las costillas (${fmt(res.sep, 1)} mm) tiene que ser mayor que el grosor (${fmt(e, 1)} mm).`);
   const vacias = res.costillas.filter(c => !c.ok).map(c => c.i);
-  if (vacias.length) add('error', `Sin forma tras los recortes: ${cst(vacias)}.`, vacias[0]);
+  if (vacias.length && figuraActiva()) add('info', `Figura: ${cst(vacias)} ${vacias.length > 1 ? 'quedan' : 'queda'} fuera del modelo o ${vacias.length > 1 ? 'son' : 'es'} más pequeña${vacias.length > 1 ? 's' : ''} que el ${P.figura.minArea} % de la mayor: no se ${vacias.length > 1 ? 'fabrican' : 'fabrica'}.`, vacias[0]);
+  else if (vacias.length) add('error', `Sin forma tras los recortes: ${cst(vacias)}.`, vacias[0]);
   if (!res.largueros.length) { add('error', 'Retícula: no sale ningún larguero. Revisa el número de largueros y el margen.'); return; }
   // separación entre largueros
   const us = [...new Set(res.largueros.map(z => z.u))].sort((a, b) => a - b);
@@ -564,6 +592,7 @@ function avisosReticula(res) {
   if (res.partidos.length) add('info', `Largueros partidos en varias piezas porque la forma tiene huecos: ${res.partidos.map(letra).join(', ')}.`);
   const alto = res.costillas.filter(c => c.ok && c.caja.y0 > 1).map(c => c.i);
   if (P.costillas.base && alto.length && alto.length < res.n) add('info', `No llegan al suelo (las sujetan los largueros): ${cst(alto)}.`, alto[0]);
+  avisosFigura(res, add);
   avisosMaqueta(res, add);
   if (!A.some(a => a.tipo === 'error' || a.tipo === 'atencion')) add('ok', `Todo correcto: ${res.cruces.length} cruces a media madera entre ${res.costillas.filter(c => c.ok).length} costillas y ${res.largueros.length} largueros.`);
 }
@@ -793,13 +822,31 @@ const anchoPerfil = () => medidasPanel()[0];
 
 const CACHE_MAPA = { clave: '', mapa: null };
 function mapaRelieve() {
-  const Rl = P.relieve, clave = JSON.stringify([Rl.fuente, Rl.ancho, Rl.alto, Rl.texto, Rl.letra, Rl.tamLetra, Rl.negrita, Rl.interlinea, Rl.suavizado, Rl.invertir, Rl.ondaAmp, Rl.ondas, Rl.modelo && Rl.modelo.id, Rl.imagen && Rl.imagen.id, Rl.gama]);
+  const Rl = P.relieve, clave = JSON.stringify([Rl.fuente, Rl.ancho, Rl.alto, Rl.texto, Rl.letra, Rl.tamLetra, Rl.negrita, Rl.interlinea, Rl.suavizado, Rl.invertir, Rl.ondaAmp, Rl.ondas, Rl.modelo && Rl.modelo.id, Rl.imagen && Rl.imagen.id, Rl.gama, UI.letrasCargadas || 0]);
   if (CACHE_MAPA.clave === clave) return CACHE_MAPA.mapa;
   let m = Rl.fuente === 'texto' ? mapaTexto(Rl) : Rl.fuente === 'imagen' ? mapaImagen(Rl) : mapaModelo(Rl);
   if (m && Rl.suavizado > 0) m = suavizarMapa(m, Rl.suavizado / m.mm);
   if (m && Rl.invertir) for (let i = 0; i < m.d.length; i++) m.d[i] = 1 - m.d[i];
   CACHE_MAPA.clave = clave; CACHE_MAPA.mapa = m;
   return m;
+}
+// «texto añadido»: un texto encima de cualquier relieve (sale o se hunde)
+const CACHE_CAPA = { clave: '', mapa: null };
+function mapaCapa() {
+  const Rl = P.relieve, C = Rl.capa;
+  if (!C || !C.activa || !String(C.texto || '').trim()) return null;
+  const clave = JSON.stringify([Rl.ancho, Rl.alto, Rl.suavizado, C.texto, C.letra, C.negrita, C.tamLetra, C.x, C.y, UI.letrasCargadas || 0]);
+  if (CACHE_CAPA.clave === clave) return CACHE_CAPA.mapa;
+  let m = mapaTexto(Rl, { texto: C.texto, letra: C.letra, negrita: C.negrita, tamLetra: C.tamLetra, interlinea: 1.05 }, C.x, C.y);
+  if (m && Rl.suavizado > 0) m = suavizarMapa(m, Math.min(Rl.suavizado, C.tamLetra / 8) / m.mm);
+  CACHE_CAPA.clave = clave; CACHE_CAPA.mapa = m;
+  return m;
+}
+function muestraMapa(m, X, Y, alto) {
+  const fx = clamp(X / m.mm, 0, m.w - 1), fy = clamp((alto - Y) / (m.mmY || m.mm), 0, m.h - 1);
+  const x0 = Math.floor(fx), y0 = Math.floor(fy), x1 = Math.min(m.w - 1, x0 + 1), y1 = Math.min(m.h - 1, y0 + 1), tx = fx - x0, ty = fy - y0;
+  const g = (x, y) => m.d[y * m.w + x];
+  return (g(x0, y0) * (1 - tx) + g(x1, y0) * tx) * (1 - ty) + (g(x0, y1) * (1 - tx) + g(x1, y1) * tx) * ty;
 }
 // profundidad (mm) en el punto (X horizontal, Y vertical) del panel
 function profundidadEn(X, Y) {
@@ -812,7 +859,8 @@ function profundidadEn(X, Y) {
     h = (g(x0, y0) * (1 - tx) + g(x1, y0) * tx) * (1 - ty) + (g(x0, y1) * (1 - tx) + g(x1, y1) * tx) * ty;
   }
   const onda = Rl.ondaAmp ? Rl.ondaAmp * (0.5 + 0.5 * Math.sin(PI2 * (Rl.ondas || 1) * X / Rl.ancho)) : 0;
-  return Math.max(2, Rl.fondo + Rl.relieve * h + onda);
+  const mc = mapaCapa(), capa = mc ? (Rl.capa.modo === 'hundir' ? -1 : 1) * Rl.capa.relieve * muestraMapa(mc, X, Y, Rl.alto) : 0;
+  return Math.max(2, Rl.fondo + Rl.relieve * h + onda + capa);
 }
 // contorno de la lama en la posición x (horizontal en lamas verticales, altura en las horizontales)
 function poligonoRelieve(x, denso) {
@@ -824,20 +872,58 @@ function poligonoRelieve(x, denso) {
   return denso ? out : simplificaCerrado(out, 0.02);
 }
 // contorno de la costilla en la posición x, venga de los perfiles clave o del relieve
-function contornoEnX(x) { return relieveActivo() ? poligonoRelieve(x) : contornoDe(perfilEn(x)); }
+function contornoEnX(x) { return relieveActivo() ? poligonoRelieve(x) : figuraActiva() ? poligonoFigura(x) : contornoDe(perfilEn(x)); }
 
 /* ---------- texto ---------- */
 const LETRAS_SISTEMA = ['Arial Black', 'Arial', 'Impact', 'Verdana', 'Tahoma', 'Trebuchet MS', 'Georgia', 'Times New Roman', 'Courier New', 'Comic Sans MS', 'serif', 'sans-serif', 'monospace'];
-function mapaTexto(Rl) {
+// letras propias (.ttf, .otf, .woff): se guardan dentro del proyecto y se registran con FontFace
+const letrasRegistradas = new Set();
+function registrarLetras() {
+  const L = (P && P.relieve && P.relieve.letras) || [];
+  L.forEach(f => {
+    const k = f.nombre + '|' + f.b64.length; if (letrasRegistradas.has(k) || typeof FontFace === 'undefined') return;
+    letrasRegistradas.add(k);
+    try {
+      const ff = new FontFace(f.nombre, bufferDeB64(f.b64));
+      ff.load().then(x => { document.fonts.add(x); UI.letrasCargadas = (UI.letrasCargadas || 0) + 1; if (relieveActivo()) { recalcular(); } })
+        .catch(() => aviso('⚠ No se puede usar la letra «' + esc(f.nombre) + '»', 5000));
+    } catch (e) { aviso('⚠ ' + esc(e.message), 5000); }
+  });
+}
+function cargarLetraArchivo(file) {
+  return file.arrayBuffer().then(buf => {
+    if (buf.byteLength > 3e6) throw new Error('La letra pesa más de 3 MB: busca una versión más ligera.');
+    const nombre = file.name.replace(/\.[^.]+$/, '').replace(/[^\wÀ-ÿ \-]+/g, ' ').trim() || 'Mi letra';
+    const ff = new FontFace(nombre, buf);
+    return ff.load().then(x => {
+      document.fonts.add(x);
+      const L = P.relieve.letras || (P.relieve.letras = []), i = L.findIndex(f => f.nombre === nombre), d = { nombre, b64: b64DeBuffer(buf) };
+      if (i >= 0) L[i] = d; else L.push(d);
+      letrasRegistradas.add(nombre + '|' + d.b64.length); UI.letrasCargadas = (UI.letrasCargadas || 0) + 1;
+      return nombre;
+    });
+  });
+}
+function llenarLetras() {
+  const propias = ((P && P.relieve && P.relieve.letras) || []).map(f => f.nombre);
+  $$('.selLetra').forEach(sel => {
+    const v = sel.value; sel.innerHTML = '';
+    if (propias.length) { const g = document.createElement('optgroup'); g.label = 'Tus letras'; propias.forEach(l => g.appendChild(new Option(l, l))); sel.appendChild(g); }
+    const g2 = document.createElement('optgroup'); g2.label = 'Del ordenador'; LETRAS_SISTEMA.forEach(l => g2.appendChild(new Option(l, l))); sel.appendChild(g2);
+    if (v) sel.value = v;
+  });
+}
+function mapaTexto(Rl, T, cx, cy) {
+  T = T || Rl;   // T: el texto que se dibuja (el principal o el «texto añadido»); cx, cy: centro en % del panel
   const mm = Math.max(1, Math.max(Rl.ancho, Rl.alto) / 700), w = Math.max(8, Math.round(Rl.ancho / mm)), h = Math.max(8, Math.round(Rl.alto / mm));
   if (typeof document === 'undefined') return null;
   const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
   const ctx = cv.getContext('2d'); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
-  const lineas = String(Rl.texto || '').split('\n'), pt = Rl.tamLetra / mm;
-  ctx.font = `${Rl.negrita ? 'bold ' : ''}${pt}px "${Rl.letra}", sans-serif`;
+  const lineas = String(T.texto || '').split('\n'), pt = T.tamLetra / mm;
+  ctx.font = `${T.negrita ? 'bold ' : ''}${pt}px "${T.letra}", sans-serif`;
   ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  const alto = pt * (Rl.interlinea || 1.1);
-  lineas.forEach((l, i) => ctx.fillText(l, w / 2, h / 2 + (i - (lineas.length - 1) / 2) * alto));
+  const alto = pt * (T.interlinea || 1.1), X = w * (cx == null ? 50 : cx) / 100, Y = h * (1 - (cy == null ? 50 : cy) / 100);
+  lineas.forEach((l, i) => ctx.fillText(l, X, Y + (i - (lineas.length - 1) / 2) * alto));
   const px = ctx.getImageData(0, 0, w, h).data, d = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) d[i] = px[i * 4] / 255;
   return { w, h, mm, d };
@@ -1026,6 +1112,245 @@ function reproyectarModelo() {
   let s = ''; for (let i = 0; i < m.d8.length; i++) s += String.fromCharCode(m.d8[i]);
   Rl.modelo = { ...Rl.modelo, w: m.w, h: m.h, d64: btoa(s), id: Date.now().toString(36) };
   return true;
+}
+
+/* ===================== FIGURAS DE PIE DESDE UN MODELO 3D (secciones reales) =====================
+   Para costillas con varillas y retícula: cada costilla es el corte de la malla por un plano.
+   - El modelo se guarda en el proyecto (vértices en int16 y caras en uint32, en base64), reducido
+     a unos 60 000 triángulos como mucho.
+   - Ejes del modelo: Y arriba y la cara mirando a +Z (como los modelos de ejemplo).
+   - eje 'x': cortes de lado a lado (cada costilla es un perfil); eje 'z': de delante a atrás.
+   - En cada corte se queda el contorno mayor; los trozos sueltos (orejas, brazos…) y los huecos se avisan. */
+const figuraActiva = () => (P.tipo === 'costillas' || P.tipo === 'reticula') && P.figura && P.figura.activa && !!(P.figura.malla && P.figura.malla.v64);
+const formaCalculada = () => relieveActivo() || figuraActiva();
+
+// ---- guardar y leer la malla ----
+function b64DeBuffer(buf) { const u = new Uint8Array(buf); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); }
+function bufferDeB64(b) { const s = atob(b), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u.buffer; }
+// reduce la malla juntando los vértices de una rejilla (rápido y suficiente para cortar)
+function reducirMalla(tri, maxTri) {
+  let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+  tri.forEach(t => t.forEach(p => { x0 = Math.min(x0, p[0]); y0 = Math.min(y0, p[1]); z0 = Math.min(z0, p[2]); x1 = Math.max(x1, p[0]); y1 = Math.max(y1, p[1]); z1 = Math.max(z1, p[2]); }));
+  const tam = Math.max(x1 - x0, y1 - y0, z1 - z0) || 1;
+  let celdas = tri.length > maxTri ? Math.round(Math.sqrt(maxTri / 2) * 1.15) : 0;   // sin reducir si ya es pequeña
+  for (let intento = 0; intento < 8; intento++) {
+    const paso = celdas ? tam / celdas : tam / 4000, mapa = new Map(), V = [], cuenta = [], F = [];
+    const id = p => {
+      const k = Math.round((p[0] - x0) / paso) + ',' + Math.round((p[1] - y0) / paso) + ',' + Math.round((p[2] - z0) / paso);
+      let i = mapa.get(k); if (i === undefined) { i = V.length; mapa.set(k, i); V.push([0, 0, 0]); cuenta.push(0); }
+      V[i][0] += p[0]; V[i][1] += p[1]; V[i][2] += p[2]; cuenta[i]++; return i;
+    };
+    tri.forEach(t => { const a = id(t[0]), b = id(t[1]), c = id(t[2]); if (a !== b && b !== c && a !== c) F.push(a, b, c); });
+    V.forEach((v, i) => { v[0] /= cuenta[i]; v[1] /= cuenta[i]; v[2] /= cuenta[i]; });
+    if (!celdas || F.length / 3 <= maxTri * 1.1) return { V, F };
+    celdas = Math.round(celdas * 0.85);
+  }
+}
+function guardarMallaFigura(tri, nombre, ejemplo) {
+  const { V, F } = reducirMalla(tri, 60000);
+  let m = 0; V.forEach(v => { m = Math.max(m, Math.abs(v[0]), Math.abs(v[1]), Math.abs(v[2])); });
+  const k = m ? 32000 / m : 1, v16 = new Int16Array(V.length * 3);
+  V.forEach((v, i) => { v16[3 * i] = Math.round(v[0] * k); v16[3 * i + 1] = Math.round(v[1] * k); v16[3 * i + 2] = Math.round(v[2] * k); });
+  P.figura.malla = { nombre, ejemplo: ejemplo || null, k, nv: V.length, nt: F.length / 3, v64: b64DeBuffer(v16.buffer), f64: b64DeBuffer(new Uint32Array(F).buffer), id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), original: tri.length };
+  return P.figura.malla;
+}
+
+// ---- malla colocada: girada, a escala (alto pedido), apoyada en y = 0 ----
+const CACHE_FIG = { clave: '', m: null };
+function mallaFigura() {
+  const Fg = P.figura, M = Fg.malla, clave = [M.id, Fg.alto, Fg.eje, Fg.giro].join('|');
+  if (CACHE_FIG.clave === clave) return CACHE_FIG.m;
+  const v16 = new Int16Array(bufferDeB64(M.v64)), F = new Uint32Array(bufferDeB64(M.f64)), n = v16.length / 3;
+  const g = (Fg.giro || 0) * Math.PI / 180, cg = Math.cos(g), sg = Math.sin(g);
+  const X = new Float64Array(n), Y = new Float64Array(n), Z = new Float64Array(n);
+  let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+  for (let i = 0; i < n; i++) {
+    const x = v16[3 * i] / M.k, y = v16[3 * i + 1] / M.k, z = v16[3 * i + 2] / M.k;
+    X[i] = x * cg + z * sg; Y[i] = y; Z[i] = -x * sg + z * cg;
+    x0 = Math.min(x0, X[i]); x1 = Math.max(x1, X[i]); y0 = Math.min(y0, Y[i]); y1 = Math.max(y1, Y[i]); z0 = Math.min(z0, Z[i]); z1 = Math.max(z1, Z[i]);
+  }
+  const s = (Fg.alto || 800) / ((y1 - y0) || 1);
+  // a coordenadas del mueble: c = posición del corte (a lo largo), u = fondo del perfil, v = altura
+  const C = new Float64Array(n), U = new Float64Array(n), Vv = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const xx = (X[i] - x0) * s, yy = (Y[i] - y0) * s, zz = (Z[i] - z0) * s;
+    if (Fg.eje === 'z') { C[i] = (z1 - z0) * s - zz; U[i] = xx; } else { C[i] = xx; U[i] = (z1 - z0) * s - zz; }   // la cara, hacia u = 0 (el frente)
+    Vv[i] = yy;
+  }
+  const largo = Fg.eje === 'z' ? (z1 - z0) * s : (x1 - x0) * s;
+  // por triángulo, el tramo en c (para descartar rápido)
+  const nt = F.length / 3, cmin = new Float64Array(nt), cmax = new Float64Array(nt);
+  for (let t = 0; t < nt; t++) { const a = C[F[3 * t]], b = C[F[3 * t + 1]], c = C[F[3 * t + 2]]; cmin[t] = Math.min(a, b, c); cmax[t] = Math.max(a, b, c); }
+  const m = { C, U, V: Vv, F, nt, cmin, cmax, largo, ancho: (Fg.eje === 'z' ? (x1 - x0) : (z1 - z0)) * s, alto: (y1 - y0) * s };
+  CACHE_FIG.clave = clave; CACHE_FIG.m = m; CACHE_SEC.clave = '';
+  return m;
+}
+// ---- corte por el plano c = x: lazos cerrados en (u, v) ----
+const CACHE_SEC = { clave: '', mapa: new Map() };
+function seccionFigura(x) {
+  const m = mallaFigura(), clave = CACHE_FIG.clave;
+  if (CACHE_SEC.clave !== clave) { CACHE_SEC.clave = clave; CACHE_SEC.mapa = new Map(); }
+  const kx = Math.round(x * 100) / 100; if (CACHE_SEC.mapa.has(kx)) return CACHE_SEC.mapa.get(kx);
+  let c = kx; const { C, U, V, F } = m;
+  // si el plano pasa justo por un vértice, se mueve un pelo
+  for (let t = 0; t < m.nt; t++) if (m.cmin[t] <= c && m.cmax[t] >= c) { for (let j = 0; j < 3; j++) if (C[F[3 * t + j]] === c) { c += 1e-4; t = m.nt; break; } }
+  const pt = new Map(), vecinos = new Map(), aristaClave = (a, b) => a < b ? a * 4294967296 + b : b * 4294967296 + a;
+  const punto = (a, b) => { const k = aristaClave(a, b); if (!pt.has(k)) { const s = (c - C[a]) / (C[b] - C[a]); pt.set(k, [U[a] + s * (U[b] - U[a]), V[a] + s * (V[b] - V[a])]); } return k; };
+  const unir = (p, q) => { if (!vecinos.has(p)) vecinos.set(p, []); if (!vecinos.has(q)) vecinos.set(q, []); vecinos.get(p).push(q); vecinos.get(q).push(p); };
+  for (let t = 0; t < m.nt; t++) {
+    if (m.cmin[t] > c || m.cmax[t] < c) continue;
+    const i = [F[3 * t], F[3 * t + 1], F[3 * t + 2]], arriba = i.map(k => C[k] > c), cruces = [];
+    for (let j = 0; j < 3; j++) { const a = i[j], b = i[(j + 1) % 3]; if (arriba[j] !== arriba[(j + 1) % 3]) cruces.push(punto(a, b)); }
+    if (cruces.length === 2) unir(cruces[0], cruces[1]);
+  }
+  // encadenar los tramos en lazos
+  const usados = new Set(), lazos = [];
+  vecinos.forEach((_, ini) => {
+    if (usados.has(ini)) return;
+    const lazo = [ini]; usados.add(ini); let prev = -1, act = ini;
+    for (;;) {
+      const sig = (vecinos.get(act) || []).find(q => q !== prev && !usados.has(q));
+      if (sig === undefined) break;
+      lazo.push(sig); usados.add(sig); prev = act; act = sig;
+    }
+    if (lazo.length >= 3) lazos.push(lazo.map(k => pt.get(k)));
+  });
+  const res = lazos.map(l => { const a = areaFirmada(l); return { poly: a < 0 ? l.slice().reverse() : l, area: Math.abs(a) }; }).sort((a, b) => b.area - a.area);
+  CACHE_SEC.mapa.set(kx, res);
+  return res;
+}
+// contorno de la costilla en x: el lazo mayor; si hay trozos sueltos y «unir» está activo,
+// se juntan con puentes (en una rejilla) y se saca un solo contorno
+function poligonoFigura(x) {
+  const ls = seccionFigura(x); if (!ls.length || ls[0].area < 20) return [];
+  const sig = ls.filter((l, i) => i === 0 || (l.area >= Math.max(30, ls[0].area * 0.01) && !dentroPoligono(ls[0].poly, l.poly[0][0], l.poly[0][1])));
+  let poly = P.figura.unir !== false && sig.length > 1 ? unirTrozos(sig.map(l => l.poly)) : ls[0].poly;
+  poly = simplificaCerrado(poly, 0.15);
+  if (P.costillas.base) poly = recortaY(poly, 0, true);
+  if (P.costillas.tope) poly = recortaY(poly, P.costillas.topeAlt, false);
+  if (poly.length >= 3 && areaFirmada(poly) < 0) poly.reverse();
+  return poly;
+}
+// une varios contornos con puentes del ancho pedido y devuelve el contorno exterior
+function unirTrozos(lazos) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  lazos.forEach(l => l.forEach(p => { x0 = Math.min(x0, p[0]); y0 = Math.min(y0, p[1]); x1 = Math.max(x1, p[0]); y1 = Math.max(y1, p[1]); }));
+  const g = Math.max(0.8, Math.max(x1 - x0, y1 - y0) / 700), pad = 3;
+  const W = Math.ceil((x1 - x0) / g) + 2 * pad + 1, H = Math.ceil((y1 - y0) / g) + 2 * pad + 1, M = new Uint8Array(W * H);
+  const aG = (p) => [(p[0] - x0) / g + pad, (p[1] - y0) / g + pad];
+  // relleno de cada lazo (por filas, regla par-impar dentro de cada lazo: los huecos se rellenan igual al unir con OR)
+  const rellenar = l => {
+    const q = l.map(aG);
+    for (let j = 0; j < H; j++) {
+      const yc = j + 0.5, xs = [];
+      for (let i = 0, k = q.length - 1; i < q.length; k = i++) { const a = q[i], b = q[k]; if ((a[1] > yc) !== (b[1] > yc)) xs.push(a[0] + (yc - a[1]) / (b[1] - a[1]) * (b[0] - a[0])); }
+      xs.sort((a, b) => a - b);
+      for (let t = 0; t + 1 < xs.length; t += 2) for (let i = Math.max(0, Math.ceil(xs[t] - 0.5)); i <= Math.min(W - 1, Math.floor(xs[t + 1] - 0.5)); i++) M[j * W + i] = 1;
+    }
+  };
+  lazos.forEach(rellenar);
+  // puentes: cada trozo, con el más cercano de los ya unidos (empezando por el mayor)
+  const ancho = Math.max(12, 2 * grosor(), (P.figura.puente || 0)) / g;
+  const unidos = [lazos[0]];
+  lazos.slice(1).forEach(l => {
+    let mej = Infinity, pa = null, pb = null;
+    unidos.forEach(u => { for (let i = 0; i < l.length; i += Math.max(1, l.length >> 7)) for (let j = 0; j < u.length; j += Math.max(1, u.length >> 7)) { const d = Math.hypot(l[i][0] - u[j][0], l[i][1] - u[j][1]); if (d < mej) { mej = d; pa = l[i]; pb = u[j]; } } });
+    if (pa) {
+      const a = aG(pa), b = aG(pb), L = Math.hypot(b[0] - a[0], b[1] - a[1]), r = ancho / 2;
+      const i0 = Math.max(0, Math.floor(Math.min(a[0], b[0]) - r)), i1 = Math.min(W - 1, Math.ceil(Math.max(a[0], b[0]) + r));
+      const j0 = Math.max(0, Math.floor(Math.min(a[1], b[1]) - r)), j1 = Math.min(H - 1, Math.ceil(Math.max(a[1], b[1]) + r));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const px = i + 0.5, py = j + 0.5; let t = L ? ((px - a[0]) * (b[0] - a[0]) + (py - a[1]) * (b[1] - a[1])) / (L * L) : 0; t = clamp(t, 0, 1);
+        if (Math.hypot(px - (a[0] + t * (b[0] - a[0])), py - (a[1] + t * (b[1] - a[1]))) <= r) M[j * W + i] = 1;
+      }
+    }
+    unidos.push(l);
+  });
+  // contorno exterior: seguir el borde de la mancha que contiene el primer punto del lazo mayor
+  const borde = contornoMascara(M, W, H);
+  if (!borde || borde.length < 3) return lazos[0];
+  // suavizado (Chaikin, una pasada) y vuelta a mm
+  const sv = []; for (let i = 0; i < borde.length; i++) { const p = borde[i], q = borde[(i + 1) % borde.length]; sv.push([0.75 * p[0] + 0.25 * q[0], 0.75 * p[1] + 0.25 * q[1]], [0.25 * p[0] + 0.75 * q[0], 0.25 * p[1] + 0.75 * q[1]]); }
+  return sv.map(p => [(p[0] - pad) * g + x0, (p[1] - pad) * g + y0]);
+}
+// borde exterior (por las esquinas de los píxeles) de la mancha mayor de una máscara
+function contornoMascara(M, W, H) {
+  const lleno = (i, j) => i >= 0 && j >= 0 && i < W && j < H && M[j * W + i] === 1;
+  // aristas del borde orientadas (lleno a la izquierda), de esquina a esquina
+  const sig = new Map(), clave = (i, j) => j * (W + 1) + i;
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+    if (!lleno(i, j)) continue;
+    if (!lleno(i, j - 1)) sig.set(clave(i, j), clave(i + 1, j));
+    if (!lleno(i + 1, j)) sig.set(clave(i + 1, j), clave(i + 1, j + 1));
+    if (!lleno(i, j + 1)) sig.set(clave(i + 1, j + 1), clave(i, j + 1));
+    if (!lleno(i - 1, j)) sig.set(clave(i, j + 1), clave(i, j));
+  }
+  // el lazo más largo es el exterior de la mancha mayor
+  const vistos = new Set(); let mejor = null;
+  sig.forEach((_, ini) => {
+    if (vistos.has(ini)) return;
+    const l = []; let k = ini, n = 0;
+    while (!vistos.has(k) && sig.has(k) && n++ < 1e6) { vistos.add(k); l.push([k % (W + 1), Math.floor(k / (W + 1))]); k = sig.get(k); }
+    if (!mejor || l.length > mejor.length) mejor = l;
+  });
+  // quitar los puntos intermedios de los tramos rectos
+  if (!mejor) return null;
+  return mejor.filter((p, i) => { const a = mejor[(i - 1 + mejor.length) % mejor.length], b = mejor[(i + 1) % mejor.length]; return (p[0] - a[0]) * (b[1] - p[1]) - (p[1] - a[1]) * (b[0] - p[0]) !== 0; });
+}
+// trozos sueltos y huecos que se pierden en cada costilla (para los avisos)
+function perdidasFigura(x) {
+  const ls = seccionFigura(x); if (ls.length < 2) return { sueltos: 0, huecos: 0 };
+  const P0 = ls[0].poly; let sueltos = 0, huecos = 0;
+  ls.slice(1).forEach(l => { if (l.area < Math.max(30, ls[0].area * 0.01)) return; if (dentroPoligono(P0, l.poly[0][0], l.poly[0][1])) huecos++; else sueltos++; });
+  return { sueltos, huecos };
+}
+function dentroPoligono(poly, x, y) {
+  let d = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const a = poly[i], b = poly[j]; if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) d = !d; }
+  return d;
+}
+function avisosFigura(res, add) {
+  if (!figuraActiva()) return;
+  const con = res.costillas.filter(c => c.ok).map(c => ({ c, p: perdidasFigura(c.x) })).filter(o => o.p.sueltos || o.p.huecos);
+  const s = con.filter(o => o.p.sueltos).map(o => o.c.i), h = con.filter(o => o.p.huecos).map(o => o.c.i);
+  if (s.length && P.figura.unir !== false) add('info', `Figura: en ${s.length} costilla${s.length > 1 ? 's' : ''} el corte tenía trozos sueltos (orejas, hombros…) y se han unido con puentes de madera (${cst(s.slice(0, 6))}${s.length > 6 ? '…' : ''}).`, s[0]);
+  else if (s.length) add('info', `Figura: en ${s.length} costilla${s.length > 1 ? 's' : ''} el corte tiene trozos sueltos (orejas, brazos…) que no se fabrican; solo se usa el contorno mayor (${cst(s.slice(0, 6))}${s.length > 6 ? '…' : ''}).`, s[0]);
+  if (h.length) add('info', `Figura: ${h.length} costilla${h.length > 1 ? 's tienen' : ' tiene'} huecos por dentro que se rellenan (${cst(h.slice(0, 6))}${h.length > 6 ? '…' : ''}).`, h[0]);
+}
+
+// ---- convertir la figura en perfiles clave (uno por costilla, mismos puntos en todos) ----
+function remuestrearLazo(poly, M) {
+  // empieza en el punto más bajo cerca del centro y reparte M puntos por la longitud
+  let cx = 0; poly.forEach(p => cx += p[0]); cx /= poly.length;
+  let i0 = 0, mej = Infinity; poly.forEach((p, i) => { const d = p[1] * 4 + Math.abs(p[0] - cx); if (d < mej) { mej = d; i0 = i; } });
+  const L = poly.slice(i0).concat(poly.slice(0, i0)); L.push(L[0]);
+  const acum = [0]; for (let i = 1; i < L.length; i++) acum.push(acum[i - 1] + Math.hypot(L[i][0] - L[i - 1][0], L[i][1] - L[i - 1][1]));
+  const tot = acum[acum.length - 1], out = []; let j = 0;
+  for (let k = 0; k < M; k++) {
+    const d = tot * k / M; while (j < acum.length - 2 && acum[j + 1] < d) j++;
+    const s = (d - acum[j]) / ((acum[j + 1] - acum[j]) || 1);
+    out.push([Math.round((L[j][0] + s * (L[j + 1][0] - L[j][0])) * 10) / 10, Math.round((L[j][1] + s * (L[j + 1][1] - L[j][1])) * 10) / 10]);
+  }
+  return out;
+}
+function convertirFiguraEnPerfiles() {
+  if (!figuraActiva() || !R) return 0;
+  let cs = R.costillas.filter(c => c.ok && c.poly.length >= 3);
+  if (cs.length > 60) cs = Array.from({ length: 60 }, (_, i) => cs[Math.round(i * (cs.length - 1) / 59)]);
+  if (cs.length < 2) return 0;
+  const M = 64;
+  P.claves = cs.map(c => ({ x: Math.round(c.x * 10) / 10, pts: remuestrearLazo(c.poly, M) }));
+  P.esquinas = new Array(M).fill(false);
+  P.plantilla = 'libre'; P.params = { largo: P.largo, fondo: Math.round(mallaFigura().ancho), alto: Math.round(mallaFigura().alto) };
+  P.editado = true; P.figura.activa = false; P.figura.malla = null;
+  return P.claves.length;
+}
+
+// ---- cargar ----
+function cargarFiguraTriangulos(tri, nombre, ejemplo) {
+  if (!tri.length) throw new Error('No se han encontrado triángulos en «' + nombre + '»');
+  const m = guardarMallaFigura(tri, nombre, ejemplo); P.figura.activa = true;
+  return m;
 }
 
 /* ===================== PLANTILLAS PARAMÉTRICAS =====================
@@ -1460,16 +1785,25 @@ function dibujarPerfil(ctx, V) {
   // costilla seleccionada
   const cs = piezaSel();
   if (cs && cs.ok && !cs.z) { ctx.setLineDash([6, 4]); ctx.strokeStyle = colorCostilla(.75); ctx.lineWidth = 1.4; V.camino(ctx, cs.poly); ctx.stroke(); ctx.setLineDash([]); }
+  const fig = figuraActiva();
+  let cont = fig ? (cs && cs.ok && !cs.z ? cs.poly : []) : [];
+  if (fig) {
+    if (cs && cs.ok && !cs.z) { ctx.fillStyle = conAlfa(acento, .13); ctx.strokeStyle = acento; ctx.lineWidth = 2; V.camino(ctx, cs.poly); ctx.fill(); ctx.stroke(); }
+    ctx.fillStyle = acento; ctx.font = '600 12.5px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText(`Forma desde el modelo 3D «${P.figura.malla.nombre}»: se cambia en el panel izquierdo`, V.w / 2, 66); ctx.textAlign = 'left';
+  }
   // otras claves
+  if (!fig) {
   ctx.strokeStyle = cssVar('--ejes'); ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
   C.forEach(o => { if (o !== k) { V.camino(ctx, curvaCerrada(o.pts, P.esquinas)); ctx.stroke(); } });
   ctx.setLineDash([]);
   // clave actual: curva completa y contorno recortado
-  const curva = curvaCerrada(k.pts, P.esquinas), cont = contornoDe(k.pts);
+  const curva = curvaCerrada(k.pts, P.esquinas); cont = contornoDe(k.pts);
   ctx.fillStyle = conAlfa(acento, .13);
   if (cont.length >= 3) { V.camino(ctx, cont); ctx.fill(); }
   ctx.strokeStyle = acento; ctx.lineWidth = 1; ctx.globalAlpha = .45; V.camino(ctx, curva); ctx.stroke(); ctx.globalAlpha = 1;
   if (cont.length >= 3) { ctx.lineWidth = 2.2; V.camino(ctx, cont); ctx.stroke(); }
+  }
   // corte superior
   if (P.costillas.tope) {
     const [, y] = V.aPantalla(0, P.costillas.topeAlt);
@@ -1477,8 +1811,8 @@ function dibujarPerfil(ctx, V) {
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(V.w, y); ctx.stroke(); ctx.setLineDash([]);
   }
   // polígono de control
-  ctx.strokeStyle = cssVar('--suave'); ctx.lineWidth = .8; ctx.setLineDash([2, 3]);
-  V.camino(ctx, k.pts); ctx.stroke(); ctx.setLineDash([]);
+  if (!fig) { ctx.strokeStyle = cssVar('--suave'); ctx.lineWidth = .8; ctx.setLineDash([2, 3]);
+  V.camino(ctx, k.pts); ctx.stroke(); ctx.setLineDash([]); }
   // varillas
   const r = radioAgujero(), Vv = P.varillas;
   // radial: tubo central y discos; pared: la pared y los rastreles
@@ -1538,7 +1872,7 @@ function dibujarPerfil(ctx, V) {
 const ED = { arr: null };
 function snap(v) { const g = +$('#kRejilla').value; return g ? Math.round(v / g) * g : Math.round(v * 10) / 10; }
 function puntoCerca(mx, my) {
-  if (relieveActivo()) return -1;
+  if (formaCalculada()) return -1;
   const k = claveActual(); let mejor = -1, md = 10;
   k.pts.forEach((p, i) => { const [x, y] = VP.aPantalla(p[0], p[1]), d = Math.hypot(x - mx, y - my); if (d < md) { md = d; mejor = i; } });
   return mejor;
@@ -1631,7 +1965,7 @@ function iniciarEditor() {
   c.addEventListener('dblclick', ev => {
     const r = c.getBoundingClientRect(), mx = ev.clientX - r.left, my = ev.clientY - r.top;
     const ip = puntoCerca(mx, my); if (ip >= 0) { alternarEsquina(ip); return; }
-    if (relieveActivo()) return;
+    if (formaCalculada()) return;
     const t = tramoCerca(mx, my); if (t) { insertarPunto(t.j, t.s); cambio('Punto añadido'); }
   });
   $('#bEsquina').onclick = () => alternarEsquina(UI.punto);
@@ -1650,7 +1984,7 @@ function dibujarPerfilRelieve(ctx, V) {
   if (cs && cs.ok && !cs.z) { ctx.fillStyle = conAlfa(cssVar('--acento'), .13); ctx.strokeStyle = cssVar('--acento'); ctx.lineWidth = 2; V.camino(ctx, cs.poly); ctx.fill(); ctx.stroke(); }
   R.rastreles.forEach(rr => { const [a, y] = V.aPantalla(0, rr.v + P.pared.alto / 2), [b] = V.aPantalla(P.pared.grueso, 0); ctx.fillStyle = 'rgba(205,179,138,.6)'; ctx.fillRect(a, y, b - a, P.pared.alto * V.sc); });
   ctx.fillStyle = cssVar('--acento'); ctx.font = '600 12.5px system-ui'; ctx.textAlign = 'center';
-  ctx.fillText(`Forma desde ${P.relieve.fuente === 'texto' ? 'el texto' : 'el modelo 3D'}: se cambia en el panel izquierdo (lama ${cs ? cs.etq : ''})`, V.w / 2, 66);
+  ctx.fillText(`Forma desde ${{ texto: 'el texto', modelo: 'el modelo 3D', imagen: 'la imagen' }[P.relieve.fuente]}: se cambia en el panel izquierdo (lama ${cs ? cs.etq : ''})`, V.w / 2, 66);
   ctx.textAlign = 'left';
 }
 function ayudaPerfil() {
@@ -1658,7 +1992,7 @@ function ayudaPerfil() {
 }
 function encuadrarPerfil() {
   if (!R) return;
-  if (relieveActivo()) { const cs = R.costillas.filter(c => c.ok); if (cs.length) VP.encuadrar({ x0: 0, y0: 0, w: Math.max(...cs.map(c => c.caja.x1)), h: Math.max(...cs.map(c => c.caja.y1)) }, 50); return; }
+  if (formaCalculada()) { const cs = R.costillas.filter(c => c.ok); if (cs.length) VP.encuadrar({ x0: 0, y0: 0, w: Math.max(...cs.map(c => c.caja.x1)), h: Math.max(...cs.map(c => c.caja.y1)) }, 50); return; }
   let x0 = Infinity, y0 = 0, x1 = -Infinity, y1 = -Infinity;
   P.claves.forEach(c => c.pts.forEach(p => { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }));
   VP.encuadrar({ x0, y0, w: x1 - x0, h: y1 - y0 }, 50);
@@ -1754,7 +2088,7 @@ function iniciar3D() {
   G.ctl = new T.OrbitControls(G.cam, cv);
   G.ctl.enableDamping = false; G.ctl.screenSpacePanning = true;
   G.ctl.addEventListener('change', pedirRender);
-  const hemi = new T.HemisphereLight(0xffffff, 0xd8cfc0, 0.6); s.add(hemi);
+  const hemi = G.hemi = new T.HemisphereLight(0xffffff, 0xd8cfc0, 0.6); s.add(hemi);
   const luz = G.luz = new T.DirectionalLight(0xffffff, 2.0);
   luz.castShadow = true; luz.shadow.mapSize.set(2048, 2048); luz.shadow.bias = -0.0004; luz.shadow.normalBias = 1.2; luz.shadow.radius = 4;
   s.add(luz); s.add(luz.target);
@@ -1901,8 +2235,26 @@ function construir3D() {
   // luz y suelo a la medida
   const tam = Math.max(sz.x, sz.y, sz.z, 300);
   G.suelo.scale.set(tam * 5, tam * 5, 1);
-  const L = G.luz; L.position.set(-tam * 0.9, tam * 1.6, tam * 1.1); L.target.position.set(0, G.alto / 3, 0);
-  const sc = L.shadow.camera; sc.left = sc.bottom = -tam * 1.2; sc.right = sc.top = tam * 1.2; sc.near = 10; sc.far = tam * 6; sc.updateProjectionMatrix();
+  G.tam = tam;
+  luces3D();
+}
+// luz normal (de arriba a un lado) o rasante: muy baja, casi paralela a la superficie, y se puede girar
+function luces3D() {
+  if (!G.luz) return;
+  const L = G.luz, tam = G.tam || 1000, ras = P.vista.rasante, a = (P.vista.rasAng || 0) * Math.PI / 180;
+  const c = [0, (G.alto || 400) / 2, 0];
+  if (!ras) {
+    L.position.set(-tam * 0.9, tam * 1.6, tam * 1.1); L.target.position.set(0, (G.alto || 400) / 3, 0);
+    L.intensity = 2.0; G.hemi.intensity = 0.6; G.scene.environmentIntensity = 0.55;
+  } else {
+    const d = tam * 2.2;
+    // en la pared, la luz va pegada a la pared (gira en su plano); en los muebles, a ras del suelo alrededor
+    if (P.tipo === 'pared') L.position.set(c[0] + d * Math.cos(a), c[1] + d * Math.sin(a), d * 0.22);
+    else L.position.set(c[0] + d * Math.cos(a), c[1] + d * 0.18, c[2] + d * Math.sin(a));
+    L.target.position.set(c[0], c[1], c[2]);
+    L.intensity = 3.2; G.hemi.intensity = P.tipo === 'pared' ? 0.12 : 0.28; G.scene.environmentIntensity = P.tipo === 'pared' ? 0.12 : 0.22;
+  }
+  const sc = L.shadow.camera, r = tam * (ras ? 1.6 : 1.2); sc.left = sc.bottom = -r; sc.right = sc.top = r; sc.near = 10; sc.far = tam * 7; sc.updateProjectionMatrix();
   pedirRender();
 }
 // varillas, separadores y tuercas (siguen la planta, recta o curva)
@@ -1949,7 +2301,7 @@ function construirVarillas3D() {
 function construirClaves3D() {
   (G.claves3d || []).forEach(l => { G.modelo.remove(l); l.geometry.dispose(); l.material.dispose(); });
   G.claves3d = [];
-  if (!P.vista.claves || relieveActivo()) return;
+  if (!P.vista.claves || formaCalculada()) return;
   const C = clavesOrdenadas(), acento = cssVar('--acento') || '#1f6fd1';
   C.forEach((k, i) => {
     if (P.tipo === 'radial' && k.x >= 359.999 && C.length > 1) return;     // la de 360° es la misma que la de 0°
@@ -1977,6 +2329,7 @@ function colocarExplosion() {
   pedirRender();
 }
 function construirFantasma() {
+  if (figuraActiva()) { if (G.fantasma) { G.modelo.remove(G.fantasma); G.fantasma.geometry.dispose(); G.fantasma = null; } return; }
   if (G.fantasma) { G.modelo.remove(G.fantasma); G.fantasma.geometry.dispose(); G.fantasma.material.dispose(); G.fantasma = null; }
   if (!P.vista.fantasma) return;
   const N = P.tipo === 'radial' ? 72 : 64, anillos = [], X = P.tipo === 'radial' ? 360 : P.largo;
@@ -2157,9 +2510,16 @@ function iniciarPanel() {
     encuadrarSiHaceFalta(); camara('tres4');
   });
   // relieve: texto o modelo 3D
-  LETRAS_SISTEMA.forEach(l => $('#rlLetra').add(new Option(l, l)));
+  llenarLetras();
   const Rl = () => P.relieve;
   enlazar('#sOrigen', () => {
+    if (P.tipo !== 'pared') {   // costillas y retícula: plantilla o figura desde un modelo 3D
+      P.figura.activa = $('#sOrigen').value === 'figura';
+      if (P.figura.activa && !P.figura.malla) { P.figura.activa = false; ponerControles(); $('#sOrigen').value = 'figura'; mostrarSecciones(true); aviso('Carga un modelo 3D o elige uno de ejemplo.'); return; }
+      R = calcular(); if (P.tipo === 'costillas') autoVarillas(P.varillas.autoN);
+      UI.costilla = 0; ponerControles(); cambio(P.figura.activa ? 'Figura desde un modelo 3D' : 'Forma desde la plantilla'); encuadrarSiHaceFalta(); encuadrarPerfil(); camara('tres4');
+      return;
+    }
     Rl().fuente = $('#sOrigen').value;
     if (relieveActivo() && P.pared.rastreles && Rl().fondo < P.pared.grueso + 15) Rl().fondo = P.pared.grueso + 15;
     UI.costilla = 0; ponerControles(); cambio({ plantilla: 'Forma desde la plantilla', texto: 'Relieve de texto', modelo: 'Relieve desde un modelo 3D', imagen: 'Relieve desde una imagen' }[Rl().fuente]);
@@ -2175,7 +2535,11 @@ function iniciarPanel() {
   enlazar('#rlInvertir', () => { Rl().invertir = $('#rlInvertir').checked; cambio(); });
   let tTexto = 0;
   $('#rlTexto').addEventListener('input', () => { clearTimeout(tTexto); tTexto = setTimeout(() => { Rl().texto = $('#rlTexto').value; cambio('Texto'); }, 450); });
-  const vista = () => { Rl().vista = $('#rlVista').value; Rl().giro = +$('#rlGiro').value; if (reproyectarModelo()) cambio('Vista del modelo'); else aviso('Para cambiar la vista, vuelve a cargar el modelo (el proyecto guarda solo su relieve).', 5000); };
+  const vista = async () => {
+    Rl().vista = $('#rlVista').value; Rl().giro = +$('#rlGiro').value;
+    if (Rl().modelo && Rl().modelo.ejemplo) { try { await cargarRecurso('modelos'); } catch (e) { /* sin modelos */ } }
+    if (reproyectarModelo()) cambio('Vista del modelo'); else aviso('Para cambiar la vista, vuelve a cargar el modelo (el proyecto guarda solo su relieve).', 5000);
+  };
   enlazar('#rlVista', vista); enlazar('#rlGiro', vista);
   $('#bCargarModelo').onclick = () => {
     const f = $('#fModelo'); f.value = '';
@@ -2188,9 +2552,37 @@ function iniciarPanel() {
     };
     f.click();
   };
-  $('#bModeloEjemplo').onclick = dialogoModelos;
+  $('#bModeloEjemplo').onclick = () => dialogoModelos(false);
   $('#bImagenEjemplo').onclick = dialogoImagenes;
+  // figura desde un modelo 3D (costillas y retícula)
+  const Fg = () => P.figura;
+  const reFigura = (txt) => { R = calcular(); if (P.tipo === 'costillas') autoVarillas(P.varillas.autoN); ponerControles(); cambio(txt); encuadrarSiHaceFalta(); encuadrarPerfil(); camara('tres4'); };
+  enlazar('#fgAlto', () => { Fg().alto = clamp(+$('#fgAlto').value || 800, 100, 5000); reFigura('Alto de la figura'); });
+  enlazar('#fgEje', () => { Fg().eje = $('#fgEje').value; reFigura(Fg().eje === 'z' ? 'Cortes de delante a atrás' : 'Cortes de lado a lado'); });
+  enlazar('#fgUnir', () => { Fg().unir = $('#fgUnir').checked; CACHE_SEC.clave = ''; reFigura(Fg().unir ? 'Unir trozos sueltos' : 'Solo el trozo mayor'); });
+  enlazar('#fgMin', () => { Fg().minArea = clamp(+$('#fgMin').value || 0, 0, 60); reFigura('Costillas pequeñas'); });
+  enlazar('#fgGiro', () => { Fg().giro = +$('#fgGiro').value; reFigura('Giro de la figura'); });
+  $('#bFigCargar').onclick = () => {
+    const f = $('#fModelo'); f.value = '';
+    f.onchange = () => {
+      const a = f.files[0]; if (!a) return;
+      aviso('Leyendo ' + esc(a.name) + '…');
+      const rd = new FileReader();
+      rd.onload = () => { try { const m = cargarFiguraTriangulos(leerMalla(rd.result, a.name), a.name); reFigura('Figura: ' + a.name); aviso(`${esc(a.name)}: ${m.original.toLocaleString('es-ES')} triángulos${m.nt < m.original ? ` (reducido a ${m.nt.toLocaleString('es-ES')})` : ''}`, 4000); } catch (e) { aviso('⚠ ' + esc(e.message), 5000); } };
+      rd.readAsArrayBuffer(a);
+    };
+    f.click();
+  };
+  $('#bFigEjemplo').onclick = () => dialogoModelos(true);
   $('#bConvertirPerfiles').onclick = () => {
+    if (figuraActiva()) {
+      if (!confirm(`Se va a convertir la figura en perfiles clave (uno por costilla, como mucho 60), para que puedas mover, añadir o quitar puntos y perfiles a mano. La forma pasa a «Plantilla: Forma libre».\n\n⚠ Este cambio no se puede revertir: el modelo 3D se quita del proyecto y ya no podrás cambiar su alto, sus cortes o su giro (solo con ↶ Deshacer, antes de cerrar). Si quieres conservarlo, guarda antes una copia del proyecto.\n\n¿Convertir?`)) return;
+      const n = convertirFiguraEnPerfiles(); if (!n) return;
+      UI.clave = Math.floor(n / 2); UI.punto = -1;
+      R = calcular(); ponerControles(); cambio(`Convertido en ${n} perfiles editables`); encuadrarSiHaceFalta(); encuadrarPerfil(); camara('tres4');
+      aviso(`Convertido en ${n} perfiles clave. Ya puedes editar los puntos en la vista del perfil.`, 5000);
+      return;
+    }
     const que = { texto: 'el texto', modelo: 'el modelo 3D', imagen: 'la imagen' }[Rl().fuente] || 'el relieve';
     if (!confirm(`Se va a convertir ${que} en perfiles clave (un perfil en cada lama), para que puedas mover, añadir o quitar puntos y perfiles a mano. La forma pasa a «Panel de pared: Plantilla».\n\n⚠ Este cambio no se puede revertir: ya no podrás volver a cambiar ${que}, ni las medidas, el relieve o el suavizado (solo con ↶ Deshacer, antes de cerrar). Si quieres conservarlo, guarda antes una copia del proyecto.\n\n¿Convertir?`)) return;
     const n = convertirRelieveEnPerfiles(); if (!n) return;
@@ -2198,6 +2590,26 @@ function iniciarPanel() {
     ponerControles(); cambio(`Convertido en ${n} perfiles editables`); encuadrarSiHaceFalta(); camara('tres4');
     aviso(`Convertido en ${n} perfiles clave. Ya puedes editar los puntos en la vista del perfil.`, 5000);
   };
+  $$('.bLetra').forEach(bt => bt.onclick = () => {
+    const destino = bt.closest('#caCampos') ? 'capa' : 'texto', f = $('#fLetra'); f.value = '';
+    f.onchange = () => {
+      const a = f.files[0]; if (!a) return;
+      cargarLetraArchivo(a).then(nombre => {
+        if (destino === 'capa') P.relieve.capa.letra = nombre; else P.relieve.letra = nombre;
+        llenarLetras(); ponerControles(); cambio('Letra: ' + nombre); aviso('Letra cargada: ' + esc(nombre) + '. Se guarda dentro del proyecto.', 4000);
+      }).catch(e => aviso('⚠ ' + esc(e.message || 'No se puede leer esa letra'), 5000));
+    };
+    f.click();
+  });
+  // texto añadido encima del relieve
+  const Ca = () => P.relieve.capa;
+  enlazar('#caActiva', () => { Ca().activa = $('#caActiva').checked; $('#caCampos').classList.toggle('oculto', !Ca().activa); cambio(Ca().activa ? 'Texto añadido' : 'Sin texto añadido'); });
+  let tCapa = 0;
+  $('#caTexto').addEventListener('input', () => { clearTimeout(tCapa); tCapa = setTimeout(() => { Ca().texto = $('#caTexto').value; cambio('Texto añadido'); }, 450); });
+  enlazar('#caLetra', () => { Ca().letra = $('#caLetra').value; cambio(); });
+  enlazar('#caNegrita', () => { Ca().negrita = $('#caNegrita').checked; cambio(); });
+  enlazar('#caModo', () => { Ca().modo = $('#caModo').value; cambio(); });
+  [['#caTam', 'tamLetra', 5, 3000], ['#caRelieve', 'relieve', 0, 500], ['#caX', 'x', 0, 100], ['#caY', 'y', 0, 100]].forEach(([s, k, a, b]) => enlazar(s, () => { Ca()[k] = clamp(+$(s).value || 0, a, b); cambio(); }));
   enlazar('#rlGama', () => { Rl().gama = clamp(+$('#rlGama').value || 1, 0.2, 5); cambio(); });
   $('#bAjustarImagen').onclick = () => { if (!Rl().imagen) { aviso('Carga antes una imagen.'); return; } ajustarAltoImagen(); ponerControles(); cambio('Alto según la imagen'); encuadrarSiHaceFalta(); camara('tres4'); };
   $('#bCargarImagen').onclick = () => {
@@ -2266,6 +2678,8 @@ function iniciarPanel() {
   $('#rExplosion').oninput = () => { P.vista.explosion = +$('#rExplosion').value; colocarExplosion(); if (P.vista.fantasma) { construirFantasma(); pedirRender(); } };
   $('#cFantasma').onchange = () => { P.vista.fantasma = $('#cFantasma').checked; construirFantasma(); pedirRender(); };
   $('#cVarillas3d').onchange = () => { P.vista.varillas = $('#cVarillas3d').checked; colocarExplosion(); };
+  $('#cRasante').onchange = () => { P.vista.rasante = $('#cRasante').checked; $('#rRasante').classList.toggle('oculto', !P.vista.rasante); luces3D(); };
+  $('#rRasante').oninput = () => { P.vista.rasAng = +$('#rRasante').value; luces3D(); };
   $('#cResalta').onchange = () => { P.vista.resalta = $('#cResalta').checked; resaltar3D(); };
   // distribución
   $$('[data-dist]').forEach(b => b.onclick = () => {
@@ -2286,7 +2700,7 @@ function llenarPlantillas() {
   sp.value = P.plantilla;
 }
 // enseña los apartados de cada tipo de mueble
-function mostrarSecciones() {
+function mostrarSecciones(forzarFigura) {
   const t = P.tipo;
   $('#secVarillas').classList.toggle('oculto', t !== 'costillas');
   $('#secReticula').classList.toggle('oculto', t !== 'reticula');
@@ -2301,16 +2715,17 @@ function mostrarSecciones() {
   $('#filaNum').classList.toggle('oculto', rad || P.costillas.modo !== 'numero');
   $('#kPosTit').textContent = rad ? 'Posición (°)' : 'Posición (mm)';
   // relieve (paneles de pared)
-  const rel = relieveActivo(), Rl = P.relieve;
-  $('#filaOrigen').classList.toggle('oculto', t !== 'pared');
-  $('#filaPlantilla').classList.toggle('oculto', rel); $('#params').classList.toggle('oculto', rel); $('#descPlantilla').classList.toggle('oculto', rel);
-  $('#secRelieve').classList.toggle('oculto', !rel); $('#bConvertirPerfiles').classList.toggle('oculto', !rel);
+  const rel = relieveActivo(), fig = figuraActiva() || (forzarFigura && t !== 'pared' && t !== 'radial'), calc = rel || fig, Rl = P.relieve;
+  $('#filaOrigen').classList.toggle('oculto', t === 'radial');
+  [...$('#sOrigen').options].forEach(o => { o.hidden = t === 'pared' ? o.value === 'figura' : !['plantilla', 'figura'].includes(o.value); });
+  $('#filaPlantilla').classList.toggle('oculto', calc); $('#params').classList.toggle('oculto', calc); $('#descPlantilla').classList.toggle('oculto', calc);
+  $('#secRelieve').classList.toggle('oculto', !rel); $('#secFigura').classList.toggle('oculto', !fig); $('#bConvertirPerfiles').classList.toggle('oculto', !(rel || figuraActiva()));
   $('#relTexto').classList.toggle('oculto', Rl.fuente !== 'texto'); $('#relModelo').classList.toggle('oculto', Rl.fuente !== 'modelo'); $('#relImagen').classList.toggle('oculto', Rl.fuente !== 'imagen');
-  $('#secClaves').classList.toggle('oculto', rel);
-  $('#sClave').classList.toggle('oculto', rel); $('#bEsquina').classList.toggle('oculto', rel); $('#infoClave').classList.toggle('oculto', rel);
+  $('#secClaves').classList.toggle('oculto', calc);
+  $('#sClave').classList.toggle('oculto', calc); $('#bEsquina').classList.toggle('oculto', calc); $('#infoClave').classList.toggle('oculto', calc);
 }
 function ponerControles() {
-  llenarPlantillas();
+  llenarPlantillas(); llenarLetras();
   const C = P.costillas, V = P.varillas;
   const op = [...$('#cGrosor').options].map(o => o.value);
   if (op.includes(String(C.grosor))) { $('#cGrosor').value = String(C.grosor); $('#filaGrosorOtro').classList.add('oculto'); }
@@ -2328,16 +2743,20 @@ function ponerControles() {
   const Ra = P.radial; $('#raNum').value = P.costillas.numero; $('#raTubo').value = Ra.tubo; $('#raHolTubo').value = Ra.holguraTubo; $('#raDiscos').value = Ra.discos; $('#raRDisco').value = Ra.rDisco; $('#raHolgura').value = Ra.holgura;
   const Pa = P.pared; $('#paNum').value = Pa.rastreles; $('#paAlto').value = Pa.alto; $('#paGrueso').value = Pa.grueso; $('#paMargen').value = Pa.margen; $('#paHolgura').value = Pa.holgura; $('#paVer').checked = Pa.verPared;
   $('#cClaves3d').checked = P.vista.claves !== false;
-  const Rl = P.relieve; $('#sOrigen').value = P.tipo === 'pared' ? Rl.fuente : 'plantilla'; $('#paOrient').value = Rl.orient || 'v';
+  const Fg = P.figura; $('#fgAlto').value = Fg.alto; $('#fgEje').value = Fg.eje; $('#fgGiro').value = String(Fg.giro || 0); $('#fgMin').value = Fg.minArea; $('#fgUnir').checked = Fg.unir !== false;
+  $('#fgInfo').textContent = Fg.malla ? `Modelo: ${Fg.malla.nombre} (${Fg.malla.nt.toLocaleString('es-ES')} triángulos${Fg.malla.original > Fg.malla.nt ? ', reducido de ' + Fg.malla.original.toLocaleString('es-ES') : ''}).` + (figuraActiva() ? ` La figura mide ${fmt(mallaFigura().largo)} × ${fmt(mallaFigura().ancho)} × ${fmt(mallaFigura().alto)} mm.` : '') : 'Sin modelo. Carga un STL u OBJ: cada costilla será un corte de verdad del modelo.';
+  const Rl = P.relieve; $('#sOrigen').value = P.tipo === 'pared' ? Rl.fuente : (figuraActiva() ? 'figura' : 'plantilla'); $('#paOrient').value = Rl.orient || 'v';
   $('#rlTexto').value = Rl.texto; $('#rlLetra').value = Rl.letra; $('#rlNegrita').checked = Rl.negrita; $('#rlTam').value = Rl.tamLetra; $('#rlInter').value = Rl.interlinea;
   $('#rlVista').value = Rl.vista; $('#rlGiro').value = String(Rl.giro || 0); $('#rlBase').value = Rl.base;
   $('#rlAncho').value = Rl.ancho; $('#rlAlto').value = Rl.alto; $('#rlFondo').value = Rl.fondo; $('#rlRelieve').value = Rl.relieve; $('#rlSuave').value = Rl.suavizado; $('#rlInvertir').checked = Rl.invertir; $('#rlOnda').value = Rl.ondaAmp; $('#rlOndas').value = Rl.ondas;
-  $('#rlModeloInfo').textContent = Rl.modelo ? `Modelo: ${Rl.modelo.nombre}` + (Rl.modelo.triangulos ? ` (${Rl.modelo.triangulos.toLocaleString('es-ES')} triángulos)` : '') + (mallaVigente() ? '' : '. El proyecto guarda su relieve; para cambiar la vista, vuelve a cargarlo.') : 'Sin modelo. Carga un STL u OBJ (rostro, figura, logo en 3D…).';
+  $('#rlModeloInfo').textContent = Rl.modelo ? `Modelo: ${Rl.modelo.nombre}` + (Rl.modelo.triangulos ? ` (${Rl.modelo.triangulos.toLocaleString('es-ES')} triángulos)` : '') + (mallaVigente() || Rl.modelo.ejemplo ? '' : '. El proyecto guarda su relieve; para cambiar la vista, vuelve a cargarlo.') : 'Sin modelo. Carga un STL u OBJ (rostro, figura, logo en 3D…).';
   $('#rlGama').value = Rl.gama || 1;
+  const Ca = Rl.capa; $('#caActiva').checked = Ca.activa; $('#caCampos').classList.toggle('oculto', !Ca.activa); $('#caTexto').value = Ca.texto; $('#caLetra').value = Ca.letra;
+  $('#caNegrita').checked = Ca.negrita; $('#caTam').value = Ca.tamLetra; $('#caRelieve').value = Ca.relieve; $('#caModo').value = Ca.modo; $('#caX').value = Ca.x; $('#caY').value = Ca.y;
   $('#rlImagenInfo').textContent = Rl.imagen ? `Imagen: ${Rl.imagen.nombre} (${Rl.imagen.w} × ${Rl.imagen.h} px). Lo blanco sale más.` : 'Sin imagen. Carga una foto o un dibujo: lo blanco sale más y lo negro queda en el fondo.';
   mostrarSecciones();
   const M = P.maqueta; $('#mActiva').checked = M.activa; $('#mEscala').value = String(M.escala); $('#mGrosor').value = M.grosor; $('#mDiam').value = M.diam; $('#mHolgura').value = M.holgura;
-  $('#rExplosion').value = P.vista.explosion; $('#cFantasma').checked = P.vista.fantasma; $('#cVarillas3d').checked = P.vista.varillas; $('#cResalta').checked = P.vista.resalta;
+  $('#rExplosion').value = P.vista.explosion; $('#cFantasma').checked = P.vista.fantasma; $('#cVarillas3d').checked = P.vista.varillas; $('#cResalta').checked = P.vista.resalta; $('#cRasante').checked = !!P.vista.rasante; $('#rRasante').value = P.vista.rasAng || 30; $('#rRasante').classList.toggle('oculto', !P.vista.rasante);
   construirParams();
 }
 
@@ -3558,7 +3977,7 @@ function proyectoDePlantilla(id, extra) {
     if (extra.varillas) Object.assign(p.varillas, extra.varillas);
     if (extra.reticula) Object.assign(p.reticula, extra.reticula);
     if (extra.tipo) p.tipo = extra.tipo;
-    ['planta', 'radial', 'pared', 'relieve'].forEach(k => { if (extra[k]) Object.assign(p[k], extra[k]); });
+    ['planta', 'radial', 'pared', 'relieve', 'figura'].forEach(k => { if (extra[k]) Object.assign(p[k], extra[k]); });
     if (extra.nombre) p.nombre = extra.nombre;
   }
   return p;
@@ -3575,6 +3994,7 @@ function cargarProyecto(p, autoVar) {
   C.forEach((k, i) => { if (Math.abs(k.x - P.largo / 2) < Math.abs(C[mejor].x - P.largo / 2)) mejor = i; });
   UI.clave = mejor; refrescarClaves();
   encuadrarPerfil(); selCostilla(Math.floor(R.n / 2)); camara('tres4'); colores3D();
+  registrarLetras();
   UI.sucio = false;
 }
 function validarProyecto(o) {
@@ -3586,7 +4006,8 @@ function validarProyecto(o) {
   p.maqueta = Object.assign(proyectoBase().maqueta, o.maqueta || {});
   p.cnc = Object.assign(proyectoBase().cnc, o.cnc || {});
   p.reticula = Object.assign(proyectoBase().reticula, o.reticula || {});
-  ['planta', 'radial', 'pared', 'relieve'].forEach(k => p[k] = Object.assign(proyectoBase()[k], o[k] || {}));
+  ['planta', 'radial', 'pared', 'relieve', 'figura'].forEach(k => p[k] = Object.assign(proyectoBase()[k], o[k] || {}));
+  p.relieve.capa = Object.assign(proyectoBase().relieve.capa, (o.relieve || {}).capa || {});
   if (!['reticula', 'radial', 'pared'].includes(p.tipo)) p.tipo = 'costillas';
   if (!PLANTILLAS[p.plantilla]) p.plantilla = 'libre';
   p.params = Object.assign(paramsDefecto(p.plantilla), o.params || {});
@@ -3622,13 +4043,24 @@ function dialogoNuevo() {
     cerrarModal(); cargarProyecto(proyectoDePlantilla(b.dataset.nuevo), true);
   });
 }
-function dialogoModelos() {
+async function dialogoModelos(paraFigura) {
+  try { aviso('Cargando los modelos…'); await cargarRecurso('modelos'); } catch (e) { aviso('⚠ ' + esc(e.message), 5000); return; }
   const M = modelosEjemplo();
   const items = M.map(m => `<button data-mod="${m.id}"><b>${esc(m.nombre)}</b><small>${esc(m.desc)} · ${m.triangulos.toLocaleString('es-ES')} triángulos · <a href="assets/modelos/${m.archivo}" download data-stl>${m.archivo}</a></small></button>`).join('');
-  modal('🗿 Modelos 3D de ejemplo', `<p class="nota">Modelos para probar el relieve. Al elegir uno se carga con su vista y unas medidas de panel adecuadas; después cambia la vista, el giro, el relieve o las lamas para ver qué pasa. Los mismos modelos están como STL en <b>assets/modelos</b>.</p><div class="ejemplos">${items || '<p>No se encuentra assets/modelos/modelos.js</p>'}</div>`);
+  modal('🗿 Modelos 3D de ejemplo', `<p class="nota">${paraFigura ? 'Modelos para probar la figura: cada costilla será un corte del modelo. Al elegir uno se carga a 800 mm de alto; después cambia el alto, los cortes, el giro o la separación.' : 'Modelos para probar el relieve. Al elegir uno se carga con su vista y unas medidas de panel adecuadas; después cambia la vista, el giro, el relieve o las lamas para ver qué pasa.'} Los mismos modelos están como STL en <b>assets/modelos</b>.</p><div class="ejemplos">${items || '<p>No se encuentra assets/modelos/modelos.js</p>'}</div>`);
   $$('[data-stl]').forEach(a => a.onclick = e => e.stopPropagation());
   $$('[data-mod]').forEach(b => b.onclick = () => {
     cerrarModal();
+    if (paraFigura) {
+      try {
+        const r = triangulosEjemplo(b.dataset.mod); if (!r) throw new Error('No se encuentra el modelo');
+        cargarFiguraTriangulos(r.tri, r.M.nombre, b.dataset.mod);
+        R = calcular(); if (P.tipo === 'costillas') autoVarillas(P.varillas.autoN);
+        UI.costilla = 0; ponerControles(); cambio('Figura: ' + r.M.nombre); encuadrarSiHaceFalta(); encuadrarPerfil(); camara('tres4');
+        aviso(esc(r.M.nombre));
+      } catch (e) { aviso('⚠ ' + esc(e.message), 5000); }
+      return;
+    }
     try {
       // fuera de un panel de pared, empieza un panel nuevo (preguntando si hay cambios)
       const nuevo = P.tipo !== 'pared';
@@ -3642,7 +4074,8 @@ function dialogoModelos() {
     } catch (e) { aviso('⚠ ' + esc(e.message), 5000); }
   });
 }
-function dialogoImagenes() {
+async function dialogoImagenes() {
+  try { await cargarRecurso('imagenes'); } catch (e) { aviso('⚠ ' + esc(e.message), 5000); return; }
   const I = imagenesEjemplo();
   const items = I.map(m => `<button data-img="${m.id}" style="display:flex;gap:10px;align-items:center;text-align:left"><img src="${m.png}" alt="" style="width:64px;height:64px;object-fit:contain;background:#000;border-radius:4px;flex:none"><span><b>${esc(m.nombre)}</b><small>${esc(m.desc)} · <a href="assets/imagenes/${m.archivo}" download data-png>${m.archivo}</a></small></span></button>`).join('');
   modal('🖼 Imágenes de ejemplo', `<p class="nota">Imágenes en escala de grises para probar el relieve: <b>lo blanco sale más y lo negro queda en el fondo</b>. Al elegir una se carga con unas medidas de panel adecuadas. Las mismas imágenes están como PNG en <b>assets/imagenes</b>: ábrelas o retócalas en un programa de dibujo y vuelve a cargarlas.</p><div class="ejemplos">${items || '<p>No se encuentra assets/imagenes/imagenes.js</p>'}</div>`);
@@ -3665,11 +4098,21 @@ function dialogoEjemplos() {
   const E = window.MADE_EJEMPLOS || [];
   const items = E.map((e, i) => `<button data-ej="${i}"><b>${esc(e.nombre)}</b><small>${esc(e.desc)}</small></button>`).join('');
   modal('🪑 Ejemplos', `<p class="nota">Muebles de ejemplo para ver cómo funciona. Se abren como un proyecto nuevo.</p><div class="ejemplos">${items || '<p>No se encuentra assets/ejemplos/ejemplos.js</p>'}</div>`);
-  $$('[data-ej]').forEach(b => b.onclick = () => {
+  $$('[data-ej]').forEach(b => b.onclick = async () => {
     if (UI.sucio && !confirm('Hay cambios sin guardar. ¿Abrir el ejemplo?')) return;
     const e = E[+b.dataset.ej]; cerrarModal();
     const p = proyectoDePlantilla(e.plantilla, e);
-    if (e.modeloEjemplo || e.imagenEjemplo) { const ant = P; P = p; try { if (e.modeloEjemplo) cargarModeloEjemplo(e.modeloEjemplo, false, true); else cargarImagenEjemplo(e.imagenEjemplo); } catch (er) { aviso('⚠ ' + esc(er.message), 5000); } P = ant; }
+    if (e.modeloEjemplo || e.imagenEjemplo || e.figuraEjemplo) {
+      const ant = P;
+      try {
+        if (e.imagenEjemplo) await cargarRecurso('imagenes'); else { aviso('Cargando el modelo…'); await cargarRecurso('modelos'); }
+        P = p;
+        if (e.modeloEjemplo) cargarModeloEjemplo(e.modeloEjemplo, false, true);
+        else if (e.imagenEjemplo) cargarImagenEjemplo(e.imagenEjemplo);
+        else { const r = triangulosEjemplo(e.figuraEjemplo); if (!r) throw new Error('No se encuentra el modelo «' + e.figuraEjemplo + '»'); cargarFiguraTriangulos(r.tri, r.M.nombre, e.figuraEjemplo); }
+      } catch (er) { aviso('⚠ ' + esc(er.message), 5000); }
+      P = ant;
+    }
     cargarProyecto(p, true);
     aviso('Ejemplo: ' + esc(e.nombre));
   });

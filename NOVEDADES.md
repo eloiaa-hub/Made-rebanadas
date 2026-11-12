@@ -2,6 +2,12 @@
 
 ## v1.5
 
+- **Figuras de pie desde un modelo 3D** (costillas y retícula): cada costilla es un corte de verdad del STL/OBJ. Alto, cortes de lado a lado o de delante a atrás, giro, unir trozos sueltos con puentes y quitar las costillas pequeñas. El modelo se guarda en el proyecto. Ejemplos «Busto de rebanadas» y «Busto en retícula».
+- **Texto añadido encima** de cualquier relieve (imagen, modelo, ondas u otro texto), que sale o se hunde.
+- **Letras propias** (.ttf, .otf, .woff): se guardan dentro del proyecto.
+- **Luz rasante** en la vista 3D, con su dirección.
+- Los modelos y las imágenes de ejemplo **solo se cargan cuando se usan**: el programa abre más rápido.
+- Las varillas van de la primera a la última costilla que existe.
 - **Origen de la forma** en los paneles de pared: plantilla, **texto en relieve** o **modelo 3D (STL / OBJ)**.
 - **Texto en relieve** para rótulos y nombres: letra, tamaño, negrita, varias líneas, suavizado de los bordes y onda de fondo.
 - **Figuras desde un modelo 3D** (caras, labios, formas de arte mural): vista, giro y base; el proyecto guarda el mapa de alturas.

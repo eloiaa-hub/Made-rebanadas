@@ -42,7 +42,7 @@ function iniciar3D() {
   G.ctl = new T.OrbitControls(G.cam, cv);
   G.ctl.enableDamping = false; G.ctl.screenSpacePanning = true;
   G.ctl.addEventListener('change', pedirRender);
-  const hemi = new T.HemisphereLight(0xffffff, 0xd8cfc0, 0.6); s.add(hemi);
+  const hemi = G.hemi = new T.HemisphereLight(0xffffff, 0xd8cfc0, 0.6); s.add(hemi);
   const luz = G.luz = new T.DirectionalLight(0xffffff, 2.0);
   luz.castShadow = true; luz.shadow.mapSize.set(2048, 2048); luz.shadow.bias = -0.0004; luz.shadow.normalBias = 1.2; luz.shadow.radius = 4;
   s.add(luz); s.add(luz.target);
@@ -189,8 +189,26 @@ function construir3D() {
   // luz y suelo a la medida
   const tam = Math.max(sz.x, sz.y, sz.z, 300);
   G.suelo.scale.set(tam * 5, tam * 5, 1);
-  const L = G.luz; L.position.set(-tam * 0.9, tam * 1.6, tam * 1.1); L.target.position.set(0, G.alto / 3, 0);
-  const sc = L.shadow.camera; sc.left = sc.bottom = -tam * 1.2; sc.right = sc.top = tam * 1.2; sc.near = 10; sc.far = tam * 6; sc.updateProjectionMatrix();
+  G.tam = tam;
+  luces3D();
+}
+// luz normal (de arriba a un lado) o rasante: muy baja, casi paralela a la superficie, y se puede girar
+function luces3D() {
+  if (!G.luz) return;
+  const L = G.luz, tam = G.tam || 1000, ras = P.vista.rasante, a = (P.vista.rasAng || 0) * Math.PI / 180;
+  const c = [0, (G.alto || 400) / 2, 0];
+  if (!ras) {
+    L.position.set(-tam * 0.9, tam * 1.6, tam * 1.1); L.target.position.set(0, (G.alto || 400) / 3, 0);
+    L.intensity = 2.0; G.hemi.intensity = 0.6; G.scene.environmentIntensity = 0.55;
+  } else {
+    const d = tam * 2.2;
+    // en la pared, la luz va pegada a la pared (gira en su plano); en los muebles, a ras del suelo alrededor
+    if (P.tipo === 'pared') L.position.set(c[0] + d * Math.cos(a), c[1] + d * Math.sin(a), d * 0.22);
+    else L.position.set(c[0] + d * Math.cos(a), c[1] + d * 0.18, c[2] + d * Math.sin(a));
+    L.target.position.set(c[0], c[1], c[2]);
+    L.intensity = 3.2; G.hemi.intensity = P.tipo === 'pared' ? 0.12 : 0.28; G.scene.environmentIntensity = P.tipo === 'pared' ? 0.12 : 0.22;
+  }
+  const sc = L.shadow.camera, r = tam * (ras ? 1.6 : 1.2); sc.left = sc.bottom = -r; sc.right = sc.top = r; sc.near = 10; sc.far = tam * 7; sc.updateProjectionMatrix();
   pedirRender();
 }
 // varillas, separadores y tuercas (siguen la planta, recta o curva)
@@ -237,7 +255,7 @@ function construirVarillas3D() {
 function construirClaves3D() {
   (G.claves3d || []).forEach(l => { G.modelo.remove(l); l.geometry.dispose(); l.material.dispose(); });
   G.claves3d = [];
-  if (!P.vista.claves || relieveActivo()) return;
+  if (!P.vista.claves || formaCalculada()) return;
   const C = clavesOrdenadas(), acento = cssVar('--acento') || '#1f6fd1';
   C.forEach((k, i) => {
     if (P.tipo === 'radial' && k.x >= 359.999 && C.length > 1) return;     // la de 360° es la misma que la de 0°
@@ -265,6 +283,7 @@ function colocarExplosion() {
   pedirRender();
 }
 function construirFantasma() {
+  if (figuraActiva()) { if (G.fantasma) { G.modelo.remove(G.fantasma); G.fantasma.geometry.dispose(); G.fantasma = null; } return; }
   if (G.fantasma) { G.modelo.remove(G.fantasma); G.fantasma.geometry.dispose(); G.fantasma.material.dispose(); G.fantasma = null; }
   if (!P.vista.fantasma) return;
   const N = P.tipo === 'radial' ? 72 : 64, anillos = [], X = P.tipo === 'radial' ? 360 : P.largo;

@@ -106,16 +106,25 @@ function dibujarPerfil(ctx, V) {
   // costilla seleccionada
   const cs = piezaSel();
   if (cs && cs.ok && !cs.z) { ctx.setLineDash([6, 4]); ctx.strokeStyle = colorCostilla(.75); ctx.lineWidth = 1.4; V.camino(ctx, cs.poly); ctx.stroke(); ctx.setLineDash([]); }
+  const fig = figuraActiva();
+  let cont = fig ? (cs && cs.ok && !cs.z ? cs.poly : []) : [];
+  if (fig) {
+    if (cs && cs.ok && !cs.z) { ctx.fillStyle = conAlfa(acento, .13); ctx.strokeStyle = acento; ctx.lineWidth = 2; V.camino(ctx, cs.poly); ctx.fill(); ctx.stroke(); }
+    ctx.fillStyle = acento; ctx.font = '600 12.5px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText(`Forma desde el modelo 3D «${P.figura.malla.nombre}»: se cambia en el panel izquierdo`, V.w / 2, 66); ctx.textAlign = 'left';
+  }
   // otras claves
+  if (!fig) {
   ctx.strokeStyle = cssVar('--ejes'); ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
   C.forEach(o => { if (o !== k) { V.camino(ctx, curvaCerrada(o.pts, P.esquinas)); ctx.stroke(); } });
   ctx.setLineDash([]);
   // clave actual: curva completa y contorno recortado
-  const curva = curvaCerrada(k.pts, P.esquinas), cont = contornoDe(k.pts);
+  const curva = curvaCerrada(k.pts, P.esquinas); cont = contornoDe(k.pts);
   ctx.fillStyle = conAlfa(acento, .13);
   if (cont.length >= 3) { V.camino(ctx, cont); ctx.fill(); }
   ctx.strokeStyle = acento; ctx.lineWidth = 1; ctx.globalAlpha = .45; V.camino(ctx, curva); ctx.stroke(); ctx.globalAlpha = 1;
   if (cont.length >= 3) { ctx.lineWidth = 2.2; V.camino(ctx, cont); ctx.stroke(); }
+  }
   // corte superior
   if (P.costillas.tope) {
     const [, y] = V.aPantalla(0, P.costillas.topeAlt);
@@ -123,8 +132,8 @@ function dibujarPerfil(ctx, V) {
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(V.w, y); ctx.stroke(); ctx.setLineDash([]);
   }
   // polígono de control
-  ctx.strokeStyle = cssVar('--suave'); ctx.lineWidth = .8; ctx.setLineDash([2, 3]);
-  V.camino(ctx, k.pts); ctx.stroke(); ctx.setLineDash([]);
+  if (!fig) { ctx.strokeStyle = cssVar('--suave'); ctx.lineWidth = .8; ctx.setLineDash([2, 3]);
+  V.camino(ctx, k.pts); ctx.stroke(); ctx.setLineDash([]); }
   // varillas
   const r = radioAgujero(), Vv = P.varillas;
   // radial: tubo central y discos; pared: la pared y los rastreles
@@ -184,7 +193,7 @@ function dibujarPerfil(ctx, V) {
 const ED = { arr: null };
 function snap(v) { const g = +$('#kRejilla').value; return g ? Math.round(v / g) * g : Math.round(v * 10) / 10; }
 function puntoCerca(mx, my) {
-  if (relieveActivo()) return -1;
+  if (formaCalculada()) return -1;
   const k = claveActual(); let mejor = -1, md = 10;
   k.pts.forEach((p, i) => { const [x, y] = VP.aPantalla(p[0], p[1]), d = Math.hypot(x - mx, y - my); if (d < md) { md = d; mejor = i; } });
   return mejor;
@@ -277,7 +286,7 @@ function iniciarEditor() {
   c.addEventListener('dblclick', ev => {
     const r = c.getBoundingClientRect(), mx = ev.clientX - r.left, my = ev.clientY - r.top;
     const ip = puntoCerca(mx, my); if (ip >= 0) { alternarEsquina(ip); return; }
-    if (relieveActivo()) return;
+    if (formaCalculada()) return;
     const t = tramoCerca(mx, my); if (t) { insertarPunto(t.j, t.s); cambio('Punto añadido'); }
   });
   $('#bEsquina').onclick = () => alternarEsquina(UI.punto);
@@ -296,7 +305,7 @@ function dibujarPerfilRelieve(ctx, V) {
   if (cs && cs.ok && !cs.z) { ctx.fillStyle = conAlfa(cssVar('--acento'), .13); ctx.strokeStyle = cssVar('--acento'); ctx.lineWidth = 2; V.camino(ctx, cs.poly); ctx.fill(); ctx.stroke(); }
   R.rastreles.forEach(rr => { const [a, y] = V.aPantalla(0, rr.v + P.pared.alto / 2), [b] = V.aPantalla(P.pared.grueso, 0); ctx.fillStyle = 'rgba(205,179,138,.6)'; ctx.fillRect(a, y, b - a, P.pared.alto * V.sc); });
   ctx.fillStyle = cssVar('--acento'); ctx.font = '600 12.5px system-ui'; ctx.textAlign = 'center';
-  ctx.fillText(`Forma desde ${P.relieve.fuente === 'texto' ? 'el texto' : 'el modelo 3D'}: se cambia en el panel izquierdo (lama ${cs ? cs.etq : ''})`, V.w / 2, 66);
+  ctx.fillText(`Forma desde ${{ texto: 'el texto', modelo: 'el modelo 3D', imagen: 'la imagen' }[P.relieve.fuente]}: se cambia en el panel izquierdo (lama ${cs ? cs.etq : ''})`, V.w / 2, 66);
   ctx.textAlign = 'left';
 }
 function ayudaPerfil() {
@@ -304,7 +313,7 @@ function ayudaPerfil() {
 }
 function encuadrarPerfil() {
   if (!R) return;
-  if (relieveActivo()) { const cs = R.costillas.filter(c => c.ok); if (cs.length) VP.encuadrar({ x0: 0, y0: 0, w: Math.max(...cs.map(c => c.caja.x1)), h: Math.max(...cs.map(c => c.caja.y1)) }, 50); return; }
+  if (formaCalculada()) { const cs = R.costillas.filter(c => c.ok); if (cs.length) VP.encuadrar({ x0: 0, y0: 0, w: Math.max(...cs.map(c => c.caja.x1)), h: Math.max(...cs.map(c => c.caja.y1)) }, 50); return; }
   let x0 = Infinity, y0 = 0, x1 = -Infinity, y1 = -Infinity;
   P.claves.forEach(c => c.pts.forEach(p => { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }));
   VP.encuadrar({ x0, y0, w: x1 - x0, h: y1 - y0 }, 50);

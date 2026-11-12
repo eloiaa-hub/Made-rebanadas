@@ -133,9 +133,16 @@ function iniciarPanel() {
     encuadrarSiHaceFalta(); camara('tres4');
   });
   // relieve: texto o modelo 3D
-  LETRAS_SISTEMA.forEach(l => $('#rlLetra').add(new Option(l, l)));
+  llenarLetras();
   const Rl = () => P.relieve;
   enlazar('#sOrigen', () => {
+    if (P.tipo !== 'pared') {   // costillas y retícula: plantilla o figura desde un modelo 3D
+      P.figura.activa = $('#sOrigen').value === 'figura';
+      if (P.figura.activa && !P.figura.malla) { P.figura.activa = false; ponerControles(); $('#sOrigen').value = 'figura'; mostrarSecciones(true); aviso('Carga un modelo 3D o elige uno de ejemplo.'); return; }
+      R = calcular(); if (P.tipo === 'costillas') autoVarillas(P.varillas.autoN);
+      UI.costilla = 0; ponerControles(); cambio(P.figura.activa ? 'Figura desde un modelo 3D' : 'Forma desde la plantilla'); encuadrarSiHaceFalta(); encuadrarPerfil(); camara('tres4');
+      return;
+    }
     Rl().fuente = $('#sOrigen').value;
     if (relieveActivo() && P.pared.rastreles && Rl().fondo < P.pared.grueso + 15) Rl().fondo = P.pared.grueso + 15;
     UI.costilla = 0; ponerControles(); cambio({ plantilla: 'Forma desde la plantilla', texto: 'Relieve de texto', modelo: 'Relieve desde un modelo 3D', imagen: 'Relieve desde una imagen' }[Rl().fuente]);
@@ -151,7 +158,11 @@ function iniciarPanel() {
   enlazar('#rlInvertir', () => { Rl().invertir = $('#rlInvertir').checked; cambio(); });
   let tTexto = 0;
   $('#rlTexto').addEventListener('input', () => { clearTimeout(tTexto); tTexto = setTimeout(() => { Rl().texto = $('#rlTexto').value; cambio('Texto'); }, 450); });
-  const vista = () => { Rl().vista = $('#rlVista').value; Rl().giro = +$('#rlGiro').value; if (reproyectarModelo()) cambio('Vista del modelo'); else aviso('Para cambiar la vista, vuelve a cargar el modelo (el proyecto guarda solo su relieve).', 5000); };
+  const vista = async () => {
+    Rl().vista = $('#rlVista').value; Rl().giro = +$('#rlGiro').value;
+    if (Rl().modelo && Rl().modelo.ejemplo) { try { await cargarRecurso('modelos'); } catch (e) { /* sin modelos */ } }
+    if (reproyectarModelo()) cambio('Vista del modelo'); else aviso('Para cambiar la vista, vuelve a cargar el modelo (el proyecto guarda solo su relieve).', 5000);
+  };
   enlazar('#rlVista', vista); enlazar('#rlGiro', vista);
   $('#bCargarModelo').onclick = () => {
     const f = $('#fModelo'); f.value = '';
@@ -164,9 +175,37 @@ function iniciarPanel() {
     };
     f.click();
   };
-  $('#bModeloEjemplo').onclick = dialogoModelos;
+  $('#bModeloEjemplo').onclick = () => dialogoModelos(false);
   $('#bImagenEjemplo').onclick = dialogoImagenes;
+  // figura desde un modelo 3D (costillas y retícula)
+  const Fg = () => P.figura;
+  const reFigura = (txt) => { R = calcular(); if (P.tipo === 'costillas') autoVarillas(P.varillas.autoN); ponerControles(); cambio(txt); encuadrarSiHaceFalta(); encuadrarPerfil(); camara('tres4'); };
+  enlazar('#fgAlto', () => { Fg().alto = clamp(+$('#fgAlto').value || 800, 100, 5000); reFigura('Alto de la figura'); });
+  enlazar('#fgEje', () => { Fg().eje = $('#fgEje').value; reFigura(Fg().eje === 'z' ? 'Cortes de delante a atrás' : 'Cortes de lado a lado'); });
+  enlazar('#fgUnir', () => { Fg().unir = $('#fgUnir').checked; CACHE_SEC.clave = ''; reFigura(Fg().unir ? 'Unir trozos sueltos' : 'Solo el trozo mayor'); });
+  enlazar('#fgMin', () => { Fg().minArea = clamp(+$('#fgMin').value || 0, 0, 60); reFigura('Costillas pequeñas'); });
+  enlazar('#fgGiro', () => { Fg().giro = +$('#fgGiro').value; reFigura('Giro de la figura'); });
+  $('#bFigCargar').onclick = () => {
+    const f = $('#fModelo'); f.value = '';
+    f.onchange = () => {
+      const a = f.files[0]; if (!a) return;
+      aviso('Leyendo ' + esc(a.name) + '…');
+      const rd = new FileReader();
+      rd.onload = () => { try { const m = cargarFiguraTriangulos(leerMalla(rd.result, a.name), a.name); reFigura('Figura: ' + a.name); aviso(`${esc(a.name)}: ${m.original.toLocaleString('es-ES')} triángulos${m.nt < m.original ? ` (reducido a ${m.nt.toLocaleString('es-ES')})` : ''}`, 4000); } catch (e) { aviso('⚠ ' + esc(e.message), 5000); } };
+      rd.readAsArrayBuffer(a);
+    };
+    f.click();
+  };
+  $('#bFigEjemplo').onclick = () => dialogoModelos(true);
   $('#bConvertirPerfiles').onclick = () => {
+    if (figuraActiva()) {
+      if (!confirm(`Se va a convertir la figura en perfiles clave (uno por costilla, como mucho 60), para que puedas mover, añadir o quitar puntos y perfiles a mano. La forma pasa a «Plantilla: Forma libre».\n\n⚠ Este cambio no se puede revertir: el modelo 3D se quita del proyecto y ya no podrás cambiar su alto, sus cortes o su giro (solo con ↶ Deshacer, antes de cerrar). Si quieres conservarlo, guarda antes una copia del proyecto.\n\n¿Convertir?`)) return;
+      const n = convertirFiguraEnPerfiles(); if (!n) return;
+      UI.clave = Math.floor(n / 2); UI.punto = -1;
+      R = calcular(); ponerControles(); cambio(`Convertido en ${n} perfiles editables`); encuadrarSiHaceFalta(); encuadrarPerfil(); camara('tres4');
+      aviso(`Convertido en ${n} perfiles clave. Ya puedes editar los puntos en la vista del perfil.`, 5000);
+      return;
+    }
     const que = { texto: 'el texto', modelo: 'el modelo 3D', imagen: 'la imagen' }[Rl().fuente] || 'el relieve';
     if (!confirm(`Se va a convertir ${que} en perfiles clave (un perfil en cada lama), para que puedas mover, añadir o quitar puntos y perfiles a mano. La forma pasa a «Panel de pared: Plantilla».\n\n⚠ Este cambio no se puede revertir: ya no podrás volver a cambiar ${que}, ni las medidas, el relieve o el suavizado (solo con ↶ Deshacer, antes de cerrar). Si quieres conservarlo, guarda antes una copia del proyecto.\n\n¿Convertir?`)) return;
     const n = convertirRelieveEnPerfiles(); if (!n) return;
@@ -174,6 +213,26 @@ function iniciarPanel() {
     ponerControles(); cambio(`Convertido en ${n} perfiles editables`); encuadrarSiHaceFalta(); camara('tres4');
     aviso(`Convertido en ${n} perfiles clave. Ya puedes editar los puntos en la vista del perfil.`, 5000);
   };
+  $$('.bLetra').forEach(bt => bt.onclick = () => {
+    const destino = bt.closest('#caCampos') ? 'capa' : 'texto', f = $('#fLetra'); f.value = '';
+    f.onchange = () => {
+      const a = f.files[0]; if (!a) return;
+      cargarLetraArchivo(a).then(nombre => {
+        if (destino === 'capa') P.relieve.capa.letra = nombre; else P.relieve.letra = nombre;
+        llenarLetras(); ponerControles(); cambio('Letra: ' + nombre); aviso('Letra cargada: ' + esc(nombre) + '. Se guarda dentro del proyecto.', 4000);
+      }).catch(e => aviso('⚠ ' + esc(e.message || 'No se puede leer esa letra'), 5000));
+    };
+    f.click();
+  });
+  // texto añadido encima del relieve
+  const Ca = () => P.relieve.capa;
+  enlazar('#caActiva', () => { Ca().activa = $('#caActiva').checked; $('#caCampos').classList.toggle('oculto', !Ca().activa); cambio(Ca().activa ? 'Texto añadido' : 'Sin texto añadido'); });
+  let tCapa = 0;
+  $('#caTexto').addEventListener('input', () => { clearTimeout(tCapa); tCapa = setTimeout(() => { Ca().texto = $('#caTexto').value; cambio('Texto añadido'); }, 450); });
+  enlazar('#caLetra', () => { Ca().letra = $('#caLetra').value; cambio(); });
+  enlazar('#caNegrita', () => { Ca().negrita = $('#caNegrita').checked; cambio(); });
+  enlazar('#caModo', () => { Ca().modo = $('#caModo').value; cambio(); });
+  [['#caTam', 'tamLetra', 5, 3000], ['#caRelieve', 'relieve', 0, 500], ['#caX', 'x', 0, 100], ['#caY', 'y', 0, 100]].forEach(([s, k, a, b]) => enlazar(s, () => { Ca()[k] = clamp(+$(s).value || 0, a, b); cambio(); }));
   enlazar('#rlGama', () => { Rl().gama = clamp(+$('#rlGama').value || 1, 0.2, 5); cambio(); });
   $('#bAjustarImagen').onclick = () => { if (!Rl().imagen) { aviso('Carga antes una imagen.'); return; } ajustarAltoImagen(); ponerControles(); cambio('Alto según la imagen'); encuadrarSiHaceFalta(); camara('tres4'); };
   $('#bCargarImagen').onclick = () => {
@@ -242,6 +301,8 @@ function iniciarPanel() {
   $('#rExplosion').oninput = () => { P.vista.explosion = +$('#rExplosion').value; colocarExplosion(); if (P.vista.fantasma) { construirFantasma(); pedirRender(); } };
   $('#cFantasma').onchange = () => { P.vista.fantasma = $('#cFantasma').checked; construirFantasma(); pedirRender(); };
   $('#cVarillas3d').onchange = () => { P.vista.varillas = $('#cVarillas3d').checked; colocarExplosion(); };
+  $('#cRasante').onchange = () => { P.vista.rasante = $('#cRasante').checked; $('#rRasante').classList.toggle('oculto', !P.vista.rasante); luces3D(); };
+  $('#rRasante').oninput = () => { P.vista.rasAng = +$('#rRasante').value; luces3D(); };
   $('#cResalta').onchange = () => { P.vista.resalta = $('#cResalta').checked; resaltar3D(); };
   // distribución
   $$('[data-dist]').forEach(b => b.onclick = () => {
@@ -262,7 +323,7 @@ function llenarPlantillas() {
   sp.value = P.plantilla;
 }
 // enseña los apartados de cada tipo de mueble
-function mostrarSecciones() {
+function mostrarSecciones(forzarFigura) {
   const t = P.tipo;
   $('#secVarillas').classList.toggle('oculto', t !== 'costillas');
   $('#secReticula').classList.toggle('oculto', t !== 'reticula');
@@ -277,16 +338,17 @@ function mostrarSecciones() {
   $('#filaNum').classList.toggle('oculto', rad || P.costillas.modo !== 'numero');
   $('#kPosTit').textContent = rad ? 'Posición (°)' : 'Posición (mm)';
   // relieve (paneles de pared)
-  const rel = relieveActivo(), Rl = P.relieve;
-  $('#filaOrigen').classList.toggle('oculto', t !== 'pared');
-  $('#filaPlantilla').classList.toggle('oculto', rel); $('#params').classList.toggle('oculto', rel); $('#descPlantilla').classList.toggle('oculto', rel);
-  $('#secRelieve').classList.toggle('oculto', !rel); $('#bConvertirPerfiles').classList.toggle('oculto', !rel);
+  const rel = relieveActivo(), fig = figuraActiva() || (forzarFigura && t !== 'pared' && t !== 'radial'), calc = rel || fig, Rl = P.relieve;
+  $('#filaOrigen').classList.toggle('oculto', t === 'radial');
+  [...$('#sOrigen').options].forEach(o => { o.hidden = t === 'pared' ? o.value === 'figura' : !['plantilla', 'figura'].includes(o.value); });
+  $('#filaPlantilla').classList.toggle('oculto', calc); $('#params').classList.toggle('oculto', calc); $('#descPlantilla').classList.toggle('oculto', calc);
+  $('#secRelieve').classList.toggle('oculto', !rel); $('#secFigura').classList.toggle('oculto', !fig); $('#bConvertirPerfiles').classList.toggle('oculto', !(rel || figuraActiva()));
   $('#relTexto').classList.toggle('oculto', Rl.fuente !== 'texto'); $('#relModelo').classList.toggle('oculto', Rl.fuente !== 'modelo'); $('#relImagen').classList.toggle('oculto', Rl.fuente !== 'imagen');
-  $('#secClaves').classList.toggle('oculto', rel);
-  $('#sClave').classList.toggle('oculto', rel); $('#bEsquina').classList.toggle('oculto', rel); $('#infoClave').classList.toggle('oculto', rel);
+  $('#secClaves').classList.toggle('oculto', calc);
+  $('#sClave').classList.toggle('oculto', calc); $('#bEsquina').classList.toggle('oculto', calc); $('#infoClave').classList.toggle('oculto', calc);
 }
 function ponerControles() {
-  llenarPlantillas();
+  llenarPlantillas(); llenarLetras();
   const C = P.costillas, V = P.varillas;
   const op = [...$('#cGrosor').options].map(o => o.value);
   if (op.includes(String(C.grosor))) { $('#cGrosor').value = String(C.grosor); $('#filaGrosorOtro').classList.add('oculto'); }
@@ -304,16 +366,20 @@ function ponerControles() {
   const Ra = P.radial; $('#raNum').value = P.costillas.numero; $('#raTubo').value = Ra.tubo; $('#raHolTubo').value = Ra.holguraTubo; $('#raDiscos').value = Ra.discos; $('#raRDisco').value = Ra.rDisco; $('#raHolgura').value = Ra.holgura;
   const Pa = P.pared; $('#paNum').value = Pa.rastreles; $('#paAlto').value = Pa.alto; $('#paGrueso').value = Pa.grueso; $('#paMargen').value = Pa.margen; $('#paHolgura').value = Pa.holgura; $('#paVer').checked = Pa.verPared;
   $('#cClaves3d').checked = P.vista.claves !== false;
-  const Rl = P.relieve; $('#sOrigen').value = P.tipo === 'pared' ? Rl.fuente : 'plantilla'; $('#paOrient').value = Rl.orient || 'v';
+  const Fg = P.figura; $('#fgAlto').value = Fg.alto; $('#fgEje').value = Fg.eje; $('#fgGiro').value = String(Fg.giro || 0); $('#fgMin').value = Fg.minArea; $('#fgUnir').checked = Fg.unir !== false;
+  $('#fgInfo').textContent = Fg.malla ? `Modelo: ${Fg.malla.nombre} (${Fg.malla.nt.toLocaleString('es-ES')} triángulos${Fg.malla.original > Fg.malla.nt ? ', reducido de ' + Fg.malla.original.toLocaleString('es-ES') : ''}).` + (figuraActiva() ? ` La figura mide ${fmt(mallaFigura().largo)} × ${fmt(mallaFigura().ancho)} × ${fmt(mallaFigura().alto)} mm.` : '') : 'Sin modelo. Carga un STL u OBJ: cada costilla será un corte de verdad del modelo.';
+  const Rl = P.relieve; $('#sOrigen').value = P.tipo === 'pared' ? Rl.fuente : (figuraActiva() ? 'figura' : 'plantilla'); $('#paOrient').value = Rl.orient || 'v';
   $('#rlTexto').value = Rl.texto; $('#rlLetra').value = Rl.letra; $('#rlNegrita').checked = Rl.negrita; $('#rlTam').value = Rl.tamLetra; $('#rlInter').value = Rl.interlinea;
   $('#rlVista').value = Rl.vista; $('#rlGiro').value = String(Rl.giro || 0); $('#rlBase').value = Rl.base;
   $('#rlAncho').value = Rl.ancho; $('#rlAlto').value = Rl.alto; $('#rlFondo').value = Rl.fondo; $('#rlRelieve').value = Rl.relieve; $('#rlSuave').value = Rl.suavizado; $('#rlInvertir').checked = Rl.invertir; $('#rlOnda').value = Rl.ondaAmp; $('#rlOndas').value = Rl.ondas;
-  $('#rlModeloInfo').textContent = Rl.modelo ? `Modelo: ${Rl.modelo.nombre}` + (Rl.modelo.triangulos ? ` (${Rl.modelo.triangulos.toLocaleString('es-ES')} triángulos)` : '') + (mallaVigente() ? '' : '. El proyecto guarda su relieve; para cambiar la vista, vuelve a cargarlo.') : 'Sin modelo. Carga un STL u OBJ (rostro, figura, logo en 3D…).';
+  $('#rlModeloInfo').textContent = Rl.modelo ? `Modelo: ${Rl.modelo.nombre}` + (Rl.modelo.triangulos ? ` (${Rl.modelo.triangulos.toLocaleString('es-ES')} triángulos)` : '') + (mallaVigente() || Rl.modelo.ejemplo ? '' : '. El proyecto guarda su relieve; para cambiar la vista, vuelve a cargarlo.') : 'Sin modelo. Carga un STL u OBJ (rostro, figura, logo en 3D…).';
   $('#rlGama').value = Rl.gama || 1;
+  const Ca = Rl.capa; $('#caActiva').checked = Ca.activa; $('#caCampos').classList.toggle('oculto', !Ca.activa); $('#caTexto').value = Ca.texto; $('#caLetra').value = Ca.letra;
+  $('#caNegrita').checked = Ca.negrita; $('#caTam').value = Ca.tamLetra; $('#caRelieve').value = Ca.relieve; $('#caModo').value = Ca.modo; $('#caX').value = Ca.x; $('#caY').value = Ca.y;
   $('#rlImagenInfo').textContent = Rl.imagen ? `Imagen: ${Rl.imagen.nombre} (${Rl.imagen.w} × ${Rl.imagen.h} px). Lo blanco sale más.` : 'Sin imagen. Carga una foto o un dibujo: lo blanco sale más y lo negro queda en el fondo.';
   mostrarSecciones();
   const M = P.maqueta; $('#mActiva').checked = M.activa; $('#mEscala').value = String(M.escala); $('#mGrosor').value = M.grosor; $('#mDiam').value = M.diam; $('#mHolgura').value = M.holgura;
-  $('#rExplosion').value = P.vista.explosion; $('#cFantasma').checked = P.vista.fantasma; $('#cVarillas3d').checked = P.vista.varillas; $('#cResalta').checked = P.vista.resalta;
+  $('#rExplosion').value = P.vista.explosion; $('#cFantasma').checked = P.vista.fantasma; $('#cVarillas3d').checked = P.vista.varillas; $('#cResalta').checked = P.vista.resalta; $('#cRasante').checked = !!P.vista.rasante; $('#rRasante').value = P.vista.rasAng || 30; $('#rRasante').classList.toggle('oculto', !P.vista.rasante);
   construirParams();
 }
 
