@@ -9,6 +9,9 @@
 - Plantilla **Estantería de pared ondulada**: lamas con baldas y ménsulas, de fondo ondulado.
 - Los paneles de pared empiezan con **lamas de 12 mm cada 26 mm** (antes 18 mm cada 60 mm); los ejemplos de pared, más juntos.
 - **Relieve desde una imagen en escala de grises** (png, jpg…): lo blanco sale más; gama, invertir, suavizado y «Alto según la imagen». Cuatro imágenes de ejemplo en `assets/imagenes` (mapa de la cara, espiral, hoja, montañas) y dos ejemplos nuevos.
+- **✏ Convertir en perfiles editables**: el texto, el modelo 3D o la imagen se pasan a perfiles clave (uno por lama) para retocar los puntos a mano. Avisa de que no se puede revertir.
+- Plantilla **Panel de pared libre**.
+- El material por defecto es **MDF crudo** (se ve mejor en pantalla).
 - **Modelos 3D de ejemplo** (STL en `assets/modelos` y botón «🗿 Modelos de ejemplo…»): cara, labios, ondas en el agua y anomalía (burbuja).
 - Se quita el enlace al **Calcador** (botón «➜ Calcador»): las piezas siguen saliendo en DXF y SVG con arcos, y en el Anidador.
 - Seis ejemplos nuevos: estantería ondulada, rótulo de texto, arte mural «ondas», retrato en lamas horizontales, labios y anomalía.

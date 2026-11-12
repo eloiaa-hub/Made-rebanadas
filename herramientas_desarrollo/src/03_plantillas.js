@@ -244,6 +244,15 @@ PLANTILLAS.pared_ondas = {
     return generarPared(p, (t, y) => p.fondo + p.relieve * (0.5 + 0.25 * Math.sin(PI2 * p.ondasX * t) + 0.25 * Math.sin(PI2 * (p.ondasY * y + p.diagonal * p.ondasX * t))));
   },
 };
+PLANTILLAS.pared_libre = {
+  nombre: 'Panel de pared libre', grupo: 'pared',
+  desc: 'Lamas planas para dibujar a mano. También es la forma que queda al convertir un texto, un modelo 3D o una imagen en perfiles editables.',
+  params: [
+    { id: 'largo', nombre: 'Largo del panel (donde van las lamas)', min: 200, max: 6000, paso: 10, valor: 1200 },
+    { id: 'alto', nombre: 'Largo de cada lama', min: 200, max: 3000, paso: 10, valor: 1000 },
+  ],
+  generar(p) { return generarPared({ largo: p.largo, alto: p.alto, ondasX: 0.5 }, () => 40); },
+};
 PLANTILLAS.pared_relieve = {
   nombre: 'Panel de pared con relieve', grupo: 'pared',
   desc: 'Lamas que forman uno o dos relieves redondeados (cúpula o duna) sobre la pared.',

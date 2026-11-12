@@ -9,7 +9,13 @@ const relieveActivo = () => P.tipo === 'pared' && P.relieve && ['texto', 'modelo
 // medidas del panel: ancho (horizontal) y alto (vertical)
 function medidasPanel() {
   if (relieveActivo()) return [P.relieve.ancho, P.relieve.alto];
-  return [P.largo, (P.params && P.params.alto) || 1000];
+  // con perfiles clave: la lama mide lo que el alto de los perfiles
+  const H = altoPerfiles();
+  return P.relieve && P.relieve.orient === 'h' ? [H, P.largo] : [P.largo, H];
+}
+function altoPerfiles() {
+  let a = 0, b = 0; (P.claves || []).forEach(k => k.pts.forEach(q => { a = Math.min(a, q[1]); b = Math.max(b, q[1]); }));
+  return b - a || (P.params && P.params.alto) || 1000;
 }
 // a lo ancho del perfil (lo que mide cada lama a lo largo): en lamas horizontales, el ancho del panel
 const anchoPerfil = () => medidasPanel()[0];
@@ -182,6 +188,28 @@ function cargarImagenEjemplo(id, conMedidas) {
   Rl.imagen = { nombre: E.nombre, w: E.w, h: E.h, d64: E.d64, id: E.id + '-' + Date.now().toString(36) };
   if (conMedidas && E.ancho) { Rl.ancho = E.ancho; Rl.alto = E.alto; }
   return E;
+}
+
+/* ---------- convertir el relieve en perfiles clave (no se puede deshacer, salvo con ↶) ----------
+   Una clave en cada lama (como mucho 60) y en cada una el mismo número de puntos, repartidos a lo largo de la lama. */
+function convertirRelieveEnPerfiles() {
+  if (!relieveActivo()) return 0;
+  const Rl = P.relieve, [W, H] = medidasPanel(), hor = Rl.orient === 'h', largo = hor ? H : W, largoV = hor ? W : H;
+  const xs = (R && R.costillas && R.costillas.length ? R.costillas.map(c => c.x) : []).filter(x => x >= 0 && x <= largo);
+  let pos = xs.length >= 2 ? xs : Array.from({ length: 13 }, (_, i) => largo * i / 12);
+  if (pos.length > 60) pos = Array.from({ length: 60 }, (_, i) => pos[Math.round(i * (pos.length - 1) / 59)]);
+  if (pos[0] > 0.5) pos.unshift(0); if (pos[pos.length - 1] < largo - 0.5) pos.push(largo);
+  const M = clamp(Math.round(largoV / 12), 24, 90);
+  const claves = pos.map(x => {
+    const pts = [[0, 0]];
+    for (let j = 0; j < M; j++) { const v = largoV * j / (M - 1); pts.push([Math.round((hor ? profundidadEn(v, x) : profundidadEn(x, v)) * 10) / 10, Math.round(v * 10) / 10]); }
+    pts.push([0, largoV]);
+    return { x: Math.round(x * 10) / 10, pts };
+  });
+  P.claves = claves; P.esquinas = [true, true, ...new Array(M - 2).fill(false), true, true];
+  P.largo = largo; P.plantilla = 'pared_libre'; P.params = { largo, alto: largoV }; P.editado = true;
+  Rl.fuente = 'plantilla'; Rl.modelo = null; Rl.imagen = null;
+  return claves.length;
 }
 
 function cargarModelo(buf, nombre) { return cargarTriangulos(leerMalla(buf, nombre), nombre); }

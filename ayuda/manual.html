@@ -20,6 +20,7 @@ figure{margin:14px 0}
 figcaption{text-align:center;color:var(--s);font-size:13px}
 .caja{background:var(--f);border-left:4px solid var(--a);padding:10px 14px;border-radius:4px;margin:12px 0}
 .caja.taller{border-left-color:var(--m)}
+.caja.aviso{border-left-color:#d9822b;background:#fdf3e7}
 kbd{border:1px solid var(--b);border-bottom-width:2px;border-radius:4px;padding:0 5px;font:12px ui-monospace,monospace;background:#fff}
 code{font:13px ui-monospace,monospace;background:var(--f);padding:0 4px;border-radius:3px}
 table{border-collapse:collapse;width:100%;margin:10px 0;font-size:14px}
@@ -172,7 +173,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
       <li><b>Grosor del tablero</b>: 10 a 30 mm, u otro.</li>
       <li><b>Reparto</b>: <i>por separación</i> (de centro a centro, el programa ajusta el número para llenar el largo) o <i>por número</i> de costillas.</li>
       <li>El recuadro gris resume el reparto: número de costillas, separación real y <b>hueco</b> entre ellas (separación − grosor). Con hueco 0 las costillas quedan <b>apiladas</b>.</li>
-      <li><b>Material</b>: contrachapados (abedul, chopo, pino, chapa de roble o nogal), alistonado de pino, MDF crudo o MDF lacado del color que quieras.</li>
+      <li><b>Material</b>: contrachapados (abedul, chopo, pino, chapa de roble o nogal), alistonado de pino, MDF crudo (el que sale por defecto) o MDF lacado del color que quieras.</li>
     </ul>
   </div>
 </div>
@@ -356,6 +357,19 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 </div>
 <div class="caja">Una foto normal no suele dar buen relieve: lo claro no siempre es lo que está más cerca. Funcionan mejor los dibujos hechos a propósito (blanco donde quieres que salga), los mapas de profundidad (<i>depth map</i>) y los mapas de alturas de terreno.</div>
 
+<h3>Convertir en perfiles editables</h3>
+<p>Con texto, modelo 3D o imagen la forma la calcula el programa y <b>no se pueden mover los puntos</b> de las lamas. Si quieres retocarla a mano (suavizar una zona, cambiar un trozo, añadir un perfil…), pulsa <b>✏ Convertir en perfiles editables…</b>, al final del apartado Relieve.</p>
+<ul>
+  <li>Se pone un <b>perfil clave en cada lama</b> (como mucho 60), con los puntos repartidos a lo largo de la lama. Las lamas salen iguales que antes.</li>
+  <li>La forma pasa a <b>Origen: Plantilla</b>, con la plantilla <b>Panel de pared libre</b>. Desde ahí se editan los puntos y los perfiles como en cualquier mueble: arrastrar, doble clic para añadir, Supr para borrar, añadir o quitar perfiles, copiar un perfil en todos…</li>
+  <li>Sigue valiendo todo lo demás: lamas verticales u horizontales, rastreles, separación, grosor, fabricar y plano.</li>
+</ul>
+<div class="caja aviso"><b>⚠ No se puede revertir.</b> Antes de convertir sale un aviso: después ya no se puede volver al texto, al modelo o a la imagen, ni cambiar su relieve, suavizado o medidas (solo con ↶ Deshacer antes de cerrar). Si quieres conservar el original, <b>guarda antes una copia</b> del proyecto.</div>
+<div class="dos">
+  <figure><img src="img/convertir_3d.jpg" alt="Retrato convertido"><figcaption>El «Retrato» convertido: un perfil clave (azul) en cada lama.</figcaption></figure>
+  <figure><img src="img/convertir_perfil.png" alt="Perfil de una lama"><figcaption>Una lama convertida, con sus puntos, lista para editar.</figcaption></figure>
+</div>
+
 <h3>Estantería de pared ondulada</h3>
 <p>La plantilla <b>Estantería de pared ondulada</b> (en Panel de pared) hace las lamas con baldas que salen de ellas: cada lama lleva un trozo de cada balda con una ménsula inclinada debajo. El fondo de las baldas ondula a lo largo, como las estanterías de lamas que se venden hechas. Parámetros: número de baldas, fondo máximo y mínimo, ondas y desfase entre baldas, grueso de la balda, fondo de la lama y alto de la ménsula.</p>
 <div class="dos">
@@ -475,7 +489,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 <ul>
   <li><b>💾 Guardar</b> (<kbd>Ctrl</kbd>+<kbd>S</kbd>) descarga el proyecto en un archivo <code>.json</code> con todo: perfiles, costillas, varillas y material. <b>📂 Abrir</b> lo carga de nuevo.</li>
   <li><b>↶ ↷</b> (<kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd>) deshacen y rehacen.</li>
-  <li><b>🪑 Ejemplos</b>: banco ondulado de abedul, banco largo de pino, tumbona de jardín, pouf redondo, mesa baja lacada y estantería duna; en retícula, banco, mesa baja y pouf; banco en S y banco curvo en arco; lámpara de lóbulos y columna torsionada; y dos paneles de pared.</li>
+  <li><b>🪑 Ejemplos</b>: banco ondulado de abedul, banco largo de pino, tumbona de jardín, pouf redondo, mesa baja lacada y estantería duna; en retícula, banco, mesa baja y pouf; banco en S y banco curvo en arco; lámpara de lóbulos y columna torsionada; paneles de pared (ondulado, con relieve, estantería, rótulo de texto, arte mural, retrato, labios, anomalía, espiral y hoja).</li>
 </ul>
 <div class="dos">
   <img src="img/ej_tumbona.jpg" alt="Tumbona">

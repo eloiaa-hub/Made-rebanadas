@@ -74,7 +74,7 @@ function proyectoBase() {
     esquinas: [],                // por punto de control: true = esquina, false = curva
     claves: [],                  // [{ x: mm a lo largo, pts: [[u, v], …] }]
     interp: 'curva',
-    costillas: { grosor: 18, modo: 'separacion', separacion: 60, numero: 25, base: true, tope: false, topeAlt: 400, material: 'abedul', color: '#f2efe8' },
+    costillas: { grosor: 18, modo: 'separacion', separacion: 60, numero: 25, base: true, tope: false, topeAlt: 400, material: 'mdf', color: '#f2efe8' },
     varillas: { tipo: 'roscada', diam: 10, holgura: 0.5, margen: 20, tramo: 'todas', separadores: true, sepD: 22, sobra: 12, autoN: 3, lista: [] },
     vista: { explosion: 0, fantasma: false, varillas: true, resalta: true, claves: true },
     maqueta: { activa: false, escala: 5, grosor: 3, diam: 3, holgura: 0.2, fresa: 0 },
@@ -780,7 +780,13 @@ const relieveActivo = () => P.tipo === 'pared' && P.relieve && ['texto', 'modelo
 // medidas del panel: ancho (horizontal) y alto (vertical)
 function medidasPanel() {
   if (relieveActivo()) return [P.relieve.ancho, P.relieve.alto];
-  return [P.largo, (P.params && P.params.alto) || 1000];
+  // con perfiles clave: la lama mide lo que el alto de los perfiles
+  const H = altoPerfiles();
+  return P.relieve && P.relieve.orient === 'h' ? [H, P.largo] : [P.largo, H];
+}
+function altoPerfiles() {
+  let a = 0, b = 0; (P.claves || []).forEach(k => k.pts.forEach(q => { a = Math.min(a, q[1]); b = Math.max(b, q[1]); }));
+  return b - a || (P.params && P.params.alto) || 1000;
 }
 // a lo ancho del perfil (lo que mide cada lama a lo largo): en lamas horizontales, el ancho del panel
 const anchoPerfil = () => medidasPanel()[0];
@@ -953,6 +959,28 @@ function cargarImagenEjemplo(id, conMedidas) {
   Rl.imagen = { nombre: E.nombre, w: E.w, h: E.h, d64: E.d64, id: E.id + '-' + Date.now().toString(36) };
   if (conMedidas && E.ancho) { Rl.ancho = E.ancho; Rl.alto = E.alto; }
   return E;
+}
+
+/* ---------- convertir el relieve en perfiles clave (no se puede deshacer, salvo con ↶) ----------
+   Una clave en cada lama (como mucho 60) y en cada una el mismo número de puntos, repartidos a lo largo de la lama. */
+function convertirRelieveEnPerfiles() {
+  if (!relieveActivo()) return 0;
+  const Rl = P.relieve, [W, H] = medidasPanel(), hor = Rl.orient === 'h', largo = hor ? H : W, largoV = hor ? W : H;
+  const xs = (R && R.costillas && R.costillas.length ? R.costillas.map(c => c.x) : []).filter(x => x >= 0 && x <= largo);
+  let pos = xs.length >= 2 ? xs : Array.from({ length: 13 }, (_, i) => largo * i / 12);
+  if (pos.length > 60) pos = Array.from({ length: 60 }, (_, i) => pos[Math.round(i * (pos.length - 1) / 59)]);
+  if (pos[0] > 0.5) pos.unshift(0); if (pos[pos.length - 1] < largo - 0.5) pos.push(largo);
+  const M = clamp(Math.round(largoV / 12), 24, 90);
+  const claves = pos.map(x => {
+    const pts = [[0, 0]];
+    for (let j = 0; j < M; j++) { const v = largoV * j / (M - 1); pts.push([Math.round((hor ? profundidadEn(v, x) : profundidadEn(x, v)) * 10) / 10, Math.round(v * 10) / 10]); }
+    pts.push([0, largoV]);
+    return { x: Math.round(x * 10) / 10, pts };
+  });
+  P.claves = claves; P.esquinas = [true, true, ...new Array(M - 2).fill(false), true, true];
+  P.largo = largo; P.plantilla = 'pared_libre'; P.params = { largo, alto: largoV }; P.editado = true;
+  Rl.fuente = 'plantilla'; Rl.modelo = null; Rl.imagen = null;
+  return claves.length;
 }
 
 function cargarModelo(buf, nombre) { return cargarTriangulos(leerMalla(buf, nombre), nombre); }
@@ -1244,6 +1272,15 @@ PLANTILLAS.pared_ondas = {
   generar(p) {
     return generarPared(p, (t, y) => p.fondo + p.relieve * (0.5 + 0.25 * Math.sin(PI2 * p.ondasX * t) + 0.25 * Math.sin(PI2 * (p.ondasY * y + p.diagonal * p.ondasX * t))));
   },
+};
+PLANTILLAS.pared_libre = {
+  nombre: 'Panel de pared libre', grupo: 'pared',
+  desc: 'Lamas planas para dibujar a mano. También es la forma que queda al convertir un texto, un modelo 3D o una imagen en perfiles editables.',
+  params: [
+    { id: 'largo', nombre: 'Largo del panel (donde van las lamas)', min: 200, max: 6000, paso: 10, valor: 1200 },
+    { id: 'alto', nombre: 'Largo de cada lama', min: 200, max: 3000, paso: 10, valor: 1000 },
+  ],
+  generar(p) { return generarPared({ largo: p.largo, alto: p.alto, ondasX: 0.5 }, () => 40); },
 };
 PLANTILLAS.pared_relieve = {
   nombre: 'Panel de pared con relieve', grupo: 'pared',
@@ -2153,6 +2190,14 @@ function iniciarPanel() {
   };
   $('#bModeloEjemplo').onclick = dialogoModelos;
   $('#bImagenEjemplo').onclick = dialogoImagenes;
+  $('#bConvertirPerfiles').onclick = () => {
+    const que = { texto: 'el texto', modelo: 'el modelo 3D', imagen: 'la imagen' }[Rl().fuente] || 'el relieve';
+    if (!confirm(`Se va a convertir ${que} en perfiles clave (un perfil en cada lama), para que puedas mover, añadir o quitar puntos y perfiles a mano. La forma pasa a «Panel de pared: Plantilla».\n\n⚠ Este cambio no se puede revertir: ya no podrás volver a cambiar ${que}, ni las medidas, el relieve o el suavizado (solo con ↶ Deshacer, antes de cerrar). Si quieres conservarlo, guarda antes una copia del proyecto.\n\n¿Convertir?`)) return;
+    const n = convertirRelieveEnPerfiles(); if (!n) return;
+    UI.clave = Math.floor(n / 2); UI.punto = -1;
+    ponerControles(); cambio(`Convertido en ${n} perfiles editables`); encuadrarSiHaceFalta(); camara('tres4');
+    aviso(`Convertido en ${n} perfiles clave. Ya puedes editar los puntos en la vista del perfil.`, 5000);
+  };
   enlazar('#rlGama', () => { Rl().gama = clamp(+$('#rlGama').value || 1, 0.2, 5); cambio(); });
   $('#bAjustarImagen').onclick = () => { if (!Rl().imagen) { aviso('Carga antes una imagen.'); return; } ajustarAltoImagen(); ponerControles(); cambio('Alto según la imagen'); encuadrarSiHaceFalta(); camara('tres4'); };
   $('#bCargarImagen').onclick = () => {

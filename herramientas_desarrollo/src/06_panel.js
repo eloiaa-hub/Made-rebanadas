@@ -166,6 +166,14 @@ function iniciarPanel() {
   };
   $('#bModeloEjemplo').onclick = dialogoModelos;
   $('#bImagenEjemplo').onclick = dialogoImagenes;
+  $('#bConvertirPerfiles').onclick = () => {
+    const que = { texto: 'el texto', modelo: 'el modelo 3D', imagen: 'la imagen' }[Rl().fuente] || 'el relieve';
+    if (!confirm(`Se va a convertir ${que} en perfiles clave (un perfil en cada lama), para que puedas mover, añadir o quitar puntos y perfiles a mano. La forma pasa a «Panel de pared: Plantilla».\n\n⚠ Este cambio no se puede revertir: ya no podrás volver a cambiar ${que}, ni las medidas, el relieve o el suavizado (solo con ↶ Deshacer, antes de cerrar). Si quieres conservarlo, guarda antes una copia del proyecto.\n\n¿Convertir?`)) return;
+    const n = convertirRelieveEnPerfiles(); if (!n) return;
+    UI.clave = Math.floor(n / 2); UI.punto = -1;
+    ponerControles(); cambio(`Convertido en ${n} perfiles editables`); encuadrarSiHaceFalta(); camara('tres4');
+    aviso(`Convertido en ${n} perfiles clave. Ya puedes editar los puntos en la vista del perfil.`, 5000);
+  };
   enlazar('#rlGama', () => { Rl().gama = clamp(+$('#rlGama').value || 1, 0.2, 5); cambio(); });
   $('#bAjustarImagen').onclick = () => { if (!Rl().imagen) { aviso('Carga antes una imagen.'); return; } ajustarAltoImagen(); ponerControles(); cambio('Alto según la imagen'); encuadrarSiHaceFalta(); camara('tres4'); };
   $('#bCargarImagen').onclick = () => {
