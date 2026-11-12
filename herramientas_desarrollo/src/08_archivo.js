@@ -154,7 +154,7 @@ function dialogoEjemplos() {
     if (UI.sucio && !confirm('Hay cambios sin guardar. ¿Abrir el ejemplo?')) return;
     const e = E[+b.dataset.ej]; cerrarModal();
     const p = proyectoDePlantilla(e.plantilla, e);
-    if (e.modeloEjemplo || e.imagenEjemplo) { const ant = P; P = p; try { if (e.modeloEjemplo) cargarModeloEjemplo(e.modeloEjemplo); else cargarImagenEjemplo(e.imagenEjemplo); } catch (er) { aviso('⚠ ' + esc(er.message), 5000); } P = ant; }
+    if (e.modeloEjemplo || e.imagenEjemplo) { const ant = P; P = p; try { if (e.modeloEjemplo) cargarModeloEjemplo(e.modeloEjemplo, false, true); else cargarImagenEjemplo(e.imagenEjemplo); } catch (er) { aviso('⚠ ' + esc(er.message), 5000); } P = ant; }
     cargarProyecto(p, true);
     aviso('Ejemplo: ' + esc(e.nombre));
   });

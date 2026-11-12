@@ -8,12 +8,12 @@
 - **Lamas horizontales** (con rastreles verticales) además de las verticales.
 - Plantilla **Estantería de pared ondulada**: lamas con baldas y ménsulas, de fondo ondulado.
 - Los paneles de pared empiezan con **lamas de 12 mm cada 26 mm** (antes 18 mm cada 60 mm); los ejemplos de pared, más juntos.
-- **Relieve desde una imagen en escala de grises** (png, jpg…): lo blanco sale más; gama, invertir, suavizado y «Alto según la imagen». Cuatro imágenes de ejemplo en `assets/imagenes` (mapa de la cara, espiral, hoja, montañas) y dos ejemplos nuevos.
+- **Relieve desde una imagen en escala de grises** (png, jpg…): lo blanco sale más; gama, invertir, suavizado y «Alto según la imagen». Cuatro imágenes de ejemplo en `assets/imagenes` (mapa del busto, espiral, hoja, montañas) y dos ejemplos nuevos.
 - **🧊 Guardar el modelo 3D** en **STL** (una malla, para imprimir en 3D) o **OBJ + MTL** (una pieza por objeto, con su color), con Z o Y arriba, a escala y con o sin herrajes.
 - **✏ Convertir en perfiles editables**: el texto, el modelo 3D o la imagen se pasan a perfiles clave (uno por lama) para retocar los puntos a mano. Avisa de que no se puede revertir.
 - Plantilla **Panel de pared libre**.
 - El material por defecto es **MDF crudo** (se ve mejor en pantalla).
-- **Modelos 3D de ejemplo** (STL en `assets/modelos` y botón «🗿 Modelos de ejemplo…»): cara, labios, ondas en el agua y anomalía (burbuja).
+- **Modelos 3D de ejemplo** (STL en `assets/modelos` y botón «🗿 Modelos de ejemplo…»): busto de mujer, labios, ondas en el agua, anomalía (burbuja) y Nefertiti (escaneo del Neues Museum, CC BY-NC-SA).
 - Se quita el enlace al **Calcador** (botón «➜ Calcador»): las piezas siguen saliendo en DXF y SVG con arcos, y en el Anidador.
 - Seis ejemplos nuevos: estantería ondulada, rótulo de texto, arte mural «ondas», retrato en lamas horizontales, labios y anomalía.
 

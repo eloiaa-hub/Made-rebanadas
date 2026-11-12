@@ -44,6 +44,43 @@ def cara(p):
     d = suma(d, cuello, 12)
     return d
 
+def cap(p, a, b, r):
+    x, y, z = p
+    t = np.clip((y - a[1]) / (b[1] - a[1]), 0, 1)
+    cx = a[0] + t * (b[0] - a[0]); cz = a[2] + t * (b[2] - a[2]); cy = a[1] + t * (b[1] - a[1])
+    return np.sqrt((x - cx)**2 + (y - cy)**2 + (z - cz)**2) - r
+def busto(p):
+    x, y, z = p
+    d = elip(p, (0, 30, -10), (80, 94, 96))                                 # cráneo
+    d = suma(d, elip(p, (0, -36, 26), (60, 68, 70)), 26)                  # cara
+    d = suma(d, elip(p, (0, -58, 22), (50, 48, 62)), 20)                  # mandíbula
+    d = suma(d, elip(p, (0, -96, 56), (20, 13, 18)), 16)                 # barbilla
+    for s in (-1, 1):
+        d = suma(d, elip(p, (s * 38, -28, 58), (26, 26, 26)), 16)        # mejillas
+        d = suma(d, elip(p, (s * 30, 18, 69), (22, 5, 9)), 10)          # arco de la ceja
+        d = resta(d, elip(p, (s * 31, 1, 79), (17, 9, 12)), 5)          # cuenca
+        d = suma(d, elip(p, (s * 31, 0, 67.5), (12.5, 12.5, 12.5)), 1.2)   # ojo (globo)
+        d = suma(d, elip(p, (s * 31, 6.5, 72.5), (15, 2.6, 7)), 2)           # párpado de arriba
+        d = suma(d, elip(p, (s * 31, -7.5, 72.5), (13, 2, 5.5)), 2)          # párpado de abajo
+        d = suma(d, elip(p, (s * 12, -47, 86), (7, 6, 7)), 4)            # aletas de la nariz
+        o = elip(p, (s * 74, -10, -6), (8, 27, 15))                       # oreja
+        o = resta(o, elip(p, (s * 80, -8, -3), (4, 17, 9)), 3)
+        d = suma(d, o, 4)
+    nariz = elip(p, (0, -14, 84), (7.5, 30, 10))
+    nariz = suma(nariz, elip(p, (0, -44, 95), (11, 9, 10)), 7)
+    d = suma(d, nariz, 6)
+    d = suma(d, elip(p, (0, -67, 86), (20, 5.5, 8.5)), 4)                     # labio de arriba
+    for s in (-1, 1): d = suma(d, elip(p, (s * 7, -65.5, 87.5), (10, 4.5, 7.5)), 3)
+    d = suma(d, elip(p, (0, -78, 84), (17, 7.5, 10)), 4)                 # labio de abajo
+    d = resta(d, elip(p, (0, -72, 94), (22, 1.0, 8)), 1.2)               # boca
+    cuello = cap(p, (0, -70, -8), (0, -205, -4), 44)
+    d = suma(d, cuello, 22)
+    hombros = elip((x, y + 0.16 * np.sqrt(x**2 + 400), z), (0, -222, -8), (225, 56, 70))
+    d = suma(d, hombros, 34)
+    corte = (-262 + 0.0011 * x**2) - y                                   # corte de abajo, curvo
+    d = np.maximum(d, corte)
+    return d
+
 def labios(X, Y):   # mapa de alturas: X de -75 a 75 mm, Y de -40 a 40 mm
     u, v = X / 66, Y / 66
     c = np.clip(1 - u**2, 0, 1)
@@ -93,21 +130,35 @@ def guardar(nombre, V, F, titulo, desc, vista='frente', giro=0, ancho=None, alto
         for k in range(len(F)): f.write(struct.pack('<12fH', *n[k], *tri[k, 0], *tri[k, 1], *tri[k, 2], 0))
     # formato compacto para el programa: vértices en décimas de mm (int16) y caras (uint16/uint32)
     q = np.round(V * 10).astype('<i2'); ix = F.astype('<u4')
-    return {'id': nombre, 'nombre': titulo, 'desc': desc, 'vista': vista, 'giro': giro, 'archivo': nombre + '.stl', 'triangulos': int(len(F)),
+    return {'_V': V, '_F': F, 'id': nombre, 'nombre': titulo, 'desc': desc, 'vista': vista, 'giro': giro, 'archivo': nombre + '.stl', 'triangulos': int(len(F)),
             'ancho': ancho, 'alto': alto,
             'v': base64.b64encode(q.tobytes()).decode(), 'f': base64.b64encode(ix.tobytes()).decode()}
 
+def leer_stl(ruta):
+    b = open(ruta, 'rb').read(); n = struct.unpack('<I', b[80:84])[0]
+    t = np.frombuffer(b[84:84 + 50 * n], dtype=np.dtype([('n', '<f4', 3), ('v', '<f4', (3, 3)), ('a', '<u2')]))['v'].reshape(-1, 3).astype(float)
+    V, inv = np.unique(np.round(t, 3), axis=0, return_inverse=True)
+    return V, inv.reshape(-1, 3)
 os.makedirs(DEST, exist_ok=True); M = []
-V, F = malla_sdf(cara, (-80, -155, -80), (80, 100, 95), 3.2)
-M.append(guardar('cara', V, F, 'Cara', 'Busto con ojos cerrados: de frente, retrato; de lado, perfil.', ancho=600, alto=900))
+busto_stl = os.path.join(AQUI, 'fuentes', 'busto_mujer.stl')
+if os.path.exists(busto_stl):
+    V, F = leer_stl(busto_stl)
+else:
+    V, F = malla_sdf(busto, (-240, -270, -112), (240, 132, 110), 3.5)
+M.append(guardar('cara', V, F, 'Busto de mujer', 'Cabeza y hombros esculpidos, lisos: de frente, retrato; de lado, perfil.', ancho=1000, alto=950))
 V, F = malla_altura(labios, 150, 80, 1.6)
 M.append(guardar('labios', V, F, 'Labios', 'Unos labios carnosos, para un panel apaisado.', ancho=1200, alto=560))
 V, F = malla_altura(ondas, 320, 320, 5.5)
 M.append(guardar('ondas', V, F, 'Ondas en el agua', 'Dos gotas que hacen ondas concéntricas que se cruzan.', ancho=900, alto=900))
 V, F = malla_altura(burbuja, 320, 320, 5.5)
 M.append(guardar('burbuja', V, F, 'Anomalía (burbuja)', 'Una burbuja que empuja la superficie, con un surco alrededor.', ancho=900, alto=900))
+# modelos de fuera, ya reducidos y orientados (Y arriba, mirando a +Z), en herramientas_desarrollo/fuentes
+nef = os.path.join(AQUI, 'fuentes', 'nefertiti.stl')
+if os.path.exists(nef):
+    V, F = leer_stl(nef)
+    M.append(guardar('nefertiti', V, F, 'Nefertiti', 'Escaneo del busto del Neues Museum de Berlín, reducido a 40 000 triángulos.', ancho=520, alto=1000))
 with open(os.path.join(DEST, 'modelos.js'), 'w') as f:
-    f.write('/* Modelos 3D de ejemplo de Made-rebanadas (generados con herramientas_desarrollo/modelos.py).\n   Los mismos modelos están en esta carpeta como .stl. */\nwindow.MADE_MODELOS = ' + json.dumps(M, ensure_ascii=False) + ';\n')
+    f.write('/* Modelos 3D de ejemplo de Made-rebanadas (generados con herramientas_desarrollo/modelos.py).\n   Los mismos modelos están en esta carpeta como .stl. */\nwindow.MADE_MODELOS = ' + json.dumps([{k: v for k, v in m.items() if not k.startswith('_')} for m in M], ensure_ascii=False) + ';\n')
 for m in M: print(m['id'], m['triangulos'], os.path.getsize(os.path.join(DEST, m['archivo'])))
 print('modelos.js', os.path.getsize(os.path.join(DEST, 'modelos.js')))
 
@@ -116,15 +167,27 @@ from PIL import Image, ImageFilter
 import io
 DIMG = os.path.join(AQUI, '..', 'assets', 'imagenes'); os.makedirs(DIMG, exist_ok=True)
 
-def img_cara(n=260):
-    xs = np.linspace(-75, 75, n); ys = np.linspace(95, -150, int(n * 245 / 150)); zs = np.arange(-80, 95, 1.2)
-    out = np.zeros((ys.size, xs.size))
-    for j, y in enumerate(ys):
-        X, Z = np.meshgrid(xs, zs, indexing='ij'); D = cara((X, np.full_like(X, y), Z)) < 0
-        an = D.any(1); idx = D.shape[1] - 1 - np.argmax(D[:, ::-1], axis=1)
-        out[j] = np.where(an, zs[idx], np.nan)
-    lo, hi = np.nanmin(out), np.nanmax(out)
-    return np.nan_to_num((out - lo) / (hi - lo) * 0.85 + 0.15, nan=0)
+def zbuffer(V, F, n):
+    """Mapa de alturas de frente (lo más cercano en +Z) de una malla, n píxeles de ancho."""
+    x0, x1, y0, y1 = V[:, 0].min(), V[:, 0].max(), V[:, 1].min(), V[:, 1].max()
+    s = (n - 1) / (x1 - x0); h = int((y1 - y0) * s) + 1
+    P = np.c_[(V[:, 0] - x0) * s, (y1 - V[:, 1]) * s, V[:, 2]]; Z = np.full((h, n), -np.inf)
+    for a, b, c in P[F]:
+        lo = np.floor(np.minimum(np.minimum(a, b), c)[:2]).astype(int); hi = np.ceil(np.maximum(np.maximum(a, b), c)[:2]).astype(int)
+        xs, ys = np.meshgrid(np.arange(max(lo[0], 0), min(hi[0], n - 1) + 1), np.arange(max(lo[1], 0), min(hi[1], h - 1) + 1))
+        if not xs.size: continue
+        d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1])
+        if abs(d) < 1e-9: continue
+        l1 = ((b[1] - c[1]) * (xs - c[0]) + (c[0] - b[0]) * (ys - c[1])) / d; l2 = ((c[1] - a[1]) * (xs - c[0]) + (a[0] - c[0]) * (ys - c[1])) / d; l3 = 1 - l1 - l2
+        m = (l1 >= -1e-6) & (l2 >= -1e-6) & (l3 >= -1e-6)
+        z = l1 * a[2] + l2 * b[2] + l3 * c[2]
+        Z[ys[m], xs[m]] = np.maximum(Z[ys[m], xs[m]], z[m])
+    an = np.isfinite(Z); lo = Z[an].min(); hi = Z[an].max()
+    return np.where(an, (Z - lo) / (hi - lo) * 0.85 + 0.15, 0)
+
+def img_cara(n=420):
+    V, F = M[0]['_V'], M[0]['_F']
+    return zbuffer(V, F, n)
 
 def img_espiral(n=300):
     y, x = np.mgrid[-1:1:n * 1j, -1:1:n * 1j]; r = np.hypot(x, y); a = np.arctan2(y, x)
@@ -154,7 +217,7 @@ def img_montanas(n=300):
 
 IM = []
 for id_, nom, desc, fn, ancho, alto in [
-        ('cara_mapa', 'Mapa de la cara', 'El modelo «Cara» visto de frente, pasado a grises: así ve el programa un STL.', img_cara, 600, 980),
+        ('cara_mapa', 'Mapa del busto', 'El modelo «Busto de mujer» visto de frente, pasado a grises: así ve el programa un STL.', img_cara, 1000, 950),
         ('espiral', 'Espiral', 'Una espiral con relieve de cresta, para lamas horizontales o verticales.', img_espiral, 900, 900),
         ('hoja', 'Hoja', 'Una hoja abombada con su nervio central y las venas marcadas.', img_hoja, 700, 700),
         ('montanas', 'Montañas', 'Un paisaje de crestas hecho con ruido: como un mapa topográfico.', img_montanas, 1200, 1200)]:

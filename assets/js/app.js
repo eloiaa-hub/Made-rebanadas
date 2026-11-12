@@ -1005,9 +1005,9 @@ function triangulosEjemplo(id) {
   return { M, tri };
 }
 // carga un modelo de ejemplo con su vista y medidas propuestas (las medidas solo si se pide)
-function cargarModeloEjemplo(id, conMedidas) {
+function cargarModeloEjemplo(id, conMedidas, mantenerVista) {
   const r = triangulosEjemplo(id); if (!r) throw new Error('No se encuentra el modelo de ejemplo «' + id + '» (assets/modelos/modelos.js)');
-  const Rl = P.relieve; Rl.fuente = 'modelo'; Rl.vista = r.M.vista || 'frente'; Rl.giro = r.M.giro || 0;
+  const Rl = P.relieve; Rl.fuente = 'modelo'; if (!mantenerVista) { Rl.vista = r.M.vista || 'frente'; Rl.giro = r.M.giro || 0; }
   if (conMedidas && r.M.ancho) { Rl.ancho = r.M.ancho; Rl.alto = r.M.alto; }
   return cargarTriangulos(r.tri, r.M.nombre, id);
 }
@@ -3669,7 +3669,7 @@ function dialogoEjemplos() {
     if (UI.sucio && !confirm('Hay cambios sin guardar. ¿Abrir el ejemplo?')) return;
     const e = E[+b.dataset.ej]; cerrarModal();
     const p = proyectoDePlantilla(e.plantilla, e);
-    if (e.modeloEjemplo || e.imagenEjemplo) { const ant = P; P = p; try { if (e.modeloEjemplo) cargarModeloEjemplo(e.modeloEjemplo); else cargarImagenEjemplo(e.imagenEjemplo); } catch (er) { aviso('⚠ ' + esc(er.message), 5000); } P = ant; }
+    if (e.modeloEjemplo || e.imagenEjemplo) { const ant = P; P = p; try { if (e.modeloEjemplo) cargarModeloEjemplo(e.modeloEjemplo, false, true); else cargarImagenEjemplo(e.imagenEjemplo); } catch (er) { aviso('⚠ ' + esc(er.message), 5000); } P = ant; }
     cargarProyecto(p, true);
     aviso('Ejemplo: ' + esc(e.nombre));
   });

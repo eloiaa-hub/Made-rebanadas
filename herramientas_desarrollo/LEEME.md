@@ -16,6 +16,7 @@ No hacen falta para usar el programa: solo para cambiarlo.
 | `01_base.js` | Utilidades, materiales, estado del proyecto |
 | `02_geometria.js` | Curvas de los perfiles, mezcla entre perfiles clave, recortes, costillas, varillas, comprobaciones, colocación automática de varillas |
 | `02b_reticula.js` | Retícula entrelazada: largueros sacados del volumen, cruces y ranuras a media madera, comprobaciones |
+| `fuentes/` | Modelos de fuera ya reducidos y orientados (Y arriba, mirando a +Z): `busto_mujer.stl`, `nefertiti.stl`; `modelos.py` los incluye |
 | `modelos.py` | Genera los STL y las imágenes en grises de ejemplo (`assets/modelos/modelos.js`, `assets/imagenes/imagenes.js`) (numpy y scikit-image) |
 | `02d_relieve.js` | Relieve de pared: mapa de alturas desde un texto (canvas) o un modelo STL/OBJ (z-buffer), perfil de cada lama, lamas horizontales |
 | `02c_disposicion.js` | Dónde va cada costilla (recta, curva, radial, pared), varillas curvas, tubo y discos, rastreles, comprobaciones de radial y pared |
