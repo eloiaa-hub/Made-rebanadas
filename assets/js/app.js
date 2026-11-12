@@ -8,7 +8,7 @@
 'use strict';
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
-const VERSION = '1.0';
+const VERSION = '1.1';
 const T = window.THREE;
 
 /* ===================== UTILIDADES ===================== */
@@ -77,6 +77,7 @@ function proyectoBase() {
     costillas: { grosor: 18, modo: 'separacion', separacion: 60, numero: 25, base: true, tope: false, topeAlt: 400, material: 'abedul', color: '#f2efe8' },
     varillas: { tipo: 'roscada', diam: 10, holgura: 0.5, margen: 20, tramo: 'todas', separadores: true, sepD: 22, sobra: 12, autoN: 3, lista: [] },
     vista: { explosion: 0, fantasma: false, varillas: true, resalta: true },
+    maqueta: { activa: false, escala: 5, grosor: 3, diam: 3, holgura: 0.2 },
   };
 }
 
@@ -302,6 +303,16 @@ function avisosDe(res, need) {
   }
   const alto = res.costillas.filter(c => c.ok && c.caja.y0 > 1).map(c => c.i);
   if (P.costillas.base && alto.length && alto.length < res.n) add('info', `No llegan al suelo (cuelgan de las varillas): ${cst(alto)}.`, alto[0]);
+  // maqueta a escala
+  const M = P.maqueta;
+  if (M && M.activa) {
+    const k = 1 / M.escala, huecoM = res.sep * k - M.grosor, rM = (M.diam + M.holgura) / 2;
+    if (huecoM < -0.01) add('error', `Maqueta 1:${M.escala}: las costillas de ${fmt(M.grosor, 1)} mm se pisan (separación ${fmt(res.sep * k, 1)} mm). Baja el grosor de la maqueta o la escala.`);
+    const justas = [];
+    res.costillas.forEach(c => { if (!c.ok) return; for (const j of c.agujeros) if (distBorde(c.poly, V.lista[j][0], V.lista[j][1]) * k - rM < 1.5) { justas.push(c.i); break; } });
+    if (justas.length) add('atencion', `Maqueta 1:${M.escala}: queda menos de 1,5 mm de material alrededor de algún agujero en ${cstLa(justas)}.`, justas[0]);
+    if (Math.abs(M.grosor * M.escala - e) > e * 0.2) add('info', `Maqueta 1:${M.escala}: ${fmt(M.grosor, 1)} mm equivalen a ${fmt(M.grosor * M.escala)} mm reales (el tablero real es de ${fmt(e, 1)} mm): la maqueta se verá ${M.grosor * M.escala > e ? 'más llena' : 'más calada'}.`);
+  }
   if (!A.some(a => a.tipo === 'error' || a.tipo === 'atencion')) add('ok', 'Todo correcto: las varillas caben y todas las costillas están sujetas.');
 }
 
@@ -1179,6 +1190,12 @@ function iniciarPanel() {
   };
   $('#bVarMas').onclick = () => { UI.modo = UI.modo === 'varilla' ? 'normal' : 'varilla'; VP.pintar(); };
   $('#bVarQuitar').onclick = () => { if (!V().lista.length) return; V().lista = []; UI.varilla = -1; cambio('Varillas quitadas'); };
+  // maqueta
+  enlazar('#mActiva', () => { P.maqueta.activa = $('#mActiva').checked; cambio(P.maqueta.activa ? 'Maqueta 1:' + P.maqueta.escala : 'Tamaño real'); });
+  enlazar('#mEscala', () => { P.maqueta.escala = +$('#mEscala').value; cambio('Maqueta 1:' + P.maqueta.escala); });
+  enlazar('#mGrosor', () => { P.maqueta.grosor = clamp(+$('#mGrosor').value || 3, 0.5, 20); cambio(); });
+  enlazar('#mDiam', () => { P.maqueta.diam = clamp(+$('#mDiam').value || 3, 0.5, 20); cambio(); });
+  enlazar('#mHolgura', () => { P.maqueta.holgura = clamp(+$('#mHolgura').value || 0, 0, 2); cambio(); });
   // claves
   $('#kPos').onchange = () => {
     const k = claveActual(); k.x = clamp(+$('#kPos').value || 0, 0, P.largo); P.editado = true;
@@ -1229,6 +1246,7 @@ function ponerControles() {
   $('#vTramo').value = V.tramo; $('#vSep').checked = V.separadores; $('#vSepD').value = V.sepD; $('#vSobra').value = V.sobra; $('#vAutoN').value = V.autoN;
   $('#filaSepD').classList.toggle('oculto', !V.separadores);
   $('#kInterp').value = P.interp;
+  const M = P.maqueta; $('#mActiva').checked = M.activa; $('#mEscala').value = String(M.escala); $('#mGrosor').value = M.grosor; $('#mDiam').value = M.diam; $('#mHolgura').value = M.holgura;
   $('#rExplosion').value = P.vista.explosion; $('#cFantasma').checked = P.vista.fantasma; $('#cVarillas3d').checked = P.vista.varillas; $('#cResalta').checked = P.vista.resalta;
   construirParams();
 }
@@ -1274,34 +1292,35 @@ function refrescarListas() {
     av.appendChild(li);
   });
   $('#nAvisos').textContent = R.avisos.filter(a => a.tipo === 'error' || a.tipo === 'atencion').length;
-  // resumen
-  const cm = calcularCompra();
+  // resumen (siempre a tamaño real)
+  const cm = calcularCompra(), largoV = cm.varillas.reduce((a, v) => a + v.largo, 0);
   $('#resumen').innerHTML = `<table>
     <tr><td>Medidas totales</td><td>${fmt(P.largo)} × ${fmt(G.fondo || 0)} × ${fmt(G.alto || 0)} mm</td></tr>
     <tr><td>Costillas</td><td>${R.n} de ${fmt(grosor(), 1)} mm</td></tr>
     <tr><td>Superficie de tablero</td><td>${fmt(cm.area / 1e6, 2)} m²</td></tr>
     <tr><td>Tableros ${fmt(cm.tablero[0])}×${fmt(cm.tablero[1])}</td><td>${cm.nTableros}</td></tr>
-    <tr><td>${esc(VARILLA_TIPOS[P.varillas.tipo].nombre)} Ø${P.varillas.diam}</td><td>${P.varillas.lista.length} · ${fmt(cm.largoVarillas)} mm</td></tr>
-    ${cm.nSep ? `<tr><td>Separadores Ø${P.varillas.sepD} × ${fmt(R.hueco, 1)}</td><td>${cm.nSep}</td></tr>` : ''}
+    <tr><td>${esc(VARILLA_TIPOS[P.varillas.tipo].nombre)} Ø${P.varillas.diam}</td><td>${cm.varillas.length} · ${fmt(largoV)} mm</td></tr>
+    ${cm.nSep ? `<tr><td>Separadores Ø${P.varillas.sepD} × ${fmt(cm.hueco, 1)}</td><td>${cm.nSep}</td></tr>` : ''}
     ${cm.nTuercas ? `<tr><td>Tuercas y arandelas M${P.varillas.diam}</td><td>${cm.nTuercas}</td></tr>` : ''}
     <tr><td>Broca para los agujeros</td><td>Ø ${fmt(P.varillas.diam + P.varillas.holgura, 1)} mm</td></tr>
   </table>`;
+  // maqueta
+  const M = P.maqueta;
+  $('#secMaqueta').classList.toggle('activa', M.activa);
+  $('#maqCtl').classList.toggle('oculto', !M.activa);
+  $('#bFabricar').innerHTML = '<span>🪚</span><span class="txt"> Fabricar</span>' + (M.activa ? '<span class="barra-maq">1:' + M.escala + '</span>' : '');
+  if (M.activa) {
+    const cf = calcularCompraFab(), mayor = R.costillas.reduce((m, c) => c.ok && c.caja.w * c.caja.h > m.w * m.h ? c.caja : m, { w: 0, h: 0 }), k = 1 / M.escala;
+    $('#resMaq').innerHTML = `Mueble de <b>${fmt(P.largo * k)} × ${fmt((G.fondo || 0) * k)} × ${fmt((G.alto || 0) * k)}</b> mm · separación <b>${fmt(cf.sep, 1)}</b> mm · hueco <b>${fmt(Math.max(0, cf.hueco), 1)}</b> mm · costilla mayor ${fmt(mayor.w * k)} × ${fmt(mayor.h * k)} mm · <b>${cf.nTableros}</b> tablero${cf.nTableros === 1 ? '' : 's'} de ${fmt(cf.tablero[0])} × ${fmt(cf.tablero[1])}`;
+  }
   $('#version').textContent = 'v' + VERSION;
   document.title = (P.nombre ? P.nombre + ' — ' : '') + 'Made-rebanadas';
 }
 
+// compra del mueble a tamaño real, aunque esté activa la maqueta
 function calcularCompra() {
-  const V = P.varillas, area = R.costillas.reduce((s, c) => s + (c.ok ? c.area : 0), 0);
-  const usadas = R.varillas.filter(v => v.usada);
-  let nSep = 0;
-  if (V.separadores && R.hueco > 0.5) usadas.forEach(v => { for (let i = v.a; i < v.b; i++) if (v.cabe[i] && v.cabe[i + 1]) nSep++; });
-  const fab = UI.fab || fabDefecto();
-  const col = colocarEnTableros(fab);
-  return {
-    area, nSep, largoVarillas: usadas.reduce((s, v) => s + v.largo, 0),
-    nTuercas: V.tipo === 'madera' ? 0 : usadas.length * 2,
-    tablero: [fab.ancho, fab.alto], nTableros: col.tableros.length, colocacion: col,
-  };
+  const a = P.maqueta.activa; P.maqueta.activa = false;
+  try { return calcularCompraFab(); } finally { P.maqueta.activa = a; }
 }
 
 /* ===================== FABRICACIÓN: TABLEROS, DXF, SVG, DESPIECE ===================== */
@@ -1313,22 +1332,53 @@ const TABLEROS = [
   { n: '2850 × 2070 (aglomerado / MDF)', a: 2850, h: 2070 },
   { n: '1220 × 610 (medio tablero)', a: 1220, h: 610 },
 ];
-function fabDefecto() { return { ancho: 2440, alto: 1220, borde: 10, sep: 12, girar: true, modo: 'tableros', numeros: true }; }
+const TABLEROS_MAQ = [
+  { n: '600 × 400 (láser)', a: 600, h: 400 },
+  { n: '900 × 600 (láser)', a: 900, h: 600 },
+  { n: '1000 × 600', a: 1000, h: 600 },
+  { n: '420 × 297 (A3)', a: 420, h: 297 },
+  { n: '1220 × 610 (medio tablero)', a: 1220, h: 610 },
+];
+
+/* ---------- maqueta: medidas de fabricación ---------- */
+const enMaqueta = () => !!(P.maqueta && P.maqueta.activa);
+const escalaFab = () => enMaqueta() ? 1 / P.maqueta.escala : 1;
+const radioFab = () => enMaqueta() ? (P.maqueta.diam + P.maqueta.holgura) / 2 : radioAgujero();
+const grosorFab = () => enMaqueta() ? P.maqueta.grosor : grosor();
+const diamVarFab = () => enMaqueta() ? P.maqueta.diam : P.varillas.diam;
+const textoEscala = () => enMaqueta() ? 'maqueta 1:' + P.maqueta.escala : 'tamaño real';
+// medidas de una costilla tal y como se fabrica (a escala si es maqueta)
+function geoFab(c) {
+  const k = escalaFab(), poly = c.poly.map(p => [p[0] * k, p[1] * k]);
+  return {
+    c, poly, caja: cajaDe(poly), r: radioFab(), area: Math.abs(c.area) * k * k,
+    agujeros: c.agujeros.map(j => [P.varillas.lista[j][0] * k, P.varillas.lista[j][1] * k]),
+    etiqueta: puntoEtiqueta(c).map(v => v * k),
+  };
+}
+function fabDefecto(maq) {
+  return maq ? { ancho: 600, alto: 400, borde: 5, sep: 4, girar: true, modo: 'tableros', numeros: true }
+             : { ancho: 2440, alto: 1220, borde: 10, sep: 12, girar: true, modo: 'tableros', numeros: true };
+}
+function fabActual() {
+  const k = enMaqueta() ? 'fabMaq' : 'fab';
+  return UI[k] || (UI[k] = fabDefecto(enMaqueta()));
+}
 
 // colocación por estantes (piezas por su rectángulo envolvente)
 function colocarEnTableros(f) {
   const piezas = R.costillas.filter(c => c.ok).map(c => {
-    let w = c.caja.w, h = c.caja.h, rot = false;
+    const g = geoFab(c);
+    let w = g.caja.w, h = g.caja.h, rot = false;
     if (f.girar && h > w) { rot = true; [w, h] = [h, w]; }
     const W = f.ancho - 2 * f.borde, H = f.alto - 2 * f.borde;
     if (f.girar && (w > W || h > H) && h <= W && w <= H) { rot = !rot; [w, h] = [h, w]; }
-    return { c, w, h, rot, cabe: w <= W + 1e-6 && h <= H + 1e-6 };
+    return { c, g, w, h, rot, cabe: w <= W + 1e-6 && h <= H + 1e-6 };
   });
   const grandes = piezas.filter(p => !p.cabe);
   const lista = piezas.filter(p => p.cabe).sort((a, b) => b.h - a.h || b.w - a.w);
   const tableros = [];
   if (f.modo === 'fila') {
-    // todas en una fila, sin tablero
     let x = 0; const t = { piezas: [], ancho: 0, alto: 0 };
     piezas.sort((a, b) => a.c.i - b.c.i).forEach(p => { t.piezas.push({ ...p, x, y: 0 }); x += p.w + f.sep; t.alto = Math.max(t.alto, p.h); });
     t.ancho = Math.max(0, x - f.sep); tableros.push(t);
@@ -1351,98 +1401,109 @@ function colocarEnTableros(f) {
       t.piezas.push({ ...p, x: e.x, y: e.y }); e.x += p.w + f.sep; tableros.push(t);
     }
   }
-  const areaP = R.costillas.reduce((s, c) => s + (c.ok ? c.area : 0), 0);
+  const areaP = piezas.reduce((s, p) => s + p.g.area, 0);
   return { tableros, grandes, uso: tableros.length ? areaP / (tableros.length * f.ancho * f.alto) : 0 };
 }
-// pasa un punto de la costilla (u, v) a coordenadas del tablero
+// pasa un punto de la costilla (ya a escala de fabricación) a coordenadas del tablero
 function aTablero(pz, p) {
-  const b = pz.c.caja; let x = p[0] - b.x0, y = p[1] - b.y0;
+  const b = pz.g.caja; let x = p[0] - b.x0, y = p[1] - b.y0;
   if (pz.rot) [x, y] = [b.h - y, x];
   return [pz.x + x, pz.y + y];
 }
+const altoTexto = g => clamp(Math.min(g.caja.w, g.caja.h) * 0.08, 2.5, 12);
 
 function abrirFabricar() {
   if (!R) return;
-  UI.fab = UI.fab || fabDefecto();
-  const f = UI.fab;
-  const ops = TABLEROS.map(t => `<option value="${t.a}x${t.h}" ${t.a === f.ancho && t.h === f.alto ? 'selected' : ''}>${t.n}</option>`).join('');
-  modal('🪚 Fabricar: costillas en tableros', `
+  const f = fabActual(), lista = enMaqueta() ? TABLEROS_MAQ : TABLEROS;
+  const ops = lista.map(t => `<option value="${t.a}x${t.h}" ${t.a === f.ancho && t.h === f.alto ? 'selected' : ''}>${t.n}</option>`).join('');
+  const maq = enMaqueta() ? `<div class="aviso-maq">Maqueta <b>1:${P.maqueta.escala}</b>: costillas a escala, tablero de ${fmt(P.maqueta.grosor, 1)} mm y agujeros de Ø ${fmt(P.maqueta.diam + P.maqueta.holgura, 2)} mm. Para el mueble real, quita «Fabricar como maqueta» en el panel izquierdo.</div>` : '';
+  modal('🪚 Fabricar: costillas en tableros' + (enMaqueta() ? ' · maqueta 1:' + P.maqueta.escala : ''), `${maq}
     <div class="fab">
       <div class="opc">
         <label class="fila">Colocación <select id="fModo"><option value="tableros">En tableros</option><option value="fila">En fila (sin tablero)</option></select></label>
         <label class="fila">Tablero <select id="fTab">${ops}<option value="otro">Otro…</option></select></label>
-        <label class="fila">Ancho (mm) <input type="number" id="fA" value="${f.ancho}" min="100" step="1"></label>
-        <label class="fila">Alto (mm) <input type="number" id="fH" value="${f.alto}" min="100" step="1"></label>
+        <label class="fila">Ancho (mm) <input type="number" id="fA" value="${f.ancho}" min="50" step="1"></label>
+        <label class="fila">Alto (mm) <input type="number" id="fH" value="${f.alto}" min="50" step="1"></label>
         <label class="fila" title="Margen sin piezas en todo el borde del tablero">Margen al borde (mm) <input type="number" id="fB" value="${f.borde}" min="0" step="1"></label>
-        <label class="fila" title="Espacio entre piezas: al menos el diámetro de la fresa más unos milímetros">Separación entre piezas (mm) <input type="number" id="fS" value="${f.sep}" min="0" step="1"></label>
+        <label class="fila" title="Espacio entre piezas: al menos el diámetro de la fresa más unos milímetros (en láser, 2 a 4 mm)">Separación entre piezas (mm) <input type="number" id="fS" value="${f.sep}" min="0" step="1"></label>
         <label class="fila chk"><input type="checkbox" id="fG" ${f.girar ? 'checked' : ''}> Permitir girar 90° (cuida la veta)</label>
         <label class="fila chk"><input type="checkbox" id="fN" ${f.numeros ? 'checked' : ''}> Grabar el número en cada costilla</label>
         <div class="info" id="fInfo"></div>
         <p class="nota" style="margin-top:10px">El DXF lleva las capas <b>CORTE</b> (contornos), <b>TALADROS</b> (agujeros de las varillas), <b>GRABADO</b> (números) y <b>TABLERO</b> (borde del tablero).</p>
+        <p class="nota">Esta colocación usa el rectángulo de cada costilla. Para encajarlas por su forma real, usa <b>🧩 Anidador</b>.</p>
       </div>
       <div><canvas id="fPrev" width="900" height="520"></canvas></div>
     </div>`,
-    [['📄 SVG', () => exportarSVG()], ['📐 DXF', () => exportarDXF(), true]], true);
+    [['🧩 Anidador', () => { cerrarModal(); abrirAnidador(); }], ['⬇ CSV de cortes', () => exportarCSVCortes()], ['📄 SVG', () => exportarSVG()], ['📐 DXF', () => exportarDXF(), true]], true);
   const leer = () => {
     const t = $('#fTab').value;
     if (t !== 'otro') { const [a, h] = t.split('x').map(Number); $('#fA').value = a; $('#fH').value = h; }
-    f.ancho = Math.max(100, +$('#fA').value); f.alto = Math.max(100, +$('#fH').value);
+    f.ancho = Math.max(50, +$('#fA').value); f.alto = Math.max(50, +$('#fH').value);
     f.borde = Math.max(0, +$('#fB').value); f.sep = Math.max(0, +$('#fS').value);
     f.girar = $('#fG').checked; f.numeros = $('#fN').checked; f.modo = $('#fModo').value;
     previsualizarFab();
   };
   $('#fModo').value = f.modo;
+  if (!lista.some(t => t.a === f.ancho && t.h === f.alto)) $('#fTab').value = 'otro';
   ['#fTab', '#fB', '#fS', '#fG', '#fN', '#fModo'].forEach(s => $(s).onchange = leer);
   ['#fA', '#fH'].forEach(s => $(s).onchange = () => { $('#fTab').value = 'otro'; leer(); });
   previsualizarFab();
 }
-function previsualizarFab() {
-  const f = UI.fab, col = colocarEnTableros(f), cv = $('#fPrev'), ctx = cv.getContext('2d');
-  const d = window.devicePixelRatio || 1, Wc = cv.clientWidth || 900, n = col.tableros.length || 1;
+// dibuja los tableros con sus piezas en un lienzo (también para el plano)
+function dibujarTableros(ctx, col, f, Wc, opciones = {}) {
+  const n = col.tableros.length || 1;
   const tw = f.modo === 'fila' ? (col.tableros[0] ? col.tableros[0].ancho : 100) : f.ancho, th = f.modo === 'fila' ? (col.tableros[0] ? col.tableros[0].alto : 100) : f.alto;
   const porFila = f.modo === 'fila' ? 1 : (n > 1 ? 2 : 1), filas = Math.ceil(n / porFila), gap = 26;
-  const sc = Math.min((Wc - (porFila + 1) * gap) / (porFila * tw), 330 / th);
+  const sc = Math.min((Wc - (porFila + 1) * gap) / (porFila * tw), (opciones.altoMax || 330) / th);
   const Hc = filas * (th * sc + gap) + gap;
-  cv.width = Wc * d; cv.height = Hc * d; cv.style.height = Hc + 'px'; ctx.setTransform(d, 0, 0, d, 0, 0);
-  ctx.fillStyle = cssVar('--vista'); ctx.fillRect(0, 0, Wc, Hc);
+  if (opciones.soloAlto) return Hc;
+  ctx.fillStyle = opciones.fondo || cssVar('--vista'); ctx.fillRect(0, 0, Wc, Hc);
   col.tableros.forEach((t, b) => {
     const ox = gap + (b % porFila) * (tw * sc + gap), oy = gap + Math.floor(b / porFila) * (th * sc + gap);
     const P2 = (x, y) => [ox + x * sc, oy + (th - y) * sc];
     if (f.modo !== 'fila') {
       ctx.fillStyle = '#efe2c9'; ctx.strokeStyle = '#a88b5c'; ctx.lineWidth = 1;
       ctx.fillRect(ox, oy, tw * sc, th * sc); ctx.strokeRect(ox + .5, oy + .5, tw * sc, th * sc);
-      ctx.fillStyle = cssVar('--suave'); ctx.font = '11px system-ui'; ctx.fillText(`Tablero ${b + 1}: ${t.piezas.length} piezas`, ox, oy - 6);
+      ctx.fillStyle = opciones.texto || cssVar('--suave'); ctx.font = '11px system-ui'; ctx.fillText(`Tablero ${b + 1}: ${t.piezas.length} piezas`, ox, oy - 6);
     }
     t.piezas.forEach(pz => {
       ctx.beginPath();
-      pz.c.poly.forEach((p, i) => { const [x, y] = P2(...aTablero(pz, p)); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+      pz.g.poly.forEach((p, i) => { const [x, y] = P2(...aTablero(pz, p)); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
       ctx.closePath(); ctx.fillStyle = 'rgba(168,116,63,.35)'; ctx.fill(); ctx.strokeStyle = '#7a5226'; ctx.stroke();
-      pz.c.agujeros.forEach(k => { const [x, y] = P2(...aTablero(pz, P.varillas.lista[k])); ctx.beginPath(); ctx.arc(x, y, Math.max(1.2, radioAgujero() * sc), 0, PI2); ctx.strokeStyle = '#c0392b'; ctx.stroke(); });
+      pz.g.agujeros.forEach(q => { const [x, y] = P2(...aTablero(pz, q)); ctx.beginPath(); ctx.arc(x, y, Math.max(1.2, pz.g.r * sc), 0, PI2); ctx.strokeStyle = '#c0392b'; ctx.stroke(); });
       if (f.numeros) {
-        const [x, y] = P2(...aTablero(pz, puntoEtiqueta(pz.c)));
+        const [x, y] = P2(...aTablero(pz, pz.g.etiqueta));
         ctx.fillStyle = '#1f4f8a'; ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(pz.c.i + 1, x, y);
         ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
       }
     });
   });
+  return Hc;
+}
+function previsualizarFab() {
+  const f = fabActual(), col = colocarEnTableros(f), cv = $('#fPrev'), ctx = cv.getContext('2d');
+  const d = window.devicePixelRatio || 1, Wc = cv.clientWidth || 900;
+  const Hc = dibujarTableros(null, col, f, Wc, { soloAlto: true });
+  cv.width = Wc * d; cv.height = Hc * d; cv.style.height = Hc + 'px'; ctx.setTransform(d, 0, 0, d, 0, 0);
+  dibujarTableros(ctx, col, f, Wc);
   const info = [];
-  if (f.modo === 'fila') info.push(`${R.costillas.filter(c => c.ok).length} costillas en fila: ${fmt(tw)} × ${fmt(th)} mm.`);
+  if (f.modo === 'fila') info.push(`${R.costillas.filter(c => c.ok).length} costillas en fila: ${fmt(col.tableros[0] ? col.tableros[0].ancho : 0)} × ${fmt(col.tableros[0] ? col.tableros[0].alto : 0)} mm.`);
   else {
     info.push(`<b>${col.tableros.length}</b> tablero${col.tableros.length === 1 ? '' : 's'} de ${fmt(f.ancho)} × ${fmt(f.alto)} mm · aprovechamiento <b>${fmt(col.uso * 100)} %</b>.`);
     if (col.grandes.length) info.push(`<span style="color:var(--peligro)">No caben en el tablero: ${cst(col.grandes.map(p => p.c.i))}.</span>`);
   }
-  info.push(`Agujeros: Ø ${fmt(P.varillas.diam + P.varillas.holgura, 1)} mm · grosor del tablero ${fmt(grosor(), 1)} mm.`);
+  info.push(`Agujeros: Ø ${fmt(2 * radioFab(), 2)} mm · grosor del tablero ${fmt(grosorFab(), 1)} mm.`);
   $('#fInfo').innerHTML = info.join('<br>');
 }
 
 // ---------- DXF (R12, el formato que abre cualquier programa) ----------
 function dxf() {
-  const f = UI.fab || fabDefecto(), col = colocarEnTableros(f), out = [];
+  const f = fabActual(), col = colocarEnTableros(f), out = [];
   const g = (c, v) => out.push(String(c), String(v));
   const n = v => (Math.round(v * 1000) / 1000).toString();
   g(0, 'SECTION'); g(2, 'HEADER'); g(9, '$ACADVER'); g(1, 'AC1009'); g(9, '$INSUNITS'); g(70, 4); g(9, '$MEASUREMENT'); g(70, 1); g(0, 'ENDSEC');
   g(0, 'SECTION'); g(2, 'TABLES'); g(0, 'TABLE'); g(2, 'LAYER'); g(70, 4);
-  [['CORTE', 7], ['TALADROS', 1], ['GRABADO', 5], ['TABLERO', 8]].forEach(([nom, col]) => { g(0, 'LAYER'); g(2, nom); g(70, 0); g(62, col); g(6, 'CONTINUOUS'); });
+  [['CORTE', 7], ['TALADROS', 1], ['GRABADO', 5], ['TABLERO', 8]].forEach(([nom, c]) => { g(0, 'LAYER'); g(2, nom); g(70, 0); g(62, c); g(6, 'CONTINUOUS'); });
   g(0, 'ENDTAB'); g(0, 'ENDSEC');
   g(0, 'SECTION'); g(2, 'ENTITIES');
   const poli = (capa, pts) => {
@@ -1454,51 +1515,71 @@ function dxf() {
     const ox = b * ((f.modo === 'fila' ? t.ancho : f.ancho) + 200);
     if (f.modo !== 'fila') poli('TABLERO', [[ox, 0], [ox + f.ancho, 0], [ox + f.ancho, f.alto], [ox, f.alto]]);
     t.piezas.forEach(pz => {
-      const pts = simplificaCerrado(pz.c.poly, 0.05).map(p => { const q = aTablero(pz, p); return [ox + q[0], q[1]]; });
-      poli('CORTE', pts);
-      pz.c.agujeros.forEach(k => { const q = aTablero(pz, P.varillas.lista[k]); g(0, 'CIRCLE'); g(8, 'TALADROS'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(radioAgujero())); });
+      poli('CORTE', simplificaCerrado(pz.g.poly, 0.05).map(p => { const q = aTablero(pz, p); return [ox + q[0], q[1]]; }));
+      pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); g(0, 'CIRCLE'); g(8, 'TALADROS'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(pz.g.r)); });
       if (f.numeros) {
-        const q = aTablero(pz, puntoEtiqueta(pz.c)), txt = String(pz.c.i + 1), h = 12;
-        g(0, 'TEXT'); g(8, 'GRABADO'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, h); g(1, txt); g(72, 1); g(11, n(ox + q[0])); g(21, n(q[1] - h / 2)); g(31, 0);
+        const q = aTablero(pz, pz.g.etiqueta), h = altoTexto(pz.g);
+        g(0, 'TEXT'); g(8, 'GRABADO'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(h)); g(1, String(pz.c.i + 1)); g(72, 1); g(11, n(ox + q[0])); g(21, n(q[1] - h / 2)); g(31, 0);
       }
     });
   });
   g(0, 'ENDSEC'); g(0, 'EOF');
   return out.join('\r\n') + '\r\n';
 }
-function exportarDXF() { descargar(nombreArchivo(P.nombre) + '_costillas.dxf', dxf(), 'application/dxf'); aviso('DXF guardado'); }
+const sufijoFab = () => enMaqueta() ? '_maqueta_1-' + P.maqueta.escala : '';
+function exportarDXF() { descargar(nombreArchivo(P.nombre) + '_costillas' + sufijoFab() + '.dxf', dxf(), 'application/dxf'); aviso('DXF guardado'); }
 
 function svg() {
-  const f = UI.fab || fabDefecto(), col = colocarEnTableros(f);
+  const f = fabActual(), col = colocarEnTableros(f);
   let W = 0, H = 0; const partes = [];
-  col.tableros.forEach((t, b) => {
+  col.tableros.forEach(t => {
     const tw = f.modo === 'fila' ? t.ancho : f.ancho, th = f.modo === 'fila' ? t.alto : f.alto, ox = W;
     H = Math.max(H, th);
     const Y = y => th - y, n = v => Math.round(v * 100) / 100;
-    if (f.modo !== 'fila') partes.push(`<rect x="${ox}" y="0" width="${tw}" height="${th}" fill="none" stroke="#999" stroke-width="1"/>`);
+    if (f.modo !== 'fila') partes.push(`<rect x="${ox}" y="0" width="${tw}" height="${th}" fill="none" stroke="#999" stroke-width="0.5"/>`);
     t.piezas.forEach(pz => {
-      const d = simplificaCerrado(pz.c.poly, 0.05).map((p, i) => { const q = aTablero(pz, p); return (i ? 'L' : 'M') + n(ox + q[0]) + ' ' + n(Y(q[1])); }).join(' ') + ' Z';
-      partes.push(`<path d="${d}" fill="none" stroke="#000" stroke-width="0.5"/>`);
-      pz.c.agujeros.forEach(k => { const q = aTablero(pz, P.varillas.lista[k]); partes.push(`<circle cx="${n(ox + q[0])}" cy="${n(Y(q[1]))}" r="${n(radioAgujero())}" fill="none" stroke="#d00" stroke-width="0.5"/>`); });
-      if (f.numeros) { const q = aTablero(pz, puntoEtiqueta(pz.c)); partes.push(`<text x="${n(ox + q[0])}" y="${n(Y(q[1]))}" font-family="Arial" font-size="12" text-anchor="middle" dominant-baseline="middle" fill="#00f">${pz.c.i + 1}</text>`); }
+      const d = simplificaCerrado(pz.g.poly, 0.05).map((p, i) => { const q = aTablero(pz, p); return (i ? 'L' : 'M') + n(ox + q[0]) + ' ' + n(Y(q[1])); }).join(' ') + ' Z';
+      partes.push(`<path d="${d}" fill="none" stroke="#000" stroke-width="0.2"/>`);
+      pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); partes.push(`<circle cx="${n(ox + q[0])}" cy="${n(Y(q[1]))}" r="${n(pz.g.r)}" fill="none" stroke="#d00" stroke-width="0.2"/>`); });
+      if (f.numeros) { const q = aTablero(pz, pz.g.etiqueta); partes.push(`<text x="${n(ox + q[0])}" y="${n(Y(q[1]))}" font-family="Arial" font-size="${n(altoTexto(pz.g))}" text-anchor="middle" dominant-baseline="middle" fill="#00f">${pz.c.i + 1}</text>`); }
     });
     W += tw + 200;
   });
   W = Math.max(1, W - 200);
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${W}mm" height="${H}mm" viewBox="0 0 ${W} ${H}">\n<!-- ${esc(P.nombre)} — Made-rebanadas -->\n${partes.join('\n')}\n</svg>\n`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${W}mm" height="${H}mm" viewBox="0 0 ${W} ${H}">\n<!-- ${esc(P.nombre)} — Made-rebanadas (${textoEscala()}) -->\n${partes.join('\n')}\n</svg>\n`;
 }
-function exportarSVG() { descargar(nombreArchivo(P.nombre) + '_costillas.svg', svg(), 'image/svg+xml'); aviso('SVG guardado'); }
+function exportarSVG() { descargar(nombreArchivo(P.nombre) + '_costillas' + sufijoFab() + '.svg', svg(), 'image/svg+xml'); aviso('SVG guardado'); }
 
 // ---------- despiece y lista de compra ----------
+function calcularCompraFab() { // como calcularCompra, pero con las medidas de fabricación (maqueta o real)
+  const V = P.varillas, k = escalaFab(), f = fabActual(), col = colocarEnTableros(f);
+  const usadas = R.varillas.filter(v => v.usada);
+  const sepF = R.sep * k, hueco = sepF - grosorFab(), sobra = enMaqueta() ? Math.max(2, V.sobra * k) : V.sobra;
+  let nSep = 0;
+  if (V.separadores && hueco > 0.5) usadas.forEach(v => { for (let i = v.a; i < v.b; i++) if (v.cabe[i] && v.cabe[i + 1]) nSep++; });
+  return {
+    area: R.costillas.reduce((s, c) => s + (c.ok ? Math.abs(c.area) * k * k : 0), 0), nSep, hueco, sep: sepF,
+    varillas: usadas.map(v => ({ k: v.k, largo: (v.b - v.a) * sepF + grosorFab() + 2 * sobra })),
+    nTuercas: V.tipo === 'madera' || enMaqueta() ? 0 : usadas.length * 2,
+    tablero: [f.ancho, f.alto], nTableros: col.tableros.length, colocacion: col,
+  };
+}
 function filasDespiece() {
-  const mat = MATERIALES[P.costillas.material].nombre, dA = fmt(P.varillas.diam + P.varillas.holgura, 1);
-  return R.costillas.map(c => ({ n: c.i + 1, x: c.x, w: c.caja.w, h: c.caja.h, e: grosor(), area: c.area, ag: c.agujeros.length, dA, mat }));
+  const mat = enMaqueta() ? `Maqueta ${fmt(P.maqueta.grosor, 1)} mm` : MATERIALES[P.costillas.material].nombre;
+  return R.costillas.map(c => { const g = geoFab(c); return { n: c.i + 1, x: c.x * escalaFab(), w: g.caja.w, h: g.caja.h, e: grosorFab(), area: g.area, ag: c.agujeros.length, dA: fmt(2 * g.r, 2), mat }; });
 }
 function listaCompra() {
-  const cm = calcularCompra(), V = P.varillas, tv = VARILLA_TIPOS[V.tipo], L = [];
+  const cm = calcularCompraFab(), V = P.varillas, tv = VARILLA_TIPOS[V.tipo], L = [];
+  if (enMaqueta()) {
+    L.push([`Tablero de maqueta (DM, contrachapado…) de ${fmt(P.maqueta.grosor, 1)} mm`, `${cm.nTableros} de ${fmt(cm.tablero[0])} × ${fmt(cm.tablero[1])} mm (${fmt(cm.area / 100, 0)} cm² de piezas)`]);
+    cm.varillas.forEach(v => L.push([`Varilla de Ø ${fmt(P.maqueta.diam, 1)} mm (bambú, madera o alambre) — varilla ${v.k + 1}`, fmt(v.largo) + ' mm']));
+    if (cm.nSep) L.push([`Separadores de ${fmt(cm.hueco, 1)} mm (tubito, pajita o arandela de cartón)`, `${cm.nSep} piezas`]);
+    L.push(['Agujeros', `Ø ${fmt(P.maqueta.diam + P.maqueta.holgura, 2)} mm`]);
+    return L;
+  }
   L.push([`${MATERIALES[P.costillas.material].nombre}, ${fmt(grosor(), 1)} mm`, `${cm.nTableros} tablero${cm.nTableros === 1 ? '' : 's'} de ${fmt(cm.tablero[0])} × ${fmt(cm.tablero[1])} mm (${fmt(cm.area / 1e6, 2)} m² de piezas)`]);
-  R.varillas.filter(v => v.usada).forEach(v => L.push([`${tv.nombre} ${V.tipo === 'roscada' ? 'M' : 'Ø '}${V.diam} — varilla ${v.k + 1}`, fmt(v.largo) + ' mm']));
-  if (cm.nSep) L.push([`${tv.sep} Ø ${V.sepD} mm (agujero interior > ${V.diam} mm)`, `${cm.nSep} piezas de ${fmt(R.hueco, 1)} mm (${fmt(cm.nSep * R.hueco)} mm en total)`]);
+  cm.varillas.forEach(v => L.push([`${tv.nombre} ${V.tipo === 'roscada' ? 'M' : 'Ø '}${V.diam} — varilla ${v.k + 1}`, fmt(v.largo) + ' mm']));
+  if (cm.nSep) L.push([`${tv.sep} Ø ${V.sepD} mm (agujero interior > ${V.diam} mm)`, `${cm.nSep} piezas de ${fmt(cm.hueco, 1)} mm (${fmt(cm.nSep * cm.hueco)} mm en total)`]);
   if (cm.nTuercas) L.push([`Tuercas M${V.diam} (mejor ciegas) y arandelas`, `${cm.nTuercas} + ${cm.nTuercas}`]);
   L.push(['Broca para los agujeros', `Ø ${fmt(V.diam + V.holgura, 1)} mm`]);
   return L;
@@ -1506,23 +1587,364 @@ function listaCompra() {
 function abrirDespiece() {
   if (!R) return;
   const F = filasDespiece(), L = listaCompra();
-  modal('📋 Despiece y lista de compra', `
+  modal('📋 Despiece y lista de compra' + (enMaqueta() ? ' · maqueta 1:' + P.maqueta.escala : ''), `
     <h4>Costillas</h4>
     <div style="max-height:46vh;overflow:auto"><table class="tabla"><tr><th class="n">Nº</th><th class="n">Posición x</th><th class="n">Ancho</th><th class="n">Alto</th><th class="n">Grosor</th><th class="n">Superficie</th><th class="n">Agujeros</th></tr>
-    ${F.map(f => `<tr><td class="n">${f.n}</td><td class="n">${fmt(f.x)} mm</td><td class="n">${fmt(f.w)}</td><td class="n">${fmt(f.h)}</td><td class="n">${fmt(f.e, 1)}</td><td class="n">${fmt(f.area / 100)} cm²</td><td class="n">${f.ag} × Ø${f.dA}</td></tr>`).join('')}
+    ${F.map(f => `<tr><td class="n">${f.n}</td><td class="n">${fmt(f.x)} mm</td><td class="n">${fmt(f.w, enMaqueta() ? 1 : 0)}</td><td class="n">${fmt(f.h, enMaqueta() ? 1 : 0)}</td><td class="n">${fmt(f.e, 1)}</td><td class="n">${fmt(f.area / 100)} cm²</td><td class="n">${f.ag} × Ø${f.dA}</td></tr>`).join('')}
     </table></div>
     <h4>Lista de compra</h4>
     <table class="tabla">${L.map(l => `<tr><td>${esc(l[0])}</td><td class="n">${esc(l[1])}</td></tr>`).join('')}</table>`,
-    [['⬇ CSV', () => exportarCSV(), true]], true);
+    [['⬇ CSV de cortes', () => exportarCSVCortes()], ['⬇ Despiece (CSV)', () => exportarCSV(), true]], true);
 }
+const csvQ = v => '"' + String(v).replace(/"/g, '""') + '"';
+const csvN = (v, d = 1) => fmt(v, d).replace(/\./g, '');
 function exportarCSV() {
-  const q = v => '"' + String(v).replace(/"/g, '""') + '"', num = (v, d = 1) => fmt(v, d).replace(/\./g, '');
-  const filas = [['Nº', 'Posición x (mm)', 'Ancho (mm)', 'Alto (mm)', 'Grosor (mm)', 'Superficie (cm²)', 'Agujeros', 'Ø agujero (mm)', 'Material'].map(q).join(';')];
-  filasDespiece().forEach(f => filas.push([f.n, num(f.x), num(f.w), num(f.h), num(f.e), num(f.area / 100, 0), f.ag, f.dA, q(f.mat)].join(';')));
-  filas.push('', q('Lista de compra'));
-  listaCompra().forEach(l => filas.push(q(l[0]) + ';' + q(l[1])));
-  descargar(nombreArchivo(P.nombre) + '_despiece.csv', '﻿' + filas.join('\r\n'), 'text/csv');
+  const filas = [['Nº', 'Posición x (mm)', 'Ancho (mm)', 'Alto (mm)', 'Grosor (mm)', 'Superficie (cm²)', 'Agujeros', 'Ø agujero (mm)', 'Material'].map(csvQ).join(';')];
+  filasDespiece().forEach(f => filas.push([f.n, csvN(f.x), csvN(f.w), csvN(f.h), csvN(f.e), csvN(f.area / 100, 0), f.ag, f.dA, csvQ(f.mat)].join(';')));
+  filas.push('', csvQ('Lista de compra (' + textoEscala() + ')'));
+  listaCompra().forEach(l => filas.push(csvQ(l[0]) + ';' + csvQ(l[1])));
+  descargar(nombreArchivo(P.nombre) + '_despiece' + sufijoFab() + '.csv', '﻿' + filas.join('\r\n'), 'text/csv');
 }
+// lista de cortes con el formato de despiece del Anidador (nombre; largo; ancho; cantidad; veta…):
+// cada costilla con su rectángulo envolvente, para abrirla en el Anidador o en una hoja de cálculo
+function exportarCSVCortes() {
+  const filas = ['nombre;largo;ancho;cantidad;veta;canto largo;canto ancho;tipo de canto'];
+  R.costillas.filter(c => c.ok).forEach(c => { const g = geoFab(c); filas.push([`Costilla ${c.i + 1}`, csvN(g.caja.w, 1), csvN(g.caja.h, 1), 1, 'no', 0, 0, ''].join(';')); });
+  descargar(nombreArchivo(P.nombre) + '_cortes' + sufijoFab() + '.csv', '﻿' + filas.join('\r\n') + '\r\n', 'text/csv');
+  aviso('CSV de cortes guardado');
+}
+
+/* ===================== PLANO DE MONTAJE EN PDF =====================
+   Escritor de PDF propio (sin librerías): líneas, polígonos, círculos, texto Helvetica e imagen JPEG.
+   Coordenadas en mm desde la esquina superior izquierda de la hoja. */
+const ANCHOS_HELV = [278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584];
+const WINANSI = { '€': 128, '‚': 130, '„': 132, '…': 133, '‘': 145, '’': 146, '“': 147, '”': 148, '•': 149, '–': 150, '—': 151 };
+const MM = 72 / 25.4;
+class PDFDoc {
+  constructor() { this.pags = []; this.imgs = []; }
+  pagina(w = 297, h = 210) { this.p = { w, h, s: [] }; this.pags.push(this.p); return this; }
+  op(t) { this.p.s.push(t); return this; }
+  X(x) { return (x * MM).toFixed(2); }
+  Y(y) { return ((this.p.h - y) * MM).toFixed(2); }
+  trazo(rgb = [0, 0, 0]) { return this.op(rgb.map(v => (v / 255).toFixed(3)).join(' ') + ' RG'); }
+  relleno(rgb = [0, 0, 0]) { return this.op(rgb.map(v => (v / 255).toFixed(3)).join(' ') + ' rg'); }
+  grosor(mm) { return this.op((mm * MM).toFixed(2) + ' w'); }
+  rayas(on) { return this.op(on ? `[${(on * MM).toFixed(1)} ${(on * MM).toFixed(1)}] 0 d` : '[] 0 d'); }
+  pintar(modo) { return this.op({ s: 'S', f: 'f', b: 'B', ss: 'S' }[modo || 's']); }
+  linea(x1, y1, x2, y2) { return this.op(`${this.X(x1)} ${this.Y(y1)} m ${this.X(x2)} ${this.Y(y2)} l S`); }
+  rect(x, y, w, h, modo) { this.op(`${this.X(x)} ${this.Y(y + h)} ${(w * MM).toFixed(2)} ${(h * MM).toFixed(2)} re`); return this.pintar(modo); }
+  poli(pts, cerrar = true, modo) {
+    if (pts.length < 2) return this;
+    this.op(pts.map((p, i) => `${this.X(p[0])} ${this.Y(p[1])} ${i ? 'l' : 'm'}`).join(' ') + (cerrar ? ' h' : ''));
+    return this.pintar(modo);
+  }
+  circulo(cx, cy, r, modo) {
+    const k = 0.5523 * r, P2 = (x, y) => `${this.X(x)} ${this.Y(y)}`;
+    this.op(`${P2(cx + r, cy)} m ${P2(cx + r, cy - k)} ${P2(cx + k, cy - r)} ${P2(cx, cy - r)} c ${P2(cx - k, cy - r)} ${P2(cx - r, cy - k)} ${P2(cx - r, cy)} c ${P2(cx - r, cy + k)} ${P2(cx - k, cy + r)} ${P2(cx, cy + r)} c ${P2(cx + k, cy + r)} ${P2(cx + r, cy + k)} ${P2(cx + r, cy)} c h`);
+    return this.pintar(modo);
+  }
+  static cod(t) { // texto → bytes WinAnsi escapados para una cadena PDF
+    let s = '';
+    for (const ch of String(t)) {
+      let c = ch.charCodeAt(0);
+      if (WINANSI[ch]) c = WINANSI[ch]; else if (c > 255) continue;
+      if (c === 40 || c === 41 || c === 92) s += '\\' + ch;
+      else if (c < 32) s += ' ';
+      else if (c > 126) s += '\\' + c.toString(8).padStart(3, '0');
+      else s += ch;
+    }
+    return s;
+  }
+  static ancho(t, pt, negrita) { // en mm
+    let u = 0;
+    for (const ch of String(t)) { const b = ch.normalize('NFD').charCodeAt(0); u += b >= 32 && b <= 126 ? ANCHOS_HELV[b - 32] : 556; }
+    return u / 1000 * pt * (negrita ? 1.06 : 1) / MM;
+  }
+  texto(x, y, t, o = {}) {
+    const pt = o.pt || 9, w = PDFDoc.ancho(t, pt, o.b);
+    const x0 = o.al === 'c' ? x - w / 2 : o.al === 'r' ? x - w : x;
+    if (o.col) this.relleno(o.col);
+    this.op(`BT /${o.b ? 'F2' : 'F1'} ${pt} Tf ${this.X(x0)} ${this.Y(y)} Td (${PDFDoc.cod(t)}) Tj ET`);
+    if (o.col) this.relleno([0, 0, 0]);
+    return w;
+  }
+  // texto en varias líneas; devuelve la y siguiente
+  parrafo(x, y, ancho, t, o = {}) {
+    const pt = o.pt || 9, alto = (o.int || 1.35) * pt / MM, pal = String(t).split(' ');
+    let lin = '';
+    for (const p of pal) {
+      const prueba = lin ? lin + ' ' + p : p;
+      if (PDFDoc.ancho(prueba, pt, o.b) > ancho && lin) { this.texto(x, y, lin, o); y += alto; lin = p; } else lin = prueba;
+    }
+    if (lin) { this.texto(x, y, lin, o); y += alto; }
+    return y;
+  }
+  imagen(jpegBin, wpx, hpx, x, y, w, h) {
+    this.imgs.push({ d: jpegBin, w: wpx, h: hpx }); const n = this.imgs.length;
+    return this.op(`q ${(w * MM).toFixed(2)} 0 0 ${(h * MM).toFixed(2)} ${this.X(x)} ${this.Y(y + h)} cm /Im${n} Do Q`);
+  }
+  generar() {
+    const obj = [], off = [];
+    let out = '%PDF-1.4\n%\xe2\xe3\xcf\xd3\n';
+    const add = s => { off.push(out.length); out += `${off.length} 0 obj\n${s}\nendobj\n`; return off.length; };
+    // 1 catálogo, 2 páginas (se reservan), 3-4 fuentes, imágenes, páginas
+    const nPag = this.pags.length, nImg = this.imgs.length;
+    const idPag = 2, idF1 = 3, idF2 = 4, img0 = 5, pag0 = img0 + nImg;
+    add(`<< /Type /Catalog /Pages ${idPag} 0 R >>`);
+    add(`<< /Type /Pages /Kids [${this.pags.map((_, i) => (pag0 + 2 * i) + ' 0 R').join(' ')}] /Count ${nPag} >>`);
+    add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
+    add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
+    this.imgs.forEach(im => add(`<< /Type /XObject /Subtype /Image /Width ${im.w} /Height ${im.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${im.d.length} >>\nstream\n${im.d}\nendstream`));
+    const xo = this.imgs.map((_, i) => `/Im${i + 1} ${img0 + i} 0 R`).join(' ');
+    this.pags.forEach((p, i) => {
+      const cont = p.s.join('\n');
+      add(`<< /Type /Page /Parent ${idPag} 0 R /MediaBox [0 0 ${(p.w * MM).toFixed(2)} ${(p.h * MM).toFixed(2)}] /Resources << /Font << /F1 ${idF1} 0 R /F2 ${idF2} 0 R >> /XObject << ${xo} >> >> /Contents ${pag0 + 2 * i + 1} 0 R >>`);
+      add(`<< /Length ${cont.length} >>\nstream\n${cont}\nendstream`);
+    });
+    const xref = out.length;
+    out += `xref\n0 ${off.length + 1}\n0000000000 65535 f \n` + off.map(o => String(o).padStart(10, '0') + ' 00000 n \n').join('');
+    out += `trailer\n<< /Size ${off.length + 1} /Root 1 0 R /Info << /Producer (Made-rebanadas) /Title (${PDFDoc.cod(P.nombre + ' - plano de montaje')}) >> >>\nstartxref\n${xref}\n%%EOF\n`;
+    const b = new Uint8Array(out.length); for (let i = 0; i < out.length; i++) b[i] = out.charCodeAt(i) & 255;
+    return b;
+  }
+}
+
+// captura del 3D en JPEG (fondo blanco, sin resaltar, montado y en vista ¾)
+function captura3D() {
+  const cam = G.cam.position.clone(), tgt = G.ctl.target.clone(), fondo = G.scene.background, ex = P.vista.explosion, res = P.vista.resalta, fan = P.vista.fantasma;
+  const r = G.renderer, pr = r.getPixelRatio();
+  P.vista.explosion = 0; P.vista.resalta = false; P.vista.fantasma = false;
+  colocarExplosion(); resaltar3D(); construirFantasma();
+  G.scene.background = new T.Color('#ffffff'); if (G.rejilla) G.rejilla.visible = false;
+  r.setPixelRatio(2); ajustar3D(); camara('tres4'); r.render(G.scene, G.cam);
+  const url = r.domElement.toDataURL('image/jpeg', 0.9), w = r.domElement.width, h = r.domElement.height;
+  P.vista.explosion = ex; P.vista.resalta = res; P.vista.fantasma = fan;
+  G.scene.background = fondo; if (G.rejilla) G.rejilla.visible = true;
+  r.setPixelRatio(pr); ajustar3D(); colocarExplosion(); resaltar3D(); construirFantasma();
+  G.cam.position.copy(cam); G.ctl.target.copy(tgt); G.ctl.update(); pedirRender();
+  return { bin: atob(url.split(',')[1]), w, h };
+}
+
+function planoPDF() {
+  const D = new PDFDoc(), k = escalaFab(), W = 297, H = 210, M = 12, maq = enMaqueta();
+  const e = grosorFab(), cm = calcularCompraFab(), V = P.varillas, fecha = new Date().toLocaleDateString('es-ES');
+  const gris = [110, 116, 125], azul = [31, 79, 138], madera = [168, 116, 63], rojo = [192, 57, 43];
+  const hojas = [];
+  const cabecera = titulo => {
+    D.pagina(W, H); hojas.push(D.p);
+    D.texto(M, M + 4, P.nombre, { pt: 14, b: true });
+    D.texto(W - M, M + 4, 'Plano de montaje · ' + (maq ? 'maqueta 1:' + P.maqueta.escala : 'medidas en mm') + ' · ' + fecha, { pt: 9, al: 'r', col: gris });
+    D.texto(M, M + 11, titulo, { pt: 11, b: true, col: azul });
+    D.trazo([200, 200, 200]).grosor(0.3).linea(M, M + 13.5, W - M, M + 13.5).trazo();
+  };
+  const tabla = (x, y, ancho, filas, o = {}) => {
+    const alto = o.alto || 5.2, c1 = o.c1 || ancho * 0.58;
+    filas.forEach((f, i) => {
+      if (f.titulo) { D.texto(x, y + alto * 0.75, f.titulo, { pt: 9.5, b: true, col: azul }); y += alto + 0.6; return; }
+      const yy = D.parrafo(x, y + alto * 0.72, c1 - 2, f[0], { pt: 8.5 });
+      D.parrafo(x + c1, y + alto * 0.72, ancho - c1, f[1], { pt: 8.5, b: true });
+      const h = Math.max(alto, yy - y - alto * 0.72 + alto);
+      D.trazo([225, 225, 225]).grosor(0.2).linea(x, y + h, x + ancho, y + h).trazo();
+      y += h;
+    });
+    return y;
+  };
+
+  // ---- hoja 1: conjunto, datos y compra ----
+  cabecera('1. Conjunto, datos y lista de compra');
+  const cap = captura3D(), iw = 165, ih = Math.min(150, iw * cap.h / cap.w);
+  D.imagen(cap.bin, cap.w, cap.h, M, M + 18, iw, ih);
+  D.trazo([210, 210, 210]).grosor(0.2).rect(M, M + 18, iw, ih).trazo();
+  const fondo = (G.fondo || 0), alto = (G.alto || 0), x2 = M + iw + 8, a2 = W - M - x2;
+  let y = tabla(x2, M + 18, a2, [
+    { titulo: 'Datos' },
+    ['Medidas (largo × fondo × alto)', `${fmt(P.largo * k)} × ${fmt(fondo * k)} × ${fmt(alto * k)} mm`],
+    ['Costillas', `${R.n} de ${fmt(e, 1)} mm`],
+    ['Separación entre centros', `${fmt(cm.sep, 1)} mm`],
+    ['Hueco entre costillas', `${fmt(Math.max(0, cm.hueco), 1)} mm`],
+    ['Material', maq ? `Maqueta de ${fmt(P.maqueta.grosor, 1)} mm` : MATERIALES[P.costillas.material].nombre],
+    ['Varillas', maq ? `${cm.varillas.length} de Ø ${fmt(P.maqueta.diam, 1)} mm` : `${cm.varillas.length} × ${VARILLA_TIPOS[V.tipo].nombre} Ø ${V.diam}`],
+    ['Agujeros', `Ø ${fmt(2 * radioFab(), 2)} mm`],
+  ]);
+  y = tabla(x2, y + 4, a2, [{ titulo: 'Lista de compra' }, ...listaCompra()]);
+  const aviso1 = R.avisos.filter(a => a.tipo === 'error');
+  if (aviso1.length) D.parrafo(M, M + 22 + ih, iw, '¡Atención! El proyecto tiene errores: ' + aviso1.map(a => a.txt).join(' '), { pt: 8.5, col: rojo });
+
+  // ---- hoja 2: vista lateral (orden de montaje) y perfil con las varillas ----
+  cabecera('2. Orden de montaje y posición de las varillas');
+  const cs = R.costillas.filter(c => c.ok);
+  // vista lateral: X a lo largo, Y alto
+  const zona1 = { x: M + 8, y: M + 24, w: W - 2 * M - 16, h: 70 };
+  const sobra = maq ? Math.max(2, V.sobra * k) : V.sobra;
+  const xmin = -sobra / k - 5, xmax = P.largo + sobra / k + 5, ymax = Math.max(...cs.map(c => c.caja.y1));
+  const s1 = Math.min(zona1.w / (xmax - xmin), zona1.h / ymax);
+  const LX = x => zona1.x + (x - xmin) * s1, LY = v => zona1.y + zona1.h - v * s1;
+  D.trazo([150, 150, 150]).grosor(0.3).linea(zona1.x - 4, LY(0), zona1.x + zona1.w + 4, LY(0));
+  cs.forEach(c => {
+    D.relleno([226, 205, 172]).trazo(madera).grosor(0.15);
+    D.rect(LX(c.x - grosor() / 2), LY(c.caja.y1), Math.max(0.25, grosor() * s1), (c.caja.y1 - c.caja.y0) * s1, 'b');
+  });
+  D.relleno([0, 0, 0]);
+  R.varillas.filter(v => v.usada).forEach(v => {
+    const xa = R.costillas[v.a].x - grosor() / 2 - sobra / k, xb = R.costillas[v.b].x + grosor() / 2 + sobra / k;
+    D.trazo(v.fallan.length ? rojo : [80, 88, 98]).grosor(0.5).linea(LX(xa), LY(v.v), LX(xb), LY(v.v));
+    if (v.k % 2) D.texto(LX(xa) - 1.5, LY(v.v) + 1.2, 'V' + (v.k + 1), { pt: 7.5, b: true, al: 'r', col: [80, 88, 98] });
+    else D.texto(LX(xb) + 1.5, LY(v.v) + 1.2, 'V' + (v.k + 1), { pt: 7.5, b: true, col: [80, 88, 98] });
+  });
+  const paso = Math.max(1, Math.ceil(cs.length / Math.floor(zona1.w / 5)));
+  cs.forEach((c, i) => { if (i % paso === 0 || i === cs.length - 1) D.texto(LX(c.x), LY(c.caja.y1) - 1.5, String(c.i + 1), { pt: 6.5, al: 'c', col: azul }); });
+  // cota del largo
+  const yc = LY(0) + 7;
+  D.trazo(azul).grosor(0.2).linea(LX(0), yc, LX(P.largo), yc).linea(LX(0), yc - 2, LX(0), yc + 2).linea(LX(P.largo), yc - 2, LX(P.largo), yc + 2).trazo();
+  D.texto((LX(0) + LX(P.largo)) / 2, yc - 1.2, fmt(P.largo * k) + ' mm', { pt: 8, al: 'c', col: azul });
+  D.texto(zona1.x, zona1.y - 3, `Vista lateral: ${R.n} costillas de ${fmt(e, 1)} mm cada ${fmt(cm.sep, 1)} mm (de centro a centro). Monta de la 1 a la ${R.n}.`, { pt: 8.5, col: gris });
+  // perfil frontal con las varillas
+  const zona2 = { x: M + 8, y: M + 112, w: 120, h: 68 };
+  let u0 = Infinity, u1 = -Infinity; cs.forEach(c => { u0 = Math.min(u0, c.caja.x0); u1 = Math.max(u1, c.caja.x1); });
+  const s2 = Math.min(zona2.w / (u1 - u0), zona2.h / ymax), FX = u => zona2.x + (u - u0) * s2, FY = v => zona2.y + zona2.h - v * s2;
+  D.trazo([215, 195, 165]).grosor(0.15); cs.forEach(c => D.poli(simplificaCerrado(c.poly, 0.5).map(p => [FX(p[0]), FY(p[1])])));
+  const cMed = R.costillas[Math.floor(R.n / 2)];
+  if (cMed.ok) D.trazo(madera).grosor(0.45).poli(simplificaCerrado(cMed.poly, 0.2).map(p => [FX(p[0]), FY(p[1])]));
+  D.trazo([150, 150, 150]).grosor(0.3).linea(zona2.x - 3, FY(0), zona2.x + zona2.w + 3, FY(0));
+  V.lista.forEach((p, i) => {
+    const mal = R.varillas[i] && (R.varillas[i].fallan.length || !R.varillas[i].usada);
+    D.trazo(mal ? rojo : [60, 66, 74]).grosor(0.35).circulo(FX(p[0]), FY(p[1]), Math.max(0.8, radioAgujero() * s2));
+    D.texto(FX(p[0]) + 2.5, FY(p[1]) - 1.5, 'V' + (i + 1), { pt: 7.5, b: true });
+  });
+  D.trazo();
+  D.texto(zona2.x, zona2.y - 3, `Perfil: todas las costillas superpuestas y, más marcada, la ${cMed.i + 1}.`, { pt: 8.5, col: gris });
+  // tabla de varillas
+  const filasV = [{ titulo: 'Varillas (medidas desde la parte trasera y desde el suelo)' }];
+  R.varillas.forEach((v, i) => filasV.push([`V${i + 1}: atrás ${fmt(v.u * k, 1)} · suelo ${fmt(v.v * k, 1)} mm`, v.usada ? `largo ${fmt(cm.varillas.find(q => q.k === v.k).largo)} mm · costillas ${v.a + 1}-${v.b + 1}` : 'no cabe']));
+  filasV.push(['Agujero en las costillas', `Ø ${fmt(2 * radioFab(), 2)} mm`]);
+  if (cm.nSep) filasV.push(['Separadores', `${cm.nSep} de ${fmt(cm.hueco, 1)} mm`]);
+  tabla(zona2.x + zona2.w + 14, zona2.y - 6, W - M - (zona2.x + zona2.w + 14), filasV, { c1: 70 });
+
+  // ---- hojas de costillas: 4 × 2 por hoja, todas a la misma escala ----
+  const porHoja = 8, cols = 4, filas = 2, cw = (W - 2 * M) / cols, ch = (H - 2 * M - 22) / filas;
+  const mw = Math.max(...cs.map(c => c.caja.w)), mh = Math.max(...cs.map(c => c.caja.h));
+  const s3 = Math.min((cw - 10) / mw, (ch - 16) / mh);
+  for (let h0 = 0; h0 < cs.length; h0 += porHoja) {
+    cabecera(`3. Costillas ${cs[h0].i + 1} a ${cs[Math.min(cs.length, h0 + porHoja) - 1].i + 1} (todas a la misma escala, 1:${fmt(k / s3, 0)} aprox.)`);
+    cs.slice(h0, h0 + porHoja).forEach((c, j) => {
+      const g = geoFab(c), cx = M + (j % cols) * cw, cy = M + 18 + Math.floor(j / cols) * ch;
+      D.trazo([225, 225, 225]).grosor(0.2).rect(cx + 1, cy + 1, cw - 2, ch - 2);
+      const ox = cx + (cw - c.caja.w * s3) / 2, oy = cy + ch - 9;
+      const PX = u => ox + (u - c.caja.x0) * s3, PY = v => oy - (v - c.caja.y0) * s3;
+      D.relleno([240, 228, 208]).trazo(madera).grosor(0.35).poli(simplificaCerrado(c.poly, 0.2).map(p => [PX(p[0]), PY(p[1])]), true, 'b');
+      D.relleno([255, 255, 255]).trazo(rojo).grosor(0.25);
+      c.agujeros.forEach(j2 => D.circulo(PX(V.lista[j2][0]), PY(V.lista[j2][1]), Math.max(0.6, radioAgujero() * s3), 'b'));
+      D.relleno([0, 0, 0]).trazo();
+      const et = puntoEtiqueta(c);
+      D.texto(PX(et[0]), PY(et[1]) + 2.2, String(c.i + 1), { pt: 14, b: true, al: 'c', col: azul });
+      D.texto(cx + 3, cy + 6, `Costilla ${c.i + 1}`, { pt: 9, b: true });
+      D.texto(cx + cw - 3, cy + 6, `${fmt(g.caja.w, maq ? 1 : 0)} × ${fmt(g.caja.h, maq ? 1 : 0)} mm`, { pt: 8.5, al: 'r', col: gris });
+      D.texto(cx + 3, cy + ch - 3.5, `x = ${fmt(c.x * k)} mm · ${c.agujeros.length} agujeros`, { pt: 7.5, col: gris });
+    });
+  }
+
+  // ---- tableros ----
+  const f = fabActual(), col = colocarEnTableros(f);
+  if (f.modo !== 'fila' && col.tableros.length) {
+    const porH = 4;
+    for (let t0 = 0; t0 < col.tableros.length; t0 += porH) {
+      cabecera(`4. Corte: tableros de ${fmt(f.ancho)} × ${fmt(f.alto)} mm (${col.tableros.length} en total, aprovechamiento ${fmt(col.uso * 100)} %)`);
+      const tw = (W - 2 * M - 10) / 2, th = (H - 2 * M - 30) / 2, s4 = Math.min(tw / f.ancho, (th - 6) / f.alto);
+      col.tableros.slice(t0, t0 + porH).forEach((t, j) => {
+        const bx = M + (j % 2) * (tw + 10), by = M + 24 + Math.floor(j / 2) * (th + 4);
+        const BX = x => bx + x * s4, BY = yv => by + 5 + (f.alto - yv) * s4;
+        D.texto(bx, by + 2.5, `Tablero ${t0 + j + 1}: ${t.piezas.length} piezas`, { pt: 8.5, b: true });
+        D.relleno([244, 235, 218]).trazo([168, 139, 92]).grosor(0.3).rect(BX(0), BY(f.alto), f.ancho * s4, f.alto * s4, 'b');
+        t.piezas.forEach(pz => {
+          D.relleno([226, 205, 172]).trazo(madera).grosor(0.2).poli(simplificaCerrado(pz.g.poly, 0.3 * (maq ? 0.2 : 1)).map(p => { const q = aTablero(pz, p); return [BX(q[0]), BY(q[1])]; }), true, 'b');
+          const q = aTablero(pz, pz.g.etiqueta); D.texto(BX(q[0]), BY(q[1]) + 1.2, String(pz.c.i + 1), { pt: 6.5, b: true, al: 'c', col: azul });
+        });
+        D.relleno([0, 0, 0]);
+      });
+    }
+  }
+
+  // ---- montaje paso a paso ----
+  cabecera('5. Montaje paso a paso');
+  const pasos = maq ? [
+    `Corta las ${R.n} costillas en tablero de ${fmt(P.maqueta.grosor, 1)} mm (DXF o SVG en «Fabricar»). Haz los agujeros de Ø ${fmt(2 * radioFab(), 2)} mm antes que el contorno.`,
+    `Corta ${cm.varillas.length} varillas de Ø ${fmt(P.maqueta.diam, 1)} mm al largo de la tabla de la hoja 2.` + (cm.nSep ? ` Prepara ${cm.nSep} separadores de ${fmt(cm.hueco, 1)} mm (tubito, pajita o arandela de cartón).` : ''),
+    `Ensarta las costillas en orden, de la 1 a la ${R.n}, con un separador entre cada dos en cada varilla.`,
+    'Comprueba que todas apoyan en la mesa y fija los extremos de las varillas con una gota de cola.',
+    'Mira la maqueta desde todos los lados: si algo no gusta, cambia el diseño antes de cortar el mueble real.',
+  ] : [
+    `Corta las ${R.n} costillas en ${MATERIALES[P.costillas.material].nombre.toLowerCase()} de ${fmt(grosor(), 1)} mm (DXF en «Fabricar»: capas CORTE, TALADROS y GRABADO). Taladra o vacía los agujeros de Ø ${fmt(2 * radioFab(), 1)} mm antes que el contorno.`,
+    'Lija los cantos y las caras de cada costilla y comprueba que lleva su número (grabado o a lápiz en una cara que no se vea).',
+    `Corta ${cm.varillas.length} varillas a su largo (tabla de la hoja 2).` + (cm.nSep ? ` Corta ${cm.nSep} separadores de ${fmt(cm.hueco, 1)} mm, todos iguales.` : ''),
+    V.tipo === 'madera' ? 'Pon la costilla 1 tumbada sobre el banco y mete las varillas en sus agujeros.' : 'Pon una tuerca y una arandela en un extremo de cada varilla y mete las varillas en la costilla 1, tumbada sobre el banco.',
+    `Ensarta un separador en cada varilla y después la costilla siguiente. Repite en orden hasta la costilla ${R.n}.`,
+    V.tipo === 'madera' ? 'Encola los extremos de las varillas en la primera y la última costilla, o fíjalos con un pasador.' : 'Pon arandela y tuerca en el otro extremo y aprieta poco a poco y por igual, alternando las varillas, hasta que no quede holgura.',
+    'Pon el mueble de pie sobre una superficie plana y comprueba que apoyan todas las costillas que deben llegar al suelo.',
+    'Acabado: aceite, cera o barniz. Si va al exterior, usa varilla inoxidable y un acabado para exterior.',
+  ];
+  let yp = M + 24;
+  pasos.forEach((t, i) => {
+    D.relleno(madera).circulo(M + 4, yp - 1.2, 3.2, 'f'); D.relleno([0, 0, 0]);
+    D.texto(M + 4, yp + 0.1, String(i + 1), { pt: 9, b: true, al: 'c', col: [255, 255, 255] });
+    yp = D.parrafo(M + 11, yp, 170, t, { pt: 10 }) + 3;
+  });
+  D.texto(M, H - M - 4, 'Herramientas: ' + (maq ? 'cortadora láser o cúter, cola blanca.' : `CNC o sierra de calar, broca de Ø ${fmt(2 * radioFab(), 1)}, lija, llaves para las tuercas M${V.diam}.`), { pt: 9, col: gris });
+
+  // pies de página
+  hojas.forEach((p, i) => { D.p = p; D.trazo([200, 200, 200]).grosor(0.2).linea(M, H - 8, W - M, H - 8); D.texto(M, H - 4.5, 'Made-rebanadas', { pt: 7.5, col: gris }); D.texto(W - M, H - 4.5, `Hoja ${i + 1} de ${hojas.length}`, { pt: 7.5, al: 'r', col: gris }); });
+  return D.generar();
+}
+function exportarPlano() {
+  if (!R) return;
+  try {
+    const b = planoPDF();
+    descargar(nombreArchivo(P.nombre) + '_plano_montaje' + sufijoFab() + '.pdf', new Blob([b], { type: 'application/pdf' }));
+    aviso('Plano de montaje guardado (PDF)');
+  } catch (e) { console.error(e); aviso('⚠ No se pudo crear el PDF: ' + esc(e.message), 5000); }
+}
+
+/* ===================== ANIDADOR DE TABLEROS (assets/anidador) =====================
+   Se abre en una ventana dentro del programa. Cuando avisa «anidador-listo», recibe las costillas
+   como piezas del Calcador (contorno exterior y agujeros de las varillas) y las medidas del tablero. */
+const PUENTES0 = { n: 0, ancho: 5, alto: 2 };
+function piezaCalcador(c) {
+  const g = geoFab(c), b = g.caja, r3 = v => +v.toFixed(3);
+  const ext = simplificaCerrado(g.poly, 0.05).map(p => ({ x: r3(p[0] - b.x0), y: r3(p[1] - b.y0) }));
+  const contornos = [{ pts: ext, b: ext.map(() => 0), cerrado: true, tipo: 'exterior', mec: { op: 'corte', prof: null, puentes: { ...PUENTES0 } } }];
+  // cada agujero: círculo de dos medias vueltas (bulge 1)
+  g.agujeros.forEach(a => {
+    const x = a[0] - b.x0, y = a[1] - b.y0;
+    contornos.push({ pts: [{ x: r3(x + g.r), y: r3(y) }, { x: r3(x - g.r), y: r3(y) }], b: [1, 1], cerrado: true, tipo: 'interior', mec: { op: 'corte', prof: null, puentes: { ...PUENTES0 } } });
+  });
+  return { nombre: `Costilla ${c.i + 1}`, cantidad: 1, veta: false, calcador: { contornos } };
+}
+let tAnid = 0;
+function abrirAnidador() {
+  if (!R) return;
+  const n = R.costillas.filter(c => c.ok).length;
+  if (!n) { aviso('No hay costillas que colocar.'); return; }
+  UI.anidListo = false;
+  $('#anidInfo').textContent = `${P.nombre}: ${n} costillas · ${textoEscala()} · tablero de ${fmt(grosorFab(), 1)} mm`;
+  const caja = $('#anidCaja'); caja.innerHTML = '';
+  const fr = document.createElement('iframe'); fr.src = 'assets/anidador/anidador.html?desde=rebanadas'; fr.title = 'Anidador de tableros';
+  caja.appendChild(fr); UI.anidFrame = fr;
+  $('#anidAviso').classList.add('oculto'); $('#anidVentana').classList.remove('oculto');
+  clearTimeout(tAnid); tAnid = setTimeout(() => { if (!UI.anidListo) $('#anidAviso').classList.remove('oculto'); }, 7000);
+}
+function cerrarAnidador() {
+  $('#anidVentana').classList.add('oculto'); $('#anidCaja').innerHTML = ''; UI.anidFrame = null; clearTimeout(tAnid);
+}
+window.addEventListener('message', e => {
+  const d = e.data; if (!d || d.tipo !== 'anidador-listo' || !UI.anidFrame || e.source !== UI.anidFrame.contentWindow) return;
+  UI.anidListo = true; $('#anidAviso').classList.add('oculto');
+  const f = fabActual();
+  e.source.postMessage({
+    tipo: 'rebanadas-piezas',
+    nombre: P.nombre + (enMaqueta() ? ` (maqueta 1:${P.maqueta.escala})` : ''),
+    piezas: R.costillas.filter(c => c.ok).map(piezaCalcador),
+    tablero: { largo: f.ancho, ancho: f.alto, grosor: grosorFab(), margen: f.borde, modo: 'forma' },
+  }, '*');
+});
 
 /* ===================== VENTANAS, ARCHIVOS, DESHACER, EJEMPLOS ===================== */
 function modal(titulo, html, botones = [], ancha = false) {
@@ -1588,6 +2010,7 @@ function validarProyecto(o) {
   p.costillas = Object.assign(proyectoBase().costillas, o.costillas || {});
   p.varillas = Object.assign(proyectoBase().varillas, o.varillas || {});
   p.vista = Object.assign(proyectoBase().vista, o.vista || {});
+  p.maqueta = Object.assign(proyectoBase().maqueta, o.maqueta || {});
   if (!PLANTILLAS[p.plantilla]) p.plantilla = 'libre';
   p.params = Object.assign(paramsDefecto(p.plantilla), o.params || {});
   const n = p.claves[0].pts.length;
@@ -1654,6 +2077,9 @@ function iniciar() {
   $('#bDespiece').onclick = abrirDespiece;
   $('#bFabricar').onclick = abrirFabricar;
   $('#bImagen').onclick = imagenPNG;
+  $('#bPlano').onclick = exportarPlano;
+  $('#bAnidador').onclick = abrirAnidador;
+  $('#anidCerrar').onclick = cerrarAnidador;
   $('#bTema').onclick = () => ponerTema(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
   $('#bAyuda').onclick = () => window.open('ayuda/manual.html', '_blank');
   $('#mCerrar').onclick = cerrarModal;
@@ -1663,6 +2089,7 @@ function iniciar() {
     if ((ev.ctrlKey || ev.metaKey) && !ev.shiftKey && ev.key.toLowerCase() === 'z') { if (enCampo) return; ev.preventDefault(); irHistoria(-1); return; }
     if ((ev.ctrlKey || ev.metaKey) && (ev.key.toLowerCase() === 'y' || (ev.shiftKey && ev.key.toLowerCase() === 'z'))) { if (enCampo) return; ev.preventDefault(); irHistoria(1); return; }
     if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 's') { ev.preventDefault(); guardarArchivo(); return; }
+    if (!$('#anidVentana').classList.contains('oculto')) return;
     if (enCampo || !$('#modal').classList.contains('oculto')) { if (ev.key === 'Escape') cerrarModal(); return; }
     if (ev.key === 'Escape') { UI.modo = 'normal'; UI.punto = -1; UI.varilla = -1; VP.pintar(); }
     else if (ev.key === 'Delete' || ev.key === 'Backspace') {
@@ -1681,7 +2108,7 @@ function iniciar() {
   requestAnimationFrame(() => { ajustar3D(); VP.ajustar(); VC.ajustar(); cargarProyecto(P, true); });
 }
 // para las pruebas automáticas
-window.MadeRebanadas = { get P() { return P; }, get R() { return R; }, cargar: o => cargarProyecto(validarProyecto(o)), dxf: () => dxf(), svg: () => svg(), camara: t => camara(t), selCostilla: i => selCostilla(i),
+window.MadeRebanadas = { get P() { return P; }, get R() { return R; }, cargar: o => cargarProyecto(validarProyecto(o)), dxf: () => dxf(), svg: () => svg(), plano: () => planoPDF(), pieza: i => piezaCalcador(R.costillas[i]), camara: t => camara(t), selCostilla: i => selCostilla(i),
   pantallaPunto: i => { const k = claveActual().pts[i], r = $('#cPerfil').getBoundingClientRect(), q = VP.aPantalla(k[0], k[1]); return [r.left + q[0], r.top + q[1]]; },
   pantallaVarilla: i => { const k = P.varillas.lista[i], r = $('#cPerfil').getBoundingClientRect(), q = VP.aPantalla(k[0], k[1]); return [r.left + q[0], r.top + q[1]]; } };
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();

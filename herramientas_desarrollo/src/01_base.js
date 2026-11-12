@@ -8,7 +8,7 @@
 'use strict';
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
-const VERSION = '1.0';
+const VERSION = '1.1';
 const T = window.THREE;
 
 /* ===================== UTILIDADES ===================== */
@@ -77,5 +77,6 @@ function proyectoBase() {
     costillas: { grosor: 18, modo: 'separacion', separacion: 60, numero: 25, base: true, tope: false, topeAlt: 400, material: 'abedul', color: '#f2efe8' },
     varillas: { tipo: 'roscada', diam: 10, holgura: 0.5, margen: 20, tramo: 'todas', separadores: true, sepD: 22, sobra: 12, autoN: 3, lista: [] },
     vista: { explosion: 0, fantasma: false, varillas: true, resalta: true },
+    maqueta: { activa: false, escala: 5, grosor: 3, diam: 3, holgura: 0.2 },
   };
 }

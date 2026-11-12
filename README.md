@@ -1,6 +1,6 @@
 # Made-rebanadas — Por Eloi A.A.
 
-**Versión 1.0** · novedades en [NOVEDADES.md](NOVEDADES.md)
+**Versión 1.1** · novedades en [NOVEDADES.md](NOVEDADES.md)
 
 **Portada en línea:** <https://eloiaa-hub.github.io/Made-rebanadas/>
 
@@ -24,7 +24,10 @@ Funciona en el navegador (Chrome, Edge o Firefox), sin instalar nada y **sin con
 - **Comprobaciones**: varillas que no caben o demasiado juntas, costillas sueltas o con una sola varilla, separadores que asoman.
 - **3D**: maderas y cantos de contrachapado, varillas, tuercas y separadores, vista explosionada, volumen ideal e imagen PNG.
 - **Fabricar**: costillas colocadas en tableros con su número grabado; **DXF** (capas CORTE, TALADROS, GRABADO, TABLERO) y **SVG** en mm.
-- **Despiece y lista de compra** en CSV.
+- **Despiece y lista de compra** en CSV, y **CSV de cortes** con el formato del Anidador.
+- **Maqueta a escala** (1:2 a 1:20) para cortarla antes en la láser.
+- **Plano de montaje en PDF**: conjunto, orden de montaje, varillas, costillas acotadas, tableros y pasos.
+- **Anidador de tableros** integrado: coloca las costillas por su forma real.
 
 ## Archivos
 
@@ -36,6 +39,7 @@ Funciona en el navegador (Chrome, Edge o Firefox), sin instalar nada y **sin con
 | `assets/js/three-bundle.js` | [Three.js](https://threejs.org) empaquetado sin módulos, para funcionar con doble clic |
 | `assets/texturas/` | Maderas y almas de tablero (`texturas.js`) |
 | `assets/ejemplos/` | Muebles de ejemplo (`ejemplos.js`) |
+| `assets/anidador/` | Anidador de tableros de la Suite CNC (`anidador.html`), que se abre desde el programa |
 | `ayuda/` | Manual en HTML y PDF |
 | `herramientas_desarrollo/` | Partes del código, scripts para unirlas y empaquetado de Three.js (ver su `LEEME.md`) |
 

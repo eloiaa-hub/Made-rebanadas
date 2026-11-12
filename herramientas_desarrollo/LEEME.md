@@ -19,9 +19,15 @@ No hacen falta para usar el programa: solo para cambiarlo.
 | `04_editor2d.js` | Editor del perfil clave y vista de la costilla |
 | `05_tres.js` | Vista 3D (Three.js) |
 | `06_panel.js` | Paneles, recálculo y resumen |
-| `07_fabricacion.js` | Colocación en tableros, DXF, SVG, despiece y CSV |
+| `07_fabricacion.js` | Maqueta a escala, colocación en tableros, DXF, SVG, despiece y CSV |
+| `07b_plano.js` | Escritor de PDF propio y plano de montaje |
+| `07c_anidador.js` | Ventana del Anidador y paso de las costillas (formato .json del Calcador) |
 | `08_archivo.js` | Ventanas, deshacer, guardar, abrir, ejemplos |
 | `09_inicio.js` | Arranque, botones y teclado |
+
+## Anidador
+
+`../assets/anidador/anidador.html` es el Anidador de la Suite CNC con un añadido al final: con `?desde=rebanadas` avisa `anidador-listo` al programa y recibe `rebanadas-piezas` (`piezas`: proyectos del Calcador, uno por costilla, con su contorno exterior y los agujeros como contornos interiores; `tablero`: largo, ancho, grosor, margen). Si se actualiza el Anidador, hay que volver a pegar ese bloque.
 
 ## Formato del proyecto (.json)
 
@@ -30,3 +36,4 @@ No hacen falta para usar el programa: solo para cambiarlo.
 - `esquinas`: por punto, `true` = esquina, `false` = curva.
 - `costillas`: grosor, reparto (`separacion` o `numero`), recortes de base y techo, material.
 - `varillas`: tipo, diámetro, holgura, madera al borde, separadores y `lista` de posiciones `[u, v]`.
+- `maqueta`: activa, escala, grosor, diámetro de la varilla y holgura.

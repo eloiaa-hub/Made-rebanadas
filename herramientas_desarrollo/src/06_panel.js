@@ -108,6 +108,12 @@ function iniciarPanel() {
   };
   $('#bVarMas').onclick = () => { UI.modo = UI.modo === 'varilla' ? 'normal' : 'varilla'; VP.pintar(); };
   $('#bVarQuitar').onclick = () => { if (!V().lista.length) return; V().lista = []; UI.varilla = -1; cambio('Varillas quitadas'); };
+  // maqueta
+  enlazar('#mActiva', () => { P.maqueta.activa = $('#mActiva').checked; cambio(P.maqueta.activa ? 'Maqueta 1:' + P.maqueta.escala : 'Tamaño real'); });
+  enlazar('#mEscala', () => { P.maqueta.escala = +$('#mEscala').value; cambio('Maqueta 1:' + P.maqueta.escala); });
+  enlazar('#mGrosor', () => { P.maqueta.grosor = clamp(+$('#mGrosor').value || 3, 0.5, 20); cambio(); });
+  enlazar('#mDiam', () => { P.maqueta.diam = clamp(+$('#mDiam').value || 3, 0.5, 20); cambio(); });
+  enlazar('#mHolgura', () => { P.maqueta.holgura = clamp(+$('#mHolgura').value || 0, 0, 2); cambio(); });
   // claves
   $('#kPos').onchange = () => {
     const k = claveActual(); k.x = clamp(+$('#kPos').value || 0, 0, P.largo); P.editado = true;
@@ -158,6 +164,7 @@ function ponerControles() {
   $('#vTramo').value = V.tramo; $('#vSep').checked = V.separadores; $('#vSepD').value = V.sepD; $('#vSobra').value = V.sobra; $('#vAutoN').value = V.autoN;
   $('#filaSepD').classList.toggle('oculto', !V.separadores);
   $('#kInterp').value = P.interp;
+  const M = P.maqueta; $('#mActiva').checked = M.activa; $('#mEscala').value = String(M.escala); $('#mGrosor').value = M.grosor; $('#mDiam').value = M.diam; $('#mHolgura').value = M.holgura;
   $('#rExplosion').value = P.vista.explosion; $('#cFantasma').checked = P.vista.fantasma; $('#cVarillas3d').checked = P.vista.varillas; $('#cResalta').checked = P.vista.resalta;
   construirParams();
 }
@@ -203,32 +210,33 @@ function refrescarListas() {
     av.appendChild(li);
   });
   $('#nAvisos').textContent = R.avisos.filter(a => a.tipo === 'error' || a.tipo === 'atencion').length;
-  // resumen
-  const cm = calcularCompra();
+  // resumen (siempre a tamaño real)
+  const cm = calcularCompra(), largoV = cm.varillas.reduce((a, v) => a + v.largo, 0);
   $('#resumen').innerHTML = `<table>
     <tr><td>Medidas totales</td><td>${fmt(P.largo)} × ${fmt(G.fondo || 0)} × ${fmt(G.alto || 0)} mm</td></tr>
     <tr><td>Costillas</td><td>${R.n} de ${fmt(grosor(), 1)} mm</td></tr>
     <tr><td>Superficie de tablero</td><td>${fmt(cm.area / 1e6, 2)} m²</td></tr>
     <tr><td>Tableros ${fmt(cm.tablero[0])}×${fmt(cm.tablero[1])}</td><td>${cm.nTableros}</td></tr>
-    <tr><td>${esc(VARILLA_TIPOS[P.varillas.tipo].nombre)} Ø${P.varillas.diam}</td><td>${P.varillas.lista.length} · ${fmt(cm.largoVarillas)} mm</td></tr>
-    ${cm.nSep ? `<tr><td>Separadores Ø${P.varillas.sepD} × ${fmt(R.hueco, 1)}</td><td>${cm.nSep}</td></tr>` : ''}
+    <tr><td>${esc(VARILLA_TIPOS[P.varillas.tipo].nombre)} Ø${P.varillas.diam}</td><td>${cm.varillas.length} · ${fmt(largoV)} mm</td></tr>
+    ${cm.nSep ? `<tr><td>Separadores Ø${P.varillas.sepD} × ${fmt(cm.hueco, 1)}</td><td>${cm.nSep}</td></tr>` : ''}
     ${cm.nTuercas ? `<tr><td>Tuercas y arandelas M${P.varillas.diam}</td><td>${cm.nTuercas}</td></tr>` : ''}
     <tr><td>Broca para los agujeros</td><td>Ø ${fmt(P.varillas.diam + P.varillas.holgura, 1)} mm</td></tr>
   </table>`;
+  // maqueta
+  const M = P.maqueta;
+  $('#secMaqueta').classList.toggle('activa', M.activa);
+  $('#maqCtl').classList.toggle('oculto', !M.activa);
+  $('#bFabricar').innerHTML = '<span>🪚</span><span class="txt"> Fabricar</span>' + (M.activa ? '<span class="barra-maq">1:' + M.escala + '</span>' : '');
+  if (M.activa) {
+    const cf = calcularCompraFab(), mayor = R.costillas.reduce((m, c) => c.ok && c.caja.w * c.caja.h > m.w * m.h ? c.caja : m, { w: 0, h: 0 }), k = 1 / M.escala;
+    $('#resMaq').innerHTML = `Mueble de <b>${fmt(P.largo * k)} × ${fmt((G.fondo || 0) * k)} × ${fmt((G.alto || 0) * k)}</b> mm · separación <b>${fmt(cf.sep, 1)}</b> mm · hueco <b>${fmt(Math.max(0, cf.hueco), 1)}</b> mm · costilla mayor ${fmt(mayor.w * k)} × ${fmt(mayor.h * k)} mm · <b>${cf.nTableros}</b> tablero${cf.nTableros === 1 ? '' : 's'} de ${fmt(cf.tablero[0])} × ${fmt(cf.tablero[1])}`;
+  }
   $('#version').textContent = 'v' + VERSION;
   document.title = (P.nombre ? P.nombre + ' — ' : '') + 'Made-rebanadas';
 }
 
+// compra del mueble a tamaño real, aunque esté activa la maqueta
 function calcularCompra() {
-  const V = P.varillas, area = R.costillas.reduce((s, c) => s + (c.ok ? c.area : 0), 0);
-  const usadas = R.varillas.filter(v => v.usada);
-  let nSep = 0;
-  if (V.separadores && R.hueco > 0.5) usadas.forEach(v => { for (let i = v.a; i < v.b; i++) if (v.cabe[i] && v.cabe[i + 1]) nSep++; });
-  const fab = UI.fab || fabDefecto();
-  const col = colocarEnTableros(fab);
-  return {
-    area, nSep, largoVarillas: usadas.reduce((s, v) => s + v.largo, 0),
-    nTuercas: V.tipo === 'madera' ? 0 : usadas.length * 2,
-    tablero: [fab.ancho, fab.alto], nTableros: col.tableros.length, colocacion: col,
-  };
+  const a = P.maqueta.activa; P.maqueta.activa = false;
+  try { return calcularCompraFab(); } finally { P.maqueta.activa = a; }
 }

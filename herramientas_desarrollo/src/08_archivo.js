@@ -63,6 +63,7 @@ function validarProyecto(o) {
   p.costillas = Object.assign(proyectoBase().costillas, o.costillas || {});
   p.varillas = Object.assign(proyectoBase().varillas, o.varillas || {});
   p.vista = Object.assign(proyectoBase().vista, o.vista || {});
+  p.maqueta = Object.assign(proyectoBase().maqueta, o.maqueta || {});
   if (!PLANTILLAS[p.plantilla]) p.plantilla = 'libre';
   p.params = Object.assign(paramsDefecto(p.plantilla), o.params || {});
   const n = p.claves[0].pts.length;

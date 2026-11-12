@@ -1,5 +1,12 @@
 # Novedades de Made-rebanadas
 
+## v1.1
+
+- **Maqueta a escala** (1:2 a 1:20): grosor, varilla y holgura propios; Fabricar, DXF, SVG, despiece, plano y Anidador salen a escala, con tableros de láser. Comprobaciones de la maqueta.
+- **Plano de montaje en PDF**: conjunto en 3D con datos y lista de compra, orden de montaje con la vista lateral y la posición de las varillas, todas las costillas acotadas, tableros de corte y montaje paso a paso.
+- **Anidador de tableros** dentro del programa (`assets/anidador`): recibe las costillas con su forma y sus agujeros y las coloca por su forma real.
+- **CSV de cortes** con el formato de despiece del Anidador (en Fabricar y en Despiece).
+
 ## v1.0 — primera versión
 
 - Muebles de **costillas separadas** unidas con varillas pasantes y separadores.

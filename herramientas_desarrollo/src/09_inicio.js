@@ -19,6 +19,9 @@ function iniciar() {
   $('#bDespiece').onclick = abrirDespiece;
   $('#bFabricar').onclick = abrirFabricar;
   $('#bImagen').onclick = imagenPNG;
+  $('#bPlano').onclick = exportarPlano;
+  $('#bAnidador').onclick = abrirAnidador;
+  $('#anidCerrar').onclick = cerrarAnidador;
   $('#bTema').onclick = () => ponerTema(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
   $('#bAyuda').onclick = () => window.open('ayuda/manual.html', '_blank');
   $('#mCerrar').onclick = cerrarModal;
@@ -28,6 +31,7 @@ function iniciar() {
     if ((ev.ctrlKey || ev.metaKey) && !ev.shiftKey && ev.key.toLowerCase() === 'z') { if (enCampo) return; ev.preventDefault(); irHistoria(-1); return; }
     if ((ev.ctrlKey || ev.metaKey) && (ev.key.toLowerCase() === 'y' || (ev.shiftKey && ev.key.toLowerCase() === 'z'))) { if (enCampo) return; ev.preventDefault(); irHistoria(1); return; }
     if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 's') { ev.preventDefault(); guardarArchivo(); return; }
+    if (!$('#anidVentana').classList.contains('oculto')) return;
     if (enCampo || !$('#modal').classList.contains('oculto')) { if (ev.key === 'Escape') cerrarModal(); return; }
     if (ev.key === 'Escape') { UI.modo = 'normal'; UI.punto = -1; UI.varilla = -1; VP.pintar(); }
     else if (ev.key === 'Delete' || ev.key === 'Backspace') {
@@ -46,7 +50,7 @@ function iniciar() {
   requestAnimationFrame(() => { ajustar3D(); VP.ajustar(); VC.ajustar(); cargarProyecto(P, true); });
 }
 // para las pruebas automáticas
-window.MadeRebanadas = { get P() { return P; }, get R() { return R; }, cargar: o => cargarProyecto(validarProyecto(o)), dxf: () => dxf(), svg: () => svg(), camara: t => camara(t), selCostilla: i => selCostilla(i),
+window.MadeRebanadas = { get P() { return P; }, get R() { return R; }, cargar: o => cargarProyecto(validarProyecto(o)), dxf: () => dxf(), svg: () => svg(), plano: () => planoPDF(), pieza: i => piezaCalcador(R.costillas[i]), camara: t => camara(t), selCostilla: i => selCostilla(i),
   pantallaPunto: i => { const k = claveActual().pts[i], r = $('#cPerfil').getBoundingClientRect(), q = VP.aPantalla(k[0], k[1]); return [r.left + q[0], r.top + q[1]]; },
   pantallaVarilla: i => { const k = P.varillas.lista[i], r = $('#cPerfil').getBoundingClientRect(), q = VP.aPantalla(k[0], k[1]); return [r.left + q[0], r.top + q[1]]; } };
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();

@@ -49,7 +49,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 
 <header class="port">
   <h1>Made-rebanadas</h1>
-  <p>Manual de uso · versión 1.0 · Muebles orgánicos hechos con costillas de tablero, sin internet · Por Eloi A.A.</p>
+  <p>Manual de uso · versión 1.1 · Muebles orgánicos hechos con costillas de tablero, sin internet · Por Eloi A.A.</p>
 </header>
 
 <figure><img src="img/portada.jpg" alt="Banco ondulado hecho con costillas de contrachapado"></figure>
@@ -67,10 +67,13 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <a href="#vista3d">10. La vista 3D</a><br>
   <a href="#fabricar">11. Paso 5 · Fabricar: tableros y DXF</a><br>
   <a href="#despiece">12. Despiece y lista de compra</a><br>
-  <a href="#archivos">13. Guardar, abrir y ejemplos</a><br>
-  <a href="#teclas">14. Atajos de teclado</a><br>
-  <a href="#taller">15. Consejos de taller</a><br>
-  <a href="#limites">16. Limitaciones de esta versión</a>
+  <a href="#maqueta">13. Maqueta a escala</a><br>
+  <a href="#plano">14. Plano de montaje en PDF</a><br>
+  <a href="#anidador">15. Anidador de tableros</a><br>
+  <a href="#archivos">16. Guardar, abrir y ejemplos</a><br>
+  <a href="#teclas">17. Atajos de teclado</a><br>
+  <a href="#taller">18. Consejos de taller</a><br>
+  <a href="#limites">19. Limitaciones de esta versión</a>
 </div>
 
 <h2 id="que">1. Qué es</h2>
@@ -89,8 +92,8 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 <figure><img src="img/pantalla.jpg" alt="Pantalla del programa"><figcaption>De izquierda a derecha: forma, costillas y varillas · vista 3D · editor del perfil y costilla seleccionada · perfiles clave, comprobaciones, lista de costillas y resumen.</figcaption></figure>
 <table>
   <tr><th>Zona</th><th>Para qué sirve</th></tr>
-  <tr><td><b>Barra superior</b></td><td>Nuevo, Abrir, Guardar, Ejemplos, Deshacer/Rehacer, Despiece, <b>Fabricar</b>, Imagen PNG, modo claro/oscuro y Ayuda.</td></tr>
-  <tr><td><b>Panel izquierdo</b></td><td><b>Forma</b> (plantilla y sus medidas), <b>Costillas</b> (grosor, separación, material) y <b>Uniones</b> (varillas y separadores).</td></tr>
+  <tr><td><b>Barra superior</b></td><td>Nuevo, Abrir, Guardar, Ejemplos, Deshacer/Rehacer, Despiece, <b>Plano</b> (PDF de montaje), <b>Anidador</b>, <b>Fabricar</b>, Imagen PNG, modo claro/oscuro y Ayuda.</td></tr>
+  <tr><td><b>Panel izquierdo</b></td><td><b>Forma</b> (plantilla y sus medidas), <b>Costillas</b> (grosor, separación, material), <b>Uniones</b> (varillas y separadores) y <b>Maqueta a escala</b>.</td></tr>
   <tr><td><b>Vista 3D</b></td><td>El mueble con sus costillas reales. Gira con el botón izquierdo, desplaza con el derecho y acerca con la rueda. Clic en una costilla para seleccionarla.</td></tr>
   <tr><td><b>Editor de perfil</b></td><td>El perfil clave que estás editando, con sus puntos, las varillas y la silueta de todas las costillas.</td></tr>
   <tr><td><b>Costilla</b></td><td>La costilla seleccionada tal y como se va a cortar: contorno, agujeros, número y medidas.</td></tr>
@@ -225,13 +228,55 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <tr><td>TABLERO</td><td>Borde del tablero</td><td>Solo de referencia</td></tr>
 </table>
 <p>El <b>SVG</b> tiene lo mismo, en milímetros, para la cortadora láser o para imprimir plantillas a escala 1:1.</p>
+<p><b>⬇ CSV de cortes</b> guarda una línea por costilla (nombre, largo y ancho de su rectángulo, cantidad y veta) con el mismo formato de despiece que lee el <b>Anidador</b> y que abre cualquier hoja de cálculo. <b>🧩 Anidador</b> abre el Anidador con las costillas por su forma real (sección 15).</p>
 <div class="caja taller">Taladra y vacía <b>los agujeros antes que el contorno</b>: si cortas primero la pieza, se puede mover al hacer los agujeros. Deja puentes (pestañas) si la pieza es pequeña.</div>
 
 <h2 id="despiece">12. Despiece y lista de compra</h2>
 <figure><img src="img/despiece.png" alt="Despiece"></figure>
-<p><b>📋 Despiece</b> muestra todas las costillas (posición, ancho, alto, superficie y agujeros) y la <b>lista de compra</b>: tableros, varillas con su largo, separadores con su número y largo, tuercas y arandelas y la broca de los agujeros. <b>⬇ CSV</b> la guarda para abrirla en una hoja de cálculo.</p>
+<p><b>📋 Despiece</b> muestra todas las costillas (posición, ancho, alto, superficie y agujeros) y la <b>lista de compra</b>: tableros, varillas con su largo, separadores con su número y largo, tuercas y arandelas y la broca de los agujeros. <b>⬇ Despiece (CSV)</b> la guarda para abrirla en una hoja de cálculo y <b>⬇ CSV de cortes</b> guarda la lista de cortes para el Anidador. Si está activa la maqueta, todo sale con las medidas de la maqueta.</p>
 
-<h2 id="archivos">13. Guardar, abrir y ejemplos</h2>
+<h2 id="maqueta">13. Maqueta a escala</h2>
+<div class="dos">
+  <img src="img/maqueta.png" alt="Apartado Maqueta a escala">
+  <div>
+    <p>Antes de gastar tableros, corta una <b>maqueta</b>: por ejemplo, a escala 1:5 en DM de 3 mm con la cortadora láser y palillos de bambú como varillas.</p>
+    <ul>
+      <li>Marca <b>Fabricar como maqueta</b> en el panel izquierdo y elige la <b>escala</b> (1:2 a 1:20).</li>
+      <li>Pon el <b>grosor</b> del tablero de la maqueta, el <b>Ø de la varilla</b> y la <b>holgura</b> del agujero (0,2 mm en láser).</li>
+      <li>El recuadro resume la maqueta: medidas, separación y hueco, costilla mayor y tableros.</li>
+    </ul>
+  </div>
+</div>
+<p>Con la maqueta activa, <b>Fabricar</b> (con la etiqueta <b>1:5</b> en el botón), el DXF, el SVG, el despiece, el CSV de cortes, el plano y el Anidador salen <b>a escala</b>, con tableros de láser (600 × 400, 900 × 600, A3…). Los archivos llevan <code>_maqueta_1-5</code> en el nombre. El 3D y el panel <b>Resumen</b> siguen a tamaño real.</p>
+<div class="caja">Comprobaciones de la maqueta: avisa si las costillas se pisan (grosor de la maqueta mayor que la separación a escala), si queda menos de 1,5 mm de material alrededor de un agujero, y si el grosor no es proporcional al del tablero real (la maqueta se verá más llena o más calada que el mueble).</div>
+
+<h2 id="plano">14. Plano de montaje en PDF</h2>
+<p><b>📄 Plano</b> descarga un PDF apaisado (A4) para llevar al taller. Lleva:</p>
+<ol>
+  <li><b>Conjunto</b>: el mueble en 3D, sus datos y la lista de compra.</li>
+  <li><b>Orden de montaje</b>: vista lateral con todas las costillas numeradas y las varillas, el perfil con la posición de cada varilla (medida desde atrás y desde el suelo), su largo y las costillas que atraviesa.</li>
+  <li><b>Costillas</b>: todas, a la misma escala, con su número, medidas, posición y agujeros (8 por hoja).</li>
+  <li><b>Corte</b>: los tableros con las costillas colocadas, como en Fabricar.</li>
+  <li><b>Montaje paso a paso</b> y herramientas.</li>
+</ol>
+<div class="dos">
+  <figure><img src="img/plano1.jpg" alt="Hoja 1 del plano"><figcaption>Hoja 1: conjunto, datos y compra.</figcaption></figure>
+  <figure><img src="img/plano2.jpg" alt="Hoja 2 del plano"><figcaption>Hoja 2: orden de montaje y varillas.</figcaption></figure>
+</div>
+<p>Si está activa la maqueta, el plano sale con las medidas y los pasos de la maqueta.</p>
+
+<h2 id="anidador">15. Anidador de tableros</h2>
+<figure><img src="img/anidador.jpg" alt="Anidador dentro de Made-rebanadas"><figcaption>El Anidador dentro de Made-rebanadas, con las costillas de una maqueta 1:5 colocadas por su forma real.</figcaption></figure>
+<p><b>🧩 Anidador</b> (en la barra o en la ventana Fabricar) abre el <b>Anidador de tableros</b> de la Suite CNC dentro del programa. Le llegan solas todas las costillas, cada una con su contorno exterior y los agujeros de las varillas, y las medidas, el grosor y el margen del tablero de Fabricar. Coloca las piezas <b>por su forma real</b>: encaja unas en los huecos de otras y aprovecha mucho mejor el tablero que la colocación de Fabricar.</p>
+<ul>
+  <li>Elige la <b>fresa</b> y la <b>holgura</b>: la separación entre piezas es su suma.</li>
+  <li>Puedes mover, girar o fijar (📌) piezas a mano, y cambiar el tablero.</li>
+  <li>Desde el Anidador guardas cada tablero en <b>DXF</b>, <b>SVG</b>, <b>PNG</b> o como proyecto del Calcador (<b>.json</b>), y el despiece con el coste en <b>CSV</b>.</li>
+  <li><b>✕ Volver a Made-rebanadas</b> cierra el Anidador. Al volver a abrirlo recibe de nuevo las costillas, con los cambios que hayas hecho en el mueble.</li>
+</ul>
+<div class="caja">El Anidador es un programa aparte de la Suite CNC: está en <code>assets/anidador/anidador.html</code> y también se puede abrir solo. Tiene su propia ayuda (❓).</div>
+
+<h2 id="archivos">16. Guardar, abrir y ejemplos</h2>
 <ul>
   <li><b>💾 Guardar</b> (<kbd>Ctrl</kbd>+<kbd>S</kbd>) descarga el proyecto en un archivo <code>.json</code> con todo: perfiles, costillas, varillas y material. <b>📂 Abrir</b> lo carga de nuevo.</li>
   <li><b>↶ ↷</b> (<kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd>) deshacen y rehacen.</li>
@@ -244,7 +289,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <img src="img/ej_estante.jpg" alt="Estantería">
 </div>
 
-<h2 id="teclas">14. Atajos de teclado</h2>
+<h2 id="teclas">17. Atajos de teclado</h2>
 <table>
   <tr><th>Tecla</th><th>Acción</th></tr>
   <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Deshacer / rehacer</td></tr>
@@ -258,8 +303,9 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <tr><td><kbd>Esc</kbd></td><td>Cancelar la colocación de una varilla y quitar la selección</td></tr>
 </table>
 
-<h2 id="taller">15. Consejos de taller</h2>
+<h2 id="taller">18. Consejos de taller</h2>
 <ul>
+  <li>Corta antes una <b>maqueta</b> (sección 13): es barata, se hace en minutos con la láser y descubre los fallos de forma y de montaje.</li>
   <li>Comprueba el <b>grosor real</b> del tablero con el calibre: un contrachapado «de 18» puede medir 17,5. Pon ese valor (Grosor → Otro…).</li>
   <li>Para un asiento, una separación de <b>2,5 a 3,5 veces el grosor</b> queda bien y no pellizca. Para apoyar objetos, mejor más juntas.</li>
   <li>Con <b>3 varillas</b> repartidas en triángulo el mueble no se retuerce. En bancos largos (más de 2 m), pon 4.</li>
@@ -268,11 +314,11 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <li>Lija los cantos de las costillas antes de montar: después no se llega bien a los huecos.</li>
 </ul>
 
-<h2 id="limites">16. Limitaciones de esta versión</h2>
+<h2 id="limites">19. Limitaciones de esta versión</h2>
 <ul>
   <li>Solo hace <b>costillas separadas</b> en una dirección. Las rebanadas en retícula (con ranuras a media madera) y las radiales quedan para otras versiones.</li>
   <li>Los contornos del DXF son polilíneas de muchos tramos rectos cortos (no arcos), con una tolerancia de 0,05 mm.</li>
-  <li>La colocación en tableros usa el rectángulo que envuelve cada costilla; no encaja unas piezas dentro de los huecos de otras.</li>
+  <li>La colocación de <b>Fabricar</b> usa el rectángulo que envuelve cada costilla; para encajarlas por su forma, usa el <b>Anidador</b>.</li>
   <li>Las varillas son rectas y paralelas al largo del mueble.</li>
 </ul>
 

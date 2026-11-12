@@ -253,3 +253,12 @@ input:disabled,select:disabled{opacity:.55}
 .fab .opc .fila.chk{justify-content:flex-start;gap:8px}
 .fab .opc .fila.chk input{width:auto;flex:none}
 .pie2d{top:34px;bottom:auto;flex-wrap:nowrap;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:calc(100% - 16px);opacity:.92}
+/* ---- v1.1: maqueta, Anidador ---- */
+.barra-maq{display:inline-block;margin-left:6px;font-size:11px;font-weight:700;padding:1px 8px;border-radius:9px;background:#e0a020;color:#1d2733;vertical-align:1px}
+#secMaqueta.activa > h3{color:#b26b00}
+.anidMarco{display:flex;flex-direction:column;background:var(--fondo)}
+.anidBarra{display:flex;align-items:center;gap:12px;padding:6px 10px;background:var(--barra);color:var(--barraTxt);font-size:13px}
+.anidBarra span{opacity:.75;flex:1}
+.anidBarra button{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.25);color:var(--barraTxt);font-weight:600}
+.anidMarco .calcCaja{flex:1;min-height:0;height:auto}
+.aviso-maq{background:color-mix(in srgb,#e0a020 16%,transparent);border:1px solid #e0a020;border-radius:6px;padding:6px 10px;margin-bottom:10px;font-size:12.5px}

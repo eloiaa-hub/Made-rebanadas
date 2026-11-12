@@ -23,6 +23,8 @@
     <button id="bRehacer" title="Rehacer (Ctrl+Y)">↷</button>
     <span class="sep"></span>
     <button id="bDespiece" title="Despiece y lista de compra (CSV)"><span>📋</span><span class="txt"> Despiece</span></button>
+    <button id="bPlano" title="Plano de montaje en PDF: orden de las costillas, varillas, costillas acotadas y lista de compra"><span>📄</span><span class="txt"> Plano</span></button>
+    <button id="bAnidador" title="Colocar las costillas por su forma real en el Anidador de tableros"><span>🧩</span><span class="txt"> Anidador</span></button>
     <button id="bFabricar" class="primario" title="Colocar las costillas en tableros y exportar DXF / SVG para la CNC"><span>🪚</span><span class="txt"> Fabricar</span></button>
     <button id="bImagen" title="Guardar la vista 3D como imagen PNG"><span>📷</span><span class="txt"> Imagen</span></button>
     <span class="sep"></span>
@@ -88,6 +90,21 @@
           <button id="bVarQuitar" class="peligro" title="Quitar todas las varillas">🗑 Todas</button>
         </div>
         <label class="fila">Varillas en Auto <input type="number" id="vAutoN" min="1" max="8" step="1" value="3"></label>
+      </div>
+    </section>
+    <section id="secMaqueta">
+      <h3>Maqueta a escala</h3>
+      <div class="sec-cuerpo">
+        <p class="nota">Para cortar antes una maqueta (por ejemplo, en DM de 3 mm con la láser). Cambia lo que sale en Fabricar, Plano, Despiece y Anidador; el 3D sigue a tamaño real.</p>
+        <label class="fila chk"><input type="checkbox" id="mActiva"> Fabricar como maqueta</label>
+        <div id="maqCtl">
+          <label class="fila">Escala
+            <select id="mEscala"><option value="2">1:2</option><option value="4">1:4</option><option value="5" selected>1:5</option><option value="8">1:8</option><option value="10">1:10</option><option value="20">1:20</option></select></label>
+          <label class="fila">Grosor de la maqueta (mm) <input type="number" id="mGrosor" min="0.5" max="20" step="0.1" value="3"></label>
+          <label class="fila" title="Palillo de bambú, varilla de madera o alambre">Ø varilla de maqueta (mm) <input type="number" id="mDiam" min="0.5" max="20" step="0.1" value="3"></label>
+          <label class="fila">Holgura del agujero (mm) <input type="number" id="mHolgura" min="0" max="2" step="0.05" value="0.2"></label>
+          <div class="resumenCost" id="resMaq"></div>
+        </div>
       </div>
     </section>
   </aside>
@@ -188,6 +205,15 @@
   <div id="mCuerpo" class="mcuerpo"></div>
   <div id="mPie" class="mpie"></div>
 </div></div>
+
+<!-- Anidador de tableros en una ventana -->
+<div id="anidVentana" class="calcVentana oculto">
+  <div class="calcMarco anidMarco">
+    <div class="anidBarra"><b>🧩 Anidador de tableros</b><span id="anidInfo"></span><button id="anidCerrar" title="Cerrar el Anidador y volver a Made-rebanadas">✕ Volver a Made-rebanadas</button></div>
+    <div id="anidCaja" class="calcCaja"></div>
+    <div id="anidAviso" class="calcAviso oculto">El Anidador no responde. Comprueba que está el archivo <b>assets/anidador/anidador.html</b> en la carpeta del programa.</div>
+  </div>
+</div>
 
 <input type="file" id="fArchivo" class="oculto" accept=".json,application/json">
 <div id="aviso" class="aviso"></div>
