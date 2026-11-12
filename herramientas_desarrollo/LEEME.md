@@ -27,6 +27,7 @@ No hacen falta para usar el programa: solo para cambiarlo.
 | `07b_plano.js` | Escritor de PDF propio y plano de montaje |
 | `07c_anidador.js` | Ventana del Anidador y paso de las costillas (formato .json del Calcador) |
 | `07d_cnc.js` | Hueso de perro y ajuste de rectas y arcos (bulge) para el DXF, el SVG y el Anidador |
+| `07e_exportar3d.js` | Guardar el mueble montado en STL binario u OBJ + MTL (una pieza por objeto) |
 | `08_archivo.js` | Ventanas, deshacer, guardar, abrir, ejemplos |
 | `09_inicio.js` | Arranque, botones y teclado |
 

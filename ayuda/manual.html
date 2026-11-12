@@ -403,6 +403,21 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <li><b>Varillas</b> muestra u oculta varillas, tuercas y separadores; <b>Resaltar</b> colorea la costilla seleccionada.</li>
   <li><b>📷 Imagen</b> guarda la vista 3D en PNG a alta resolución.</li>
 </ul>
+<h3>Guardar el modelo 3D (STL u OBJ)</h3>
+<div class="dos">
+  <img src="img/guardar3d.png" alt="Guardar el modelo 3D">
+  <div>
+    <p><b>🧊 3D</b>, en la barra, guarda el mueble montado (sin explosión) como modelo 3D, en milímetros, para abrirlo en SketchUp, Fusion, FreeCAD, Blender… o para imprimir una maqueta en 3D.</p>
+    <ul>
+      <li><b>STL</b>: una sola malla con todas las piezas. Es el formato de la impresión 3D.</li>
+      <li><b>OBJ + MTL</b>: cada pieza es un objeto aparte con su nombre (Lama 1, Costilla 3, Larguero A, Rastrel 2…) y el color de su material. Se guardan dos archivos: el <b>.obj</b> y el <b>.mtl</b> (los colores); guárdalos juntos.</li>
+      <li><b>Eje vertical</b>: <b>Z arriba</b> para CAD e impresión 3D; <b>Y arriba</b> para Blender o three.js.</li>
+      <li><b>Escala 1:</b> 1 es tamaño real. Para imprimir una maqueta, 10 o 20 (si la maqueta está activa, propone su escala). Abajo se ven las medidas que tendrá el modelo.</li>
+      <li><b>Incluir varillas, tubos y rastreles</b>: quítalo si solo quieres las piezas de tablero.</li>
+    </ul>
+  </div>
+</div>
+<div class="caja taller">Para imprimir en 3D a escala, comprueba que las lamas o costillas no queden demasiado finas: a 1:10 un tablero de 12 mm se queda en 1,2 mm.</div>
 
 <h2 id="fabricar">16. Paso 5 · Fabricar: tableros, DXF y SVG</h2>
 <figure><img src="img/fabricar.png" alt="Ventana Fabricar"></figure>
