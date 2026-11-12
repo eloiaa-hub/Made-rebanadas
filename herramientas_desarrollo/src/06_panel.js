@@ -164,6 +164,7 @@ function iniciarPanel() {
     };
     f.click();
   };
+  $('#bModeloEjemplo').onclick = dialogoModelos;
   enlazar('#paOrient', () => { Rl().orient = $('#paOrient').value; cambio(Rl().orient === 'h' ? 'Lamas horizontales' : 'Lamas verticales'); encuadrarSiHaceFalta(); camara('tres4'); });
   // planta curva
   enlazar('#plForma', () => { P.planta.forma = $('#plForma').value; mostrarSecciones(); cambio('Planta ' + $('#plForma').selectedOptions[0].text.toLowerCase()); camara('tres4'); });
@@ -287,7 +288,7 @@ function ponerControles() {
   $('#rlTexto').value = Rl.texto; $('#rlLetra').value = Rl.letra; $('#rlNegrita').checked = Rl.negrita; $('#rlTam').value = Rl.tamLetra; $('#rlInter').value = Rl.interlinea;
   $('#rlVista').value = Rl.vista; $('#rlGiro').value = String(Rl.giro || 0); $('#rlBase').value = Rl.base;
   $('#rlAncho').value = Rl.ancho; $('#rlAlto').value = Rl.alto; $('#rlFondo').value = Rl.fondo; $('#rlRelieve').value = Rl.relieve; $('#rlSuave').value = Rl.suavizado; $('#rlInvertir').checked = Rl.invertir; $('#rlOnda').value = Rl.ondaAmp; $('#rlOndas').value = Rl.ondas;
-  $('#rlModeloInfo').textContent = Rl.modelo ? `Modelo: ${Rl.modelo.nombre}` + (Rl.modelo.triangulos ? ` (${Rl.modelo.triangulos.toLocaleString('es-ES')} triángulos)` : '') + (UI.malla ? '' : '. El proyecto guarda su relieve; para cambiar la vista, vuelve a cargarlo.') : 'Sin modelo. Carga un STL u OBJ (rostro, figura, logo en 3D…).';
+  $('#rlModeloInfo').textContent = Rl.modelo ? `Modelo: ${Rl.modelo.nombre}` + (Rl.modelo.triangulos ? ` (${Rl.modelo.triangulos.toLocaleString('es-ES')} triángulos)` : '') + (mallaVigente() ? '' : '. El proyecto guarda su relieve; para cambiar la vista, vuelve a cargarlo.') : 'Sin modelo. Carga un STL u OBJ (rostro, figura, logo en 3D…).';
   mostrarSecciones();
   const M = P.maqueta; $('#mActiva').checked = M.activa; $('#mEscala').value = String(M.escala); $('#mGrosor').value = M.grosor; $('#mDiam').value = M.diam; $('#mHolgura').value = M.holgura;
   $('#rExplosion').value = P.vista.explosion; $('#cFantasma').checked = P.vista.fantasma; $('#cVarillas3d').checked = P.vista.varillas; $('#cResalta').checked = P.vista.resalta;

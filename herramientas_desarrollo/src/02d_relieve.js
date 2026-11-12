@@ -142,17 +142,43 @@ function mapaModelo(Rl) {
   // el mapa guardado puede tener otro tamaño que el panel: se estira al panel
   return { w: M.w, h: M.h, mm: Rl.ancho / M.w, d, mmY: Rl.alto / M.h };
 }
-function cargarModelo(buf, nombre) {
-  const tri = leerMalla(buf, nombre);
+function cargarModelo(buf, nombre) { return cargarTriangulos(leerMalla(buf, nombre), nombre); }
+function cargarTriangulos(tri, nombre, ejemplo) {
   if (!tri.length) throw new Error('No se han encontrado triángulos en «' + nombre + '»');
   const Rl = P.relieve, mmPx = Math.max(1, Math.max(Rl.ancho, Rl.alto) / 500);
   const m = mapaDesdeMalla(tri, Rl.vista, Rl.giro, Rl.ancho, Rl.alto, mmPx);
   let s = ''; for (let i = 0; i < m.d8.length; i++) s += String.fromCharCode(m.d8[i]);
-  Rl.modelo = { nombre, w: m.w, h: m.h, d64: btoa(s), id: Date.now().toString(36), triangulos: tri.length };
-  UI.malla = { tri, nombre };     // para volver a proyectar si cambia la vista (no se guarda)
+  const mallaId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  Rl.modelo = { nombre, w: m.w, h: m.h, d64: btoa(s), id: mallaId, mallaId, triangulos: tri.length };
+  if (ejemplo) Rl.modelo.ejemplo = ejemplo;
+  UI.malla = { tri, nombre, id: mallaId };     // para volver a proyectar si cambia la vista (no se guarda)
   return tri.length;
 }
+// ---- modelos 3D de ejemplo (assets/modelos/modelos.js): vértices int16 en décimas de mm + caras uint32 ----
+const modelosEjemplo = () => window.MADE_MODELOS || [];
+function triangulosEjemplo(id) {
+  const M = modelosEjemplo().find(m => m.id === id); if (!M) return null;
+  const bin = b => { const s = atob(b), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u.buffer; };
+  const v = new Int16Array(bin(M.v)), f = new Uint32Array(bin(M.f)), V = i => [v[3 * i] / 10, v[3 * i + 1] / 10, v[3 * i + 2] / 10], tri = [];
+  for (let k = 0; k < f.length; k += 3) tri.push([V(f[k]), V(f[k + 1]), V(f[k + 2])]);
+  return { M, tri };
+}
+// carga un modelo de ejemplo con su vista y medidas propuestas (las medidas solo si se pide)
+function cargarModeloEjemplo(id, conMedidas) {
+  const r = triangulosEjemplo(id); if (!r) throw new Error('No se encuentra el modelo de ejemplo «' + id + '» (assets/modelos/modelos.js)');
+  const Rl = P.relieve; Rl.fuente = 'modelo'; Rl.vista = r.M.vista || 'frente'; Rl.giro = r.M.giro || 0;
+  if (conMedidas && r.M.ancho) { Rl.ancho = r.M.ancho; Rl.alto = r.M.alto; }
+  return cargarTriangulos(r.tri, r.M.nombre, id);
+}
+// la malla en memoria solo vale para el modelo del proyecto actual (al abrir otro o deshacer, cambia)
+function mallaVigente() {
+  const mo = P.relieve && P.relieve.modelo;
+  if (UI.malla && !(mo && mo.mallaId === UI.malla.id)) UI.malla = null;
+  if (!UI.malla && mo && mo.ejemplo) { const r = triangulosEjemplo(mo.ejemplo); if (r) UI.malla = { tri: r.tri, nombre: r.M.nombre, id: mo.mallaId }; }
+  return UI.malla;
+}
 function reproyectarModelo() {
+  mallaVigente();
   if (!UI.malla) return false;
   const Rl = P.relieve, mmPx = Math.max(1, Math.max(Rl.ancho, Rl.alto) / 500);
   const m = mapaDesdeMalla(UI.malla.tri, Rl.vista, Rl.giro, Rl.ancho, Rl.alto, mmPx);

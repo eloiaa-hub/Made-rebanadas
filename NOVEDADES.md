@@ -8,7 +8,8 @@
 - **Lamas horizontales** (con rastreles verticales) además de las verticales.
 - Plantilla **Estantería de pared ondulada**: lamas con baldas y ménsulas, de fondo ondulado.
 - Los paneles de pared empiezan con **lamas de 12 mm cada 26 mm** (antes 18 mm cada 60 mm); los ejemplos de pared, más juntos.
-- Tres ejemplos nuevos: estantería ondulada, rótulo de texto y arte mural «ondas».
+- **Modelos 3D de ejemplo** (STL en `assets/modelos` y botón «🗿 Modelos de ejemplo…»): cara, labios, ondas en el agua y anomalía (burbuja).
+- Seis ejemplos nuevos: estantería ondulada, rótulo de texto, arte mural «ondas», retrato en lamas horizontales, labios y anomalía.
 
 ## v1.4
 

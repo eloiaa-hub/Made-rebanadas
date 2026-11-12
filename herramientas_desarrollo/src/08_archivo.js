@@ -107,6 +107,26 @@ function dialogoNuevo() {
     cerrarModal(); cargarProyecto(proyectoDePlantilla(b.dataset.nuevo), true);
   });
 }
+function dialogoModelos() {
+  const M = modelosEjemplo();
+  const items = M.map(m => `<button data-mod="${m.id}"><b>${esc(m.nombre)}</b><small>${esc(m.desc)} · ${m.triangulos.toLocaleString('es-ES')} triángulos · <a href="assets/modelos/${m.archivo}" download data-stl>${m.archivo}</a></small></button>`).join('');
+  modal('🗿 Modelos 3D de ejemplo', `<p class="nota">Modelos para probar el relieve. Al elegir uno se carga con su vista y unas medidas de panel adecuadas; después cambia la vista, el giro, el relieve o las lamas para ver qué pasa. Los mismos modelos están como STL en <b>assets/modelos</b>.</p><div class="ejemplos">${items || '<p>No se encuentra assets/modelos/modelos.js</p>'}</div>`);
+  $$('[data-stl]').forEach(a => a.onclick = e => e.stopPropagation());
+  $$('[data-mod]').forEach(b => b.onclick = () => {
+    cerrarModal();
+    try {
+      // fuera de un panel de pared, empieza un panel nuevo (preguntando si hay cambios)
+      const nuevo = P.tipo !== 'pared';
+      if (nuevo && UI.sucio && !confirm('El relieve se hace en un panel de pared nuevo. Hay cambios sin guardar. ¿Seguir?')) return;
+      const ant = P; if (nuevo) P = proyectoDePlantilla('pared_ondas');
+      let n; try { n = cargarModeloEjemplo(b.dataset.mod, true); } catch (e) { P = ant; throw e; }
+      if (P.pared.rastreles && P.relieve.fondo < P.pared.grueso + 15) P.relieve.fondo = P.pared.grueso + 15;
+      if (nuevo) { P.nombre = 'Relieve ' + P.relieve.modelo.nombre; const p = P; P = ant; cargarProyecto(p, true); }
+      else { ponerControles(); cambio('Modelo: ' + P.relieve.modelo.nombre); encuadrarSiHaceFalta(); camara('tres4'); }
+      aviso(`${esc(P.relieve.modelo.nombre)}: ${n.toLocaleString('es-ES')} triángulos`);
+    } catch (e) { aviso('⚠ ' + esc(e.message), 5000); }
+  });
+}
 function dialogoEjemplos() {
   const E = window.MADE_EJEMPLOS || [];
   const items = E.map((e, i) => `<button data-ej="${i}"><b>${esc(e.nombre)}</b><small>${esc(e.desc)}</small></button>`).join('');
@@ -114,7 +134,9 @@ function dialogoEjemplos() {
   $$('[data-ej]').forEach(b => b.onclick = () => {
     if (UI.sucio && !confirm('Hay cambios sin guardar. ¿Abrir el ejemplo?')) return;
     const e = E[+b.dataset.ej]; cerrarModal();
-    cargarProyecto(proyectoDePlantilla(e.plantilla, e), true);
+    const p = proyectoDePlantilla(e.plantilla, e);
+    if (e.modeloEjemplo) { const ant = P; P = p; try { cargarModeloEjemplo(e.modeloEjemplo); } catch (er) { aviso('⚠ ' + esc(er.message), 5000); } P = ant; }
+    cargarProyecto(p, true);
     aviso('Ejemplo: ' + esc(e.nombre));
   });
 }

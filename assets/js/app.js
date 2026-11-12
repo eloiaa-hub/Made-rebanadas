@@ -913,17 +913,43 @@ function mapaModelo(Rl) {
   // el mapa guardado puede tener otro tamaño que el panel: se estira al panel
   return { w: M.w, h: M.h, mm: Rl.ancho / M.w, d, mmY: Rl.alto / M.h };
 }
-function cargarModelo(buf, nombre) {
-  const tri = leerMalla(buf, nombre);
+function cargarModelo(buf, nombre) { return cargarTriangulos(leerMalla(buf, nombre), nombre); }
+function cargarTriangulos(tri, nombre, ejemplo) {
   if (!tri.length) throw new Error('No se han encontrado triángulos en «' + nombre + '»');
   const Rl = P.relieve, mmPx = Math.max(1, Math.max(Rl.ancho, Rl.alto) / 500);
   const m = mapaDesdeMalla(tri, Rl.vista, Rl.giro, Rl.ancho, Rl.alto, mmPx);
   let s = ''; for (let i = 0; i < m.d8.length; i++) s += String.fromCharCode(m.d8[i]);
-  Rl.modelo = { nombre, w: m.w, h: m.h, d64: btoa(s), id: Date.now().toString(36), triangulos: tri.length };
-  UI.malla = { tri, nombre };     // para volver a proyectar si cambia la vista (no se guarda)
+  const mallaId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  Rl.modelo = { nombre, w: m.w, h: m.h, d64: btoa(s), id: mallaId, mallaId, triangulos: tri.length };
+  if (ejemplo) Rl.modelo.ejemplo = ejemplo;
+  UI.malla = { tri, nombre, id: mallaId };     // para volver a proyectar si cambia la vista (no se guarda)
   return tri.length;
 }
+// ---- modelos 3D de ejemplo (assets/modelos/modelos.js): vértices int16 en décimas de mm + caras uint32 ----
+const modelosEjemplo = () => window.MADE_MODELOS || [];
+function triangulosEjemplo(id) {
+  const M = modelosEjemplo().find(m => m.id === id); if (!M) return null;
+  const bin = b => { const s = atob(b), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u.buffer; };
+  const v = new Int16Array(bin(M.v)), f = new Uint32Array(bin(M.f)), V = i => [v[3 * i] / 10, v[3 * i + 1] / 10, v[3 * i + 2] / 10], tri = [];
+  for (let k = 0; k < f.length; k += 3) tri.push([V(f[k]), V(f[k + 1]), V(f[k + 2])]);
+  return { M, tri };
+}
+// carga un modelo de ejemplo con su vista y medidas propuestas (las medidas solo si se pide)
+function cargarModeloEjemplo(id, conMedidas) {
+  const r = triangulosEjemplo(id); if (!r) throw new Error('No se encuentra el modelo de ejemplo «' + id + '» (assets/modelos/modelos.js)');
+  const Rl = P.relieve; Rl.fuente = 'modelo'; Rl.vista = r.M.vista || 'frente'; Rl.giro = r.M.giro || 0;
+  if (conMedidas && r.M.ancho) { Rl.ancho = r.M.ancho; Rl.alto = r.M.alto; }
+  return cargarTriangulos(r.tri, r.M.nombre, id);
+}
+// la malla en memoria solo vale para el modelo del proyecto actual (al abrir otro o deshacer, cambia)
+function mallaVigente() {
+  const mo = P.relieve && P.relieve.modelo;
+  if (UI.malla && !(mo && mo.mallaId === UI.malla.id)) UI.malla = null;
+  if (!UI.malla && mo && mo.ejemplo) { const r = triangulosEjemplo(mo.ejemplo); if (r) UI.malla = { tri: r.tri, nombre: r.M.nombre, id: mo.mallaId }; }
+  return UI.malla;
+}
 function reproyectarModelo() {
+  mallaVigente();
   if (!UI.malla) return false;
   const Rl = P.relieve, mmPx = Math.max(1, Math.max(Rl.ancho, Rl.alto) / 500);
   const m = mapaDesdeMalla(UI.malla.tri, Rl.vista, Rl.giro, Rl.ancho, Rl.alto, mmPx);
@@ -2083,6 +2109,7 @@ function iniciarPanel() {
     };
     f.click();
   };
+  $('#bModeloEjemplo').onclick = dialogoModelos;
   enlazar('#paOrient', () => { Rl().orient = $('#paOrient').value; cambio(Rl().orient === 'h' ? 'Lamas horizontales' : 'Lamas verticales'); encuadrarSiHaceFalta(); camara('tres4'); });
   // planta curva
   enlazar('#plForma', () => { P.planta.forma = $('#plForma').value; mostrarSecciones(); cambio('Planta ' + $('#plForma').selectedOptions[0].text.toLowerCase()); camara('tres4'); });
@@ -2206,7 +2233,7 @@ function ponerControles() {
   $('#rlTexto').value = Rl.texto; $('#rlLetra').value = Rl.letra; $('#rlNegrita').checked = Rl.negrita; $('#rlTam').value = Rl.tamLetra; $('#rlInter').value = Rl.interlinea;
   $('#rlVista').value = Rl.vista; $('#rlGiro').value = String(Rl.giro || 0); $('#rlBase').value = Rl.base;
   $('#rlAncho').value = Rl.ancho; $('#rlAlto').value = Rl.alto; $('#rlFondo').value = Rl.fondo; $('#rlRelieve').value = Rl.relieve; $('#rlSuave').value = Rl.suavizado; $('#rlInvertir').checked = Rl.invertir; $('#rlOnda').value = Rl.ondaAmp; $('#rlOndas').value = Rl.ondas;
-  $('#rlModeloInfo').textContent = Rl.modelo ? `Modelo: ${Rl.modelo.nombre}` + (Rl.modelo.triangulos ? ` (${Rl.modelo.triangulos.toLocaleString('es-ES')} triángulos)` : '') + (UI.malla ? '' : '. El proyecto guarda su relieve; para cambiar la vista, vuelve a cargarlo.') : 'Sin modelo. Carga un STL u OBJ (rostro, figura, logo en 3D…).';
+  $('#rlModeloInfo').textContent = Rl.modelo ? `Modelo: ${Rl.modelo.nombre}` + (Rl.modelo.triangulos ? ` (${Rl.modelo.triangulos.toLocaleString('es-ES')} triángulos)` : '') + (mallaVigente() ? '' : '. El proyecto guarda su relieve; para cambiar la vista, vuelve a cargarlo.') : 'Sin modelo. Carga un STL u OBJ (rostro, figura, logo en 3D…).';
   mostrarSecciones();
   const M = P.maqueta; $('#mActiva').checked = M.activa; $('#mEscala').value = String(M.escala); $('#mGrosor').value = M.grosor; $('#mDiam').value = M.diam; $('#mHolgura').value = M.holgura;
   $('#rExplosion').value = P.vista.explosion; $('#cFantasma').checked = P.vista.fantasma; $('#cVarillas3d').checked = P.vista.varillas; $('#cResalta').checked = P.vista.resalta;
@@ -3443,6 +3470,26 @@ function dialogoNuevo() {
     cerrarModal(); cargarProyecto(proyectoDePlantilla(b.dataset.nuevo), true);
   });
 }
+function dialogoModelos() {
+  const M = modelosEjemplo();
+  const items = M.map(m => `<button data-mod="${m.id}"><b>${esc(m.nombre)}</b><small>${esc(m.desc)} · ${m.triangulos.toLocaleString('es-ES')} triángulos · <a href="assets/modelos/${m.archivo}" download data-stl>${m.archivo}</a></small></button>`).join('');
+  modal('🗿 Modelos 3D de ejemplo', `<p class="nota">Modelos para probar el relieve. Al elegir uno se carga con su vista y unas medidas de panel adecuadas; después cambia la vista, el giro, el relieve o las lamas para ver qué pasa. Los mismos modelos están como STL en <b>assets/modelos</b>.</p><div class="ejemplos">${items || '<p>No se encuentra assets/modelos/modelos.js</p>'}</div>`);
+  $$('[data-stl]').forEach(a => a.onclick = e => e.stopPropagation());
+  $$('[data-mod]').forEach(b => b.onclick = () => {
+    cerrarModal();
+    try {
+      // fuera de un panel de pared, empieza un panel nuevo (preguntando si hay cambios)
+      const nuevo = P.tipo !== 'pared';
+      if (nuevo && UI.sucio && !confirm('El relieve se hace en un panel de pared nuevo. Hay cambios sin guardar. ¿Seguir?')) return;
+      const ant = P; if (nuevo) P = proyectoDePlantilla('pared_ondas');
+      let n; try { n = cargarModeloEjemplo(b.dataset.mod, true); } catch (e) { P = ant; throw e; }
+      if (P.pared.rastreles && P.relieve.fondo < P.pared.grueso + 15) P.relieve.fondo = P.pared.grueso + 15;
+      if (nuevo) { P.nombre = 'Relieve ' + P.relieve.modelo.nombre; const p = P; P = ant; cargarProyecto(p, true); }
+      else { ponerControles(); cambio('Modelo: ' + P.relieve.modelo.nombre); encuadrarSiHaceFalta(); camara('tres4'); }
+      aviso(`${esc(P.relieve.modelo.nombre)}: ${n.toLocaleString('es-ES')} triángulos`);
+    } catch (e) { aviso('⚠ ' + esc(e.message), 5000); }
+  });
+}
 function dialogoEjemplos() {
   const E = window.MADE_EJEMPLOS || [];
   const items = E.map((e, i) => `<button data-ej="${i}"><b>${esc(e.nombre)}</b><small>${esc(e.desc)}</small></button>`).join('');
@@ -3450,7 +3497,9 @@ function dialogoEjemplos() {
   $$('[data-ej]').forEach(b => b.onclick = () => {
     if (UI.sucio && !confirm('Hay cambios sin guardar. ¿Abrir el ejemplo?')) return;
     const e = E[+b.dataset.ej]; cerrarModal();
-    cargarProyecto(proyectoDePlantilla(e.plantilla, e), true);
+    const p = proyectoDePlantilla(e.plantilla, e);
+    if (e.modeloEjemplo) { const ant = P; P = p; try { cargarModeloEjemplo(e.modeloEjemplo); } catch (er) { aviso('⚠ ' + esc(er.message), 5000); } P = ant; }
+    cargarProyecto(p, true);
     aviso('Ejemplo: ' + esc(e.nombre));
   });
 }
