@@ -1,5 +1,14 @@
 # Novedades de Made-rebanadas
 
+## v1.3
+
+- **Perfiles clave en el 3D**: se dibujan como líneas y se seleccionan pinchándolos (el que se edita, en naranja). Casilla «Perfiles» para mostrarlos u ocultarlos.
+- **Planta curva** para las costillas con varillas: en **arco** (radio y sentido) o **en S** (amplitud y ondas). Costillas perpendiculares a la curva, varillas curvadas, separadores de largo variable (lista en el plano), radio mínimo de curvado y aviso si las costillas se tocan por dentro.
+- **Rebanadas radiales** (lámparas y columnas): costillas alrededor de un tubo central, con discos de unión ranurados y muescas en las costillas. Perfiles clave por ángulo. Plantillas **Lámpara de lóbulos** y **Columna / pie de lámpara**, con giro en espiral.
+- **Paneles de pared**: lamas verticales con relieve sobre rastreles (muescas detrás) o tablero trasero. Plantillas **Panel ondulado** y **Panel con relieve**.
+- Plano PDF, despiece, lista de compra, DXF, SVG, Anidador y maqueta para todos los tipos.
+- Seis ejemplos nuevos: banco en S, banco en arco, lámpara, columna y dos paneles de pared.
+
 ## v1.2
 
 - **Retícula entrelazada (waffle)**: nuevo tipo de mueble. Costillas y largueros que se cruzan con **ranuras a media madera**, sin herrajes. Número de largueros, margen, vuelo, holgura de la ranura y ranuras desde arriba o desde abajo.

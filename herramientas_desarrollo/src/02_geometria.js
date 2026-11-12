@@ -83,6 +83,8 @@ function recortaY(poly, y0, quedarArriba) {
   // quita puntos repetidos
   return out.filter((p, i) => { const q = out[(i + 1) % out.length]; return Math.hypot(p[0] - q[0], p[1] - q[1]) > 1e-6; });
 }
+// recorte por la recta vertical u = u0 (se queda lo de la derecha)
+function recortaU(poly, u0) { return recortaY(poly.map(p => [p[1], p[0]]), u0, true).map(p => [p[1], p[0]]); }
 // simplificación Douglas–Peucker de un polígono cerrado (para DXF / SVG)
 function simplificaCerrado(poly, tol) {
   if (poly.length < 5) return poly.slice();
@@ -133,6 +135,7 @@ function contornoDe(ctrl) {
   let poly = curvaCerrada(ctrl, P.esquinas);
   if (P.costillas.base) poly = recortaY(poly, 0, true);
   if (P.costillas.tope) poly = recortaY(poly, P.costillas.topeAlt, false);
+  if (P.tipo === 'radial') poly = recortaU(poly, radioTubo());
   if (poly.length >= 3 && areaFirmada(poly) < 0) poly.reverse();
   return poly;
 }
@@ -142,13 +145,17 @@ function grosor() { return P.costillas.grosor; }
 // en la retícula, las costillas de los extremos se meten hacia dentro el «vuelo» de los largueros
 const vueloRet = () => P.tipo === 'reticula' ? clamp(P.reticula.vuelo || 0, 0, P.largo / 4) : 0;
 function reparto() {
+  if (P.tipo === 'radial') { // costillas repartidas en la vuelta completa (grados)
+    const n = clamp(Math.round(P.costillas.numero), 3, 360), s = 360 / n;
+    return { n, s, hueco: PI2 * radioTubo() / n - grosor(), ini: 0, xs: Array.from({ length: n }, (_, i) => i * s), radial: true };
+  }
   const e = grosor(), v = vueloRet(), L = P.largo - 2 * v, c = P.costillas;
   let n;
   if (c.modo === 'numero') n = Math.max(2, Math.round(c.numero));
   else n = Math.max(2, Math.round((L - e) / Math.max(1, c.separacion)) + 1);
   n = Math.min(n, 600);
   const s = (L - e) / (n - 1);
-  return { n, s, hueco: s - e, ini: v };
+  return { n, s, hueco: s - e, ini: v, xs: Array.from({ length: n }, (_, i) => v + e / 2 + i * s) };
 }
 function radioAgujero() { return (P.varillas.diam + P.varillas.holgura) / 2; }
 
@@ -156,13 +163,20 @@ function calcular() {
   const e = grosor(), rep = reparto(), V = P.varillas;
   const res = { n: rep.n, sep: rep.s, hueco: rep.hueco, costillas: [], varillas: [], avisos: [] };
   for (let i = 0; i < rep.n; i++) {
-    const x = rep.ini + e / 2 + i * rep.s, ctrl = perfilEn(x), poly = contornoDe(ctrl);
+    const x = rep.xs[i], ctrl = perfilEn(x), poly = contornoDe(ctrl);
     const ok = poly.length >= 3 && Math.abs(areaFirmada(poly)) > 25;
     const caja = ok ? cajaDe(poly) : { x0: 0, y0: 0, x1: 0, y1: 0, w: 0, h: 0 };
     res.costillas.push({ i, x, poly: ok ? poly : [], base: ok ? poly : [], ok, caja, area: ok ? areaFirmada(poly) : 0, agujeros: [], nVar: 0, ranuras: [], etq: String(i + 1), nombre: 'Costilla ' + (i + 1) });
   }
-  res.largueros = []; res.cruces = [];
-  if (P.tipo === 'reticula') { reticula(res); avisosReticula(res); return res; }
+  res.largueros = []; res.cruces = []; res.discos = []; res.rastreles = []; res.ranurasMal = [];
+  // centro del fondo de las costillas (en radial y pared, el eje o la pared: 0)
+  const okc = res.costillas.filter(c => c.ok);
+  res.uc = P.tipo === 'radial' || P.tipo === 'pared' || !okc.length ? 0 : (Math.min(...okc.map(c => c.caja.x0)) + Math.max(...okc.map(c => c.caja.x1))) / 2;
+  ucActual = res.uc;
+  const fin = () => { res.otras = [...res.largueros, ...res.discos]; res.otras.forEach((o, k) => o.i = res.n + k); return res; };
+  if (P.tipo === 'reticula') { reticula(res); avisosReticula(res); return fin(); }
+  if (P.tipo === 'radial') { radialExtras(res); aplicarRanuras(res, e + P.radial.holgura); avisosRadial(res); return fin(); }
+  if (P.tipo === 'pared') { paredExtras(res); aplicarRanuras(res, e); avisosPared(res); return fin(); }
   // varillas: ¿caben en cada costilla?
   const need = radioAgujero() + V.margen;
   V.lista.forEach((p, k) => {
@@ -180,10 +194,11 @@ function calcular() {
     const fallan = [];
     for (let i = a; i <= b && usada; i++) { if (cabe[i]) { res.costillas[i].agujeros.push(k); res.costillas[i].nVar++; } else fallan.push(i); }
     res.varillas.push({ k, u: p[0], v: p[1], cabe, a, b, usada, fallan,
-      largo: usada ? (b - a) * rep.s + e + 2 * V.sobra : 0 });
+      largo: usada ? (b - a) * rep.s + e + 2 * V.sobra : 0, dists: usada ? new Array(b - a).fill(rep.s) : [] });
   });
+  if (disposicion() === 'curva') varillasCurvas(res);
   avisosDe(res, need);
-  return res;
+  return fin();
 }
 
 function lista(nums) { // «3, 4, 5 y 9» a partir de índices (se muestran desde 1)
@@ -210,6 +225,12 @@ function avisosDe(res, need) {
   for (let i = 0; i < V.lista.length; i++) for (let j = i + 1; j < V.lista.length; j++) {
     const d = Math.hypot(V.lista[i][0] - V.lista[j][0], V.lista[i][1] - V.lista[j][1]);
     if (d < 2 * radioAgujero() + V.margen) add('error', `Las varillas ${i + 1} y ${j + 1} están demasiado juntas (${fmt(d, 0)} mm entre centros).`);
+  }
+  // planta curva
+  if (disposicion() === 'curva') {
+    if (res.tocanCurva && res.tocanCurva.length) add('error', `Por el lado de dentro de la curva se tocan con la siguiente: ${cst(res.tocanCurva)}. Sube la separación o abre la curva.`, res.tocanCurva[0]);
+    const curvas = res.varillas.filter(v => v.usada && isFinite(v.radioMin));
+    if (curvas.length) { const rm = Math.min(...curvas.map(v => v.radioMin)); add(rm < 25 * V.diam ? 'atencion' : 'info', `Planta curva: las varillas se curvan hasta un radio de ${fmt(rm)} mm${rm < 25 * V.diam ? ' (muy cerrado para Ø ' + V.diam + ': usa varilla más fina o abre la curva)' : ''}. Los separadores tienen largos distintos (ver Despiece).`); }
   }
   if (V.lista.length) {
     const sueltas = res.costillas.filter(c => c.ok && c.nVar === 0).map(c => c.i);

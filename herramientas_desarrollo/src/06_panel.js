@@ -58,12 +58,11 @@ function encuadrarSiHaceFalta() { encuadrarPerfil(); encuadrarCostilla(); }
 
 function iniciarPanel() {
   const sp = $('#sPlantilla');
-  Object.entries(PLANTILLAS).forEach(([id, pl]) => sp.add(new Option(pl.nombre, id)));
   sp.onchange = () => {
     if (P.editado && !confirm('Se perderán los retoques hechos a mano en los perfiles. ¿Cambiar de plantilla?')) { sp.value = P.plantilla; return; }
     P.plantilla = sp.value; P.params = paramsDefecto(sp.value); P.nombre = PLANTILLAS[sp.value].nombre;
     aplicarPlantilla(); UI.clave = 0;
-    autoVarillas(P.varillas.autoN);
+    if (P.tipo === 'costillas') { R = calcular(); autoVarillas(P.varillas.autoN); }
     construirParams(); cambio('Plantilla: ' + PLANTILLAS[sp.value].nombre);
     encuadrarSiHaceFalta(); camara('tres4');
   };
@@ -110,12 +109,45 @@ function iniciarPanel() {
   $('#bVarQuitar').onclick = () => { if (!V().lista.length) return; V().lista = []; UI.varilla = -1; cambio('Varillas quitadas'); };
   // tipo de mueble y retícula
   enlazar('#sTipo', () => {
-    P.tipo = $('#sTipo').value;
-    if (P.tipo === 'reticula' && P.costillas.modo === 'separacion' && P.costillas.separacion < 3 * grosor()) { P.costillas.separacion = Math.round(Math.max(100, 6 * grosor())); ponerControles(); }
-    if (P.tipo !== 'reticula' && !P.varillas.lista.length) { R = calcular(); autoVarillas(P.varillas.autoN); }
-    UI.costilla = Math.min(UI.costilla, R.n - 1);
-    cambio(P.tipo === 'reticula' ? 'Retícula entrelazada' : 'Costillas con varillas');
+    const nuevo = $('#sTipo').value, gN = grupoTipo(nuevo);
+    if (gN !== grupoDe(P.plantilla) && P.editado && !confirm('Este tipo de mueble usa otras plantillas: se perderán los retoques de los perfiles. ¿Seguir?')) { $('#sTipo').value = P.tipo; return; }
+    P.tipo = nuevo;
+    if (gN !== grupoDe(P.plantilla)) {
+      const id = Object.keys(PLANTILLAS).find(k => grupoDe(k) === gN);
+      P.plantilla = id; P.params = paramsDefecto(id); P.nombre = PLANTILLAS[id].nombre; aplicarPlantilla(); UI.clave = 0;
+    }
+    if (P.tipo === 'radial') { P.costillas.modo = 'numero'; P.costillas.numero = clamp(P.costillas.numero, 3, 48); if (P.costillas.numero > 24) P.costillas.numero = 12;
+      if (grosor() > 10 && confirm('Las piezas radiales (lámparas) suelen hacerse con tablero fino. ¿Pasar a contrachapado de 6 mm?')) P.costillas.grosor = 6;
+      const tMin = Math.ceil(P.costillas.numero * (grosor() + 1) / Math.PI); if (P.radial.tubo < tMin) P.radial.tubo = tMin; }
+    if (P.tipo === 'reticula' && P.costillas.modo === 'separacion' && P.costillas.separacion < 3 * grosor()) P.costillas.separacion = Math.round(Math.max(100, 6 * grosor()));
+    if (P.tipo !== 'radial' && P.costillas.modo === 'numero' && grupoDe(P.plantilla) !== 'radial') P.costillas.modo = 'separacion';
+    R = calcular();
+    if (P.tipo === 'costillas' && !P.varillas.lista.length) autoVarillas(P.varillas.autoN);
+    UI.costilla = 0; ponerControles();
+    cambio({ costillas: 'Costillas con varillas', reticula: 'Retícula entrelazada', radial: 'Rebanadas radiales', pared: 'Panel de pared' }[P.tipo]);
+    encuadrarSiHaceFalta(); camara('tres4');
   });
+  // planta curva
+  enlazar('#plForma', () => { P.planta.forma = $('#plForma').value; mostrarSecciones(); cambio('Planta ' + $('#plForma').selectedOptions[0].text.toLowerCase()); camara('tres4'); });
+  enlazar('#plRadio', () => { P.planta.radio = Math.max(150, +$('#plRadio').value || 2500); cambio(); });
+  enlazar('#plSentido', () => { P.planta.sentido = +$('#plSentido').value; cambio(); });
+  enlazar('#plAmp', () => { P.planta.amplitud = Math.max(0, +$('#plAmp').value || 0); cambio(); });
+  enlazar('#plOndas', () => { P.planta.ondas = clamp(+$('#plOndas').value || 1, 0.5, 4); cambio(); });
+  // radial
+  enlazar('#raNum', () => { P.costillas.numero = clamp(Math.round(+$('#raNum').value || 12), 3, 120); cambio(P.costillas.numero + ' costillas'); });
+  enlazar('#raTubo', () => { P.radial.tubo = Math.max(4, +$('#raTubo').value || 20); cambio(); });
+  enlazar('#raHolTubo', () => { P.radial.holguraTubo = Math.max(0, +$('#raHolTubo').value || 0); cambio(); });
+  enlazar('#raDiscos', () => { P.radial.discos = clamp(Math.round(+$('#raDiscos').value || 0), 0, 6); cambio(); });
+  enlazar('#raRDisco', () => { P.radial.rDisco = Math.max(0, +$('#raRDisco').value || 0); cambio(); });
+  enlazar('#raHolgura', () => { P.radial.holgura = clamp(+$('#raHolgura').value || 0, 0, 3); cambio(); });
+  // pared
+  enlazar('#paNum', () => { P.pared.rastreles = clamp(Math.round(+$('#paNum').value || 0), 0, 10); cambio(); });
+  enlazar('#paAlto', () => { P.pared.alto = Math.max(10, +$('#paAlto').value || 45); cambio(); });
+  enlazar('#paGrueso', () => { P.pared.grueso = Math.max(5, +$('#paGrueso').value || 20); cambio(); });
+  enlazar('#paMargen', () => { P.pared.margen = Math.max(0, +$('#paMargen').value || 0); cambio(); });
+  enlazar('#paHolgura', () => { P.pared.holgura = clamp(+$('#paHolgura').value || 0, 0, 3); cambio(); });
+  enlazar('#paVer', () => { P.pared.verPared = $('#paVer').checked; construir3D(); });
+  enlazar('#cClaves3d', () => { P.vista.claves = $('#cClaves3d').checked; construirClaves3D(); });
   enlazar('#rNum', () => { P.reticula.num = clamp(Math.round(+$('#rNum').value || 1), 1, 20); cambio(P.reticula.num + ' largueros'); });
   enlazar('#rMargen', () => { P.reticula.margen = Math.max(0, +$('#rMargen').value || 0); cambio(); });
   enlazar('#rVuelo', () => { P.reticula.vuelo = Math.max(0, +$('#rVuelo').value || 0); cambio(); });
@@ -164,8 +196,30 @@ function iniciarPanel() {
 }
 
 // pone los controles con los valores del proyecto
+// plantillas del grupo del tipo de mueble
+function llenarPlantillas() {
+  const sp = $('#sPlantilla'), g = grupoTipo(P.tipo); sp.innerHTML = '';
+  Object.entries(PLANTILLAS).forEach(([id, pl]) => { if ((pl.grupo || 'lineal') === g) sp.add(new Option(pl.nombre, id)); });
+  sp.value = P.plantilla;
+}
+// enseña los apartados de cada tipo de mueble
+function mostrarSecciones() {
+  const t = P.tipo;
+  $('#secVarillas').classList.toggle('oculto', t !== 'costillas');
+  $('#secReticula').classList.toggle('oculto', t !== 'reticula');
+  $('#secPlanta').classList.toggle('oculto', t !== 'costillas');
+  $('#secRadial').classList.toggle('oculto', t !== 'radial');
+  $('#secPared').classList.toggle('oculto', t !== 'pared');
+  $$('.filaArco').forEach(f => f.classList.toggle('oculto', P.planta.forma !== 'arco'));
+  $$('.filaS').forEach(f => f.classList.toggle('oculto', P.planta.forma !== 's'));
+  const rad = t === 'radial';
+  $('#cModo').closest('label').classList.toggle('oculto', rad);
+  $('#filaSep').classList.toggle('oculto', rad || P.costillas.modo !== 'separacion');
+  $('#filaNum').classList.toggle('oculto', rad || P.costillas.modo !== 'numero');
+  $('#kPosTit').textContent = rad ? 'Posición (°)' : 'Posición (mm)';
+}
 function ponerControles() {
-  $('#sPlantilla').value = P.plantilla;
+  llenarPlantillas();
   const C = P.costillas, V = P.varillas;
   const op = [...$('#cGrosor').options].map(o => o.value);
   if (op.includes(String(C.grosor))) { $('#cGrosor').value = String(C.grosor); $('#filaGrosorOtro').classList.add('oculto'); }
@@ -179,6 +233,11 @@ function ponerControles() {
   $('#filaSepD').classList.toggle('oculto', !V.separadores);
   $('#kInterp').value = P.interp;
   $('#sTipo').value = P.tipo; const Rt = P.reticula; $('#rNum').value = Rt.num; $('#rMargen').value = Rt.margen; $('#rVuelo').value = Rt.vuelo; $('#rHolgura').value = Rt.holgura; $('#rArriba').value = Rt.xArriba !== false ? '1' : '0';
+  const Pl = P.planta; $('#plForma').value = Pl.forma; $('#plRadio').value = Pl.radio; $('#plSentido').value = String(Pl.sentido === -1 ? -1 : 1); $('#plAmp').value = Pl.amplitud; $('#plOndas').value = Pl.ondas;
+  const Ra = P.radial; $('#raNum').value = P.costillas.numero; $('#raTubo').value = Ra.tubo; $('#raHolTubo').value = Ra.holguraTubo; $('#raDiscos').value = Ra.discos; $('#raRDisco').value = Ra.rDisco; $('#raHolgura').value = Ra.holgura;
+  const Pa = P.pared; $('#paNum').value = Pa.rastreles; $('#paAlto').value = Pa.alto; $('#paGrueso').value = Pa.grueso; $('#paMargen').value = Pa.margen; $('#paHolgura').value = Pa.holgura; $('#paVer').checked = Pa.verPared;
+  $('#cClaves3d').checked = P.vista.claves !== false;
+  mostrarSecciones();
   const M = P.maqueta; $('#mActiva').checked = M.activa; $('#mEscala').value = String(M.escala); $('#mGrosor').value = M.grosor; $('#mDiam').value = M.diam; $('#mHolgura').value = M.holgura;
   $('#rExplosion').value = P.vista.explosion; $('#cFantasma').checked = P.vista.fantasma; $('#cVarillas3d').checked = P.vista.varillas; $('#cResalta').checked = P.vista.resalta;
   construirParams();
@@ -190,13 +249,14 @@ function refrescarClaves() {
   C.forEach((k, i) => s.add(new Option(`Perfil clave ${i + 1}`, i)));
   s.value = UI.clave;
   const k = C[UI.clave];
-  $('#infoClave').textContent = `en x = ${fmt(k.x)} mm (${fmt(k.x / P.largo * 100)} %)`;
+  $('#infoClave').textContent = P.tipo === 'radial' ? `a ${fmt(k.x, 1)}°` : `en x = ${fmt(k.x)} mm (${fmt(k.x / P.largo * 100)} %)`;
+  if (G.modelo) construirClaves3D();
   $('#kPos').value = k.x;
   $('#nClaves').textContent = C.length;
   const ul = $('#listaClaves'); ul.innerHTML = '';
   C.forEach((o, i) => {
     const li = document.createElement('li'); li.className = i === UI.clave ? 'sel' : '';
-    li.innerHTML = `<span class="icono">◆</span><span class="nom">Perfil clave ${i + 1}</span><span class="pos">x ${fmt(o.x)} mm</span>`;
+    li.innerHTML = `<span class="icono">◆</span><span class="nom">Perfil clave ${i + 1}</span><span class="pos">${P.tipo === 'radial' ? '' : 'x '}${textoPos(o.x)}</span>`;
     li.onclick = () => { UI.clave = i; UI.punto = -1; refrescarClaves(); VP.pintar(); };
     ul.appendChild(li);
   });
@@ -205,17 +265,19 @@ function refrescarClaves() {
 
 function refrescarListas() {
   // resumen del reparto
-  $('#resCost').innerHTML = `<b>${R.n}</b> costillas · separación <b>${fmt(R.sep, 1)}</b> mm · hueco <b>${fmt(Math.max(0, R.hueco), 1)}</b> mm`;
+  $('#resCost').innerHTML = P.tipo === 'radial' ? `<b>${R.n}</b> costillas cada <b>${fmt(R.sep, 1)}°</b> · junto al tubo quedan <b>${fmt(Math.max(0, R.hueco), 1)}</b> mm entre ellas`
+    : `<b>${R.n}</b> ${P.tipo === 'pared' ? 'lamas' : 'costillas'} · separación <b>${fmt(R.sep, 1)}</b> mm · hueco <b>${fmt(Math.max(0, R.hueco), 1)}</b> mm`;
   // costillas y largueros
   const ret = P.tipo === 'reticula';
-  $('#nCost').textContent = R.n + (ret ? ' + ' + R.largueros.length : '');
+  $('#nCost').textContent = R.n + (R.otras.length ? ' + ' + R.otras.length : '');
   const malas = new Set(); R.avisos.forEach(a => { if (a.tipo === 'error') R.varillas.forEach(v => v.fallan.forEach(i => malas.add(i))); });
-  if (!ret) R.costillas.forEach(c => { if (!c.ok || (P.varillas.lista.length && c.nVar === 0)) malas.add(c.i); });
+  if (P.tipo === 'costillas') R.costillas.forEach(c => { if (!c.ok || (P.varillas.lista.length && c.nVar === 0)) malas.add(c.i); });
+  else if (!ret) { R.costillas.forEach(c => { if (!c.ok) malas.add(c.i); }); (R.ranurasMal || []).forEach(p => malas.add(p.i)); (R.discosMal || []).forEach(d => malas.add(d.i)); (R.rastrelesMal || []).forEach(i => malas.add(i)); }
   else { R.costillas.forEach(c => { if (!c.ok || !c.ranuras.length) malas.add(c.i); }); (R.ranurasMal || []).forEach(p => malas.add(p.i)); }
   const ul = $('#listaCost'); ul.innerHTML = '';
-  [...R.costillas, ...R.largueros].forEach(c => {
+  [...R.costillas, ...R.otras].forEach(c => {
     const li = document.createElement('li'); li.className = c.i === UI.costilla ? 'sel' : '';
-    li.innerHTML = `<span class="icono">${malas.has(c.i) ? '<span class="mal">!</span>' : c.z ? '▬' : '▮'}</span><span class="nom">${c.nombre}</span><span class="med">${c.ok ? fmt(c.caja.w) + ' × ' + fmt(c.caja.h) : 'vacía'}</span>`;
+    li.innerHTML = `<span class="icono">${malas.has(c.i) ? '<span class="mal">!</span>' : c.disco ? '◎' : c.z ? '▬' : '▮'}</span><span class="nom">${c.nombre}</span><span class="med">${c.ok ? fmt(c.caja.w) + ' × ' + fmt(c.caja.h) : 'vacía'}</span>`;
     li.onclick = () => selCostilla(c.i);
     ul.appendChild(li);
   });
@@ -230,20 +292,21 @@ function refrescarListas() {
   // resumen (siempre a tamaño real)
   const cm = calcularCompra(), largoV = cm.varillas.reduce((a, v) => a + v.largo, 0);
   $('#resumen').innerHTML = `<table>
-    <tr><td>Medidas totales</td><td>${fmt(P.largo)} × ${fmt(G.fondo || 0)} × ${fmt(G.alto || 0)} mm</td></tr>
-    <tr><td>Costillas</td><td>${R.n} de ${fmt(grosor(), 1)} mm</td></tr>
+    <tr><td>Medidas totales</td><td>${(G.dims || [0, 0, 0]).map(v => fmt(v)).join(' × ')} mm</td></tr>
+    <tr><td>${P.tipo === 'pared' ? 'Lamas' : 'Costillas'}</td><td>${R.n} de ${fmt(grosor(), 1)} mm</td></tr>
     <tr><td>Superficie de tablero</td><td>${fmt(cm.area / 1e6, 2)} m²</td></tr>
     <tr><td>Tableros ${fmt(cm.tablero[0])}×${fmt(cm.tablero[1])}</td><td>${cm.nTableros}</td></tr>
-    ${ret ? `<tr><td>Largueros</td><td>${R.largueros.length} de ${fmt(grosor(), 1)} mm</td></tr>
+    ${P.tipo === 'radial' ? `<tr><td>Tubo central</td><td>Ø ${fmt(P.radial.tubo)} mm</td></tr><tr><td>Discos de unión</td><td>${R.discos.length}</td></tr>`
+    : P.tipo === 'pared' ? `<tr><td>Rastreles ${fmt(P.pared.alto)} × ${fmt(P.pared.grueso)}</td><td>${R.rastreles.length} de ${fmt(P.largo)} mm</td></tr>`
+    : ret ? `<tr><td>Largueros</td><td>${R.largueros.length} de ${fmt(grosor(), 1)} mm</td></tr>
     <tr><td>Cruces a media madera</td><td>${R.cruces.length}</td></tr>
     <tr><td>Ancho de las ranuras</td><td>${fmt(grosor() + P.reticula.holgura, 2)} mm</td></tr>` : `
     <tr><td>${esc(VARILLA_TIPOS[P.varillas.tipo].nombre)} Ø${P.varillas.diam}</td><td>${cm.varillas.length} · ${fmt(largoV)} mm</td></tr>
-    ${cm.nSep ? `<tr><td>Separadores Ø${P.varillas.sepD} × ${fmt(cm.hueco, 1)}</td><td>${cm.nSep}</td></tr>` : ''}
+    ${cm.nSep ? `<tr><td>Separadores Ø${P.varillas.sepD} × ${cm.sepMax - cm.sepMin > 0.2 ? fmt(cm.sepMin) + '–' + fmt(cm.sepMax) : fmt(cm.sepMin, 1)}</td><td>${cm.nSep}</td></tr>` : ''}
     ${cm.nTuercas ? `<tr><td>Tuercas y arandelas M${P.varillas.diam}</td><td>${cm.nTuercas}</td></tr>` : ''}
     <tr><td>Broca para los agujeros</td><td>Ø ${fmt(P.varillas.diam + P.varillas.holgura, 1)} mm</td></tr>`}
   </table>`;
-  $('#secVarillas').classList.toggle('oculto', ret);
-  $('#secReticula').classList.toggle('oculto', !ret);
+  mostrarSecciones();
   if (ret) { const mz = R.largueros.reduce((m, z) => Math.max(m, z.caja.w), 0); $('#resRet').innerHTML = `<b>${R.largueros.length}</b> largueros (hasta ${fmt(mz)} mm de largo) · <b>${R.cruces.length}</b> cruces · ranura de <b>${fmt(grosor() + P.reticula.holgura, 2)}</b> mm`; }
   // maqueta
   const M = P.maqueta;
@@ -252,7 +315,7 @@ function refrescarListas() {
   $('#bFabricar').innerHTML = '<span>🪚</span><span class="txt"> Fabricar</span>' + (M.activa ? '<span class="barra-maq">1:' + M.escala + '</span>' : '');
   if (M.activa) {
     const cf = calcularCompraFab(), mayor = R.costillas.reduce((m, c) => c.ok && c.caja.w * c.caja.h > m.w * m.h ? c.caja : m, { w: 0, h: 0 }), k = 1 / M.escala;
-    $('#resMaq').innerHTML = `Mueble de <b>${fmt(P.largo * k)} × ${fmt((G.fondo || 0) * k)} × ${fmt((G.alto || 0) * k)}</b> mm · separación <b>${fmt(cf.sep, 1)}</b> mm · hueco <b>${fmt(Math.max(0, cf.hueco), 1)}</b> mm · costilla mayor ${fmt(mayor.w * k)} × ${fmt(mayor.h * k)} mm · <b>${cf.nTableros}</b> tablero${cf.nTableros === 1 ? '' : 's'} de ${fmt(cf.tablero[0])} × ${fmt(cf.tablero[1])}`;
+    $('#resMaq').innerHTML = `Mueble de <b>${(G.dims || [0, 0, 0]).map(v => fmt(v * k)).join(' × ')}</b> mm · ` + (P.tipo === 'radial' ? '' : `separación <b>${fmt(cf.sep, 1)}</b> mm · hueco <b>${fmt(Math.max(0, cf.hueco), 1)}</b> mm · `) + ` costilla mayor ${fmt(mayor.w * k)} × ${fmt(mayor.h * k)} mm · <b>${cf.nTableros}</b> tablero${cf.nTableros === 1 ? '' : 's'} de ${fmt(cf.tablero[0])} × ${fmt(cf.tablero[1])}`;
   }
   $('#version').textContent = 'v' + VERSION;
   document.title = (P.nombre ? P.nombre + ' — ' : '') + 'Made-rebanadas';

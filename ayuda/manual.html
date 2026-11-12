@@ -49,7 +49,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 
 <header class="port">
   <h1>Made-rebanadas</h1>
-  <p>Manual de uso · versión 1.2 · Muebles orgánicos hechos con costillas de tablero, sin internet · Por Eloi A.A.</p>
+  <p>Manual de uso · versión 1.3 · Muebles orgánicos hechos con costillas de tablero, sin internet · Por Eloi A.A.</p>
 </header>
 
 <figure><img src="img/portada.jpg" alt="Banco ondulado hecho con costillas de contrachapado"></figure>
@@ -64,22 +64,25 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <a href="#costillas">7. Paso 3 · Las costillas</a><br>
   <a href="#varillas">8. Paso 4 · Las varillas</a><br>
   <a href="#reticula">9. Otro tipo: retícula entrelazada</a><br>
-  <a href="#comprobar">10. Comprobaciones</a><br>
-  <a href="#vista3d">11. La vista 3D</a><br>
-  <a href="#fabricar">12. Paso 5 · Fabricar: tableros y DXF</a><br>
-  <a href="#despiece">13. Despiece y lista de compra</a><br>
-  <a href="#maqueta">14. Maqueta a escala</a><br>
-  <a href="#plano">15. Plano de montaje en PDF</a><br>
-  <a href="#anidador">16. Anidador de tableros</a><br>
-  <a href="#archivos">17. Guardar, abrir y ejemplos</a><br>
-  <a href="#teclas">18. Atajos de teclado</a><br>
-  <a href="#taller">19. Consejos de taller</a><br>
-  <a href="#limites">20. Limitaciones de esta versión</a>
+  <a href="#curva">10. Planta curva (arco y S)</a><br>
+  <a href="#radial">11. Rebanadas radiales: lámparas y columnas</a><br>
+  <a href="#pared">12. Paneles de pared</a><br>
+  <a href="#comprobar">13. Comprobaciones</a><br>
+  <a href="#vista3d">14. La vista 3D</a><br>
+  <a href="#fabricar">15. Paso 5 · Fabricar: tableros y DXF</a><br>
+  <a href="#despiece">16. Despiece y lista de compra</a><br>
+  <a href="#maqueta">17. Maqueta a escala</a><br>
+  <a href="#plano">18. Plano de montaje en PDF</a><br>
+  <a href="#anidador">19. Anidador de tableros</a><br>
+  <a href="#archivos">20. Guardar, abrir y ejemplos</a><br>
+  <a href="#teclas">21. Atajos de teclado</a><br>
+  <a href="#taller">22. Consejos de taller</a><br>
+  <a href="#limites">23. Limitaciones de esta versión</a>
 </div>
 
 <h2 id="que">1. Qué es</h2>
 <p><b>Made-rebanadas</b> sirve para diseñar muebles de formas orgánicas (bancos ondulados, tumbonas, poufs, mesas, estanterías) hechos con <b>rebanadas</b>: una serie de piezas planas de tablero, llamadas <b>costillas</b>, puestas una detrás de otra con un pequeño hueco entre ellas. Cada costilla es una <b>sección</b> de la forma 3D, como si cortaras el volumen del mueble en lonchas.</p>
-<p>Hay dos tipos de mueble. En el de <b>costillas con varillas</b>, las costillas se unen con <b>varillas pasantes</b> (varilla roscada, redondo de madera o tubo) y unos <b>separadores</b> que mantienen el hueco. En la <b>retícula entrelazada</b>, unas costillas y unos largueros se cruzan y encajan con ranuras a media madera (sección 9). El programa calcula el contorno de cada pieza, comprueba que las varillas caben en todas, coloca las piezas en los tableros y prepara el <b>DXF</b> para cortarlas en la CNC.</p>
+<p>Hay cuatro tipos de mueble. En el de <b>costillas con varillas</b>, las costillas se unen con <b>varillas pasantes</b> (varilla roscada, redondo de madera o tubo) y unos <b>separadores</b> que mantienen el hueco. En la <b>retícula entrelazada</b>, unas costillas y unos largueros se cruzan y encajan con ranuras a media madera (sección 9). Las <b>radiales</b> (lámparas y columnas) van alrededor de un eje (sección 11) y los <b>paneles de pared</b> son lamas sobre rastreles (sección 12). Además, las costillas con varillas pueden seguir una <b>planta curva</b>, en arco o en S (sección 10). El programa calcula el contorno de cada pieza, comprueba que las varillas caben en todas, coloca las piezas en los tableros y prepara el <b>DXF</b> para cortarlas en la CNC.</p>
 <p>Funciona en el navegador (Chrome, Edge o Firefox), con doble clic, sin instalar nada y sin conexión a internet.</p>
 
 <h2 id="abrir">2. Abrir el programa</h2>
@@ -113,6 +116,8 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 <div class="caja">Cada perfil es una curva cerrada que pasa por sus puntos. Un punto puede ser <b>curva</b> (círculo, pasa suave) o <b>esquina</b> (cuadrado). Entre dos esquinas seguidas el tramo es <b>recto</b>: así se hacen las bases que apoyan en el suelo.</div>
 
 <h2 id="plantilla">5. Paso 1 · La plantilla</h2>
+<p>Elige primero el <b>Tipo de mueble</b> (costillas con varillas, retícula, radial o panel de pared): la lista de plantillas cambia con él.</p>
+<figure><img src="img/tipo.png" class="estrecha" alt="Tipo de mueble y plantilla"></figure>
 <p>Empieza con <b>🗋 Nuevo</b> o eligiendo una <b>Plantilla</b> en el panel izquierdo. Cada plantilla genera los perfiles clave a partir de unas medidas que cambias con el deslizador o escribiendo el número:</p>
 <figure><img src="img/nuevo.png" class="estrecha" style="max-width:520px" alt="Diálogo de mueble nuevo"></figure>
 <table>
@@ -123,6 +128,8 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <tr><td>Mesa baja «ola»</td><td>Largo, fondo, altura, arco inferior y su variación en ola, apoyos, vuelo del tablero y curva de los lados.</td></tr>
   <tr><td>Estantería «duna»</td><td>Largo, fondo, altura, ondulación del frente, profundidad, alto y altura del hueco.</td></tr>
   <tr><td>Forma libre</td><td>Largo, fondo y altura de un bloque redondeado para dibujar tus propios perfiles.</td></tr>
+  <tr><td>Lámpara de lóbulos / Columna <i>(radial)</i></td><td>Altura, radio mayor, radio abajo y arriba, altura de la panza, lóbulos, su profundidad y giro en espiral.</td></tr>
+  <tr><td>Panel ondulado / con relieve <i>(pared)</i></td><td>Ancho y alto del panel, fondo mínimo, relieve y ondas (o posición y anchura de los relieves).</td></tr>
 </table>
 <div class="caja">Si ya has retocado los perfiles a mano y cambias una medida de la plantilla, la forma <b>se vuelve a generar</b> y se pierden los retoques (el programa te avisa antes). Solo el <b>largo</b> se puede cambiar sin perderlos: los perfiles clave se estiran a la nueva medida.</div>
 
@@ -130,7 +137,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 <figure><img src="img/perfil.png" alt="Editor de perfil"><figcaption>Perfil clave en azul con sus puntos (● curva, ■ esquina), otros perfiles clave en gris discontinuo, la silueta de todas las costillas en marrón claro y las varillas V1, V2, V3 con su zona de seguridad.</figcaption></figure>
 <table>
   <tr><th>Qué quieres hacer</th><th>Cómo</th></tr>
-  <tr><td>Elegir el perfil clave</td><td>Desplegable del título del editor, la lista <b>Perfiles clave</b> del panel derecho, o <kbd>RePág</kbd> / <kbd>AvPág</kbd>.</td></tr>
+  <tr><td>Elegir el perfil clave</td><td><b>Pinchando su línea en la vista 3D</b> (los perfiles clave se dibujan en azul y el que se edita, en naranja), el desplegable del título del editor, la lista <b>Perfiles clave</b> del panel derecho, o <kbd>RePág</kbd> / <kbd>AvPág</kbd>.</td></tr>
   <tr><td>Mover un punto</td><td>Arrástralo. Se ajusta a la <b>rejilla al mover</b> (5 mm por defecto); con <kbd>Mayús</kbd> se mueve libre.</td></tr>
   <tr><td>Mover el punto en todos los perfiles</td><td>Marca <b>Al mover un punto, moverlo en todas las claves</b>: el punto se desplaza lo mismo en todos los perfiles y la forma conserva sus ondas.</td></tr>
   <tr><td>Añadir un punto</td><td><b>Doble clic sobre la línea</b> del perfil. Se añade en todos los perfiles clave, en el mismo sitio de la curva.</td></tr>
@@ -138,6 +145,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <tr><td>Borrar un punto</td><td><b>Clic derecho</b> sobre él, o selecciónalo y pulsa <kbd>Supr</kbd> (mínimo 3 puntos).</td></tr>
   <tr><td>Moverte por el dibujo</td><td>Arrastra en vacío para desplazar y usa la rueda para acercar. <b>⤢</b> o <kbd>F</kbd> encuadra.</td></tr>
 </table>
+<figure><img src="img/claves3d.jpg" alt="Perfiles clave en el 3D"><figcaption>En la vista 3D, los perfiles clave son líneas azules: pincha una para editarla (se pone naranja). La casilla <b>Perfiles</b> de la vista 3D las muestra u oculta.</figcaption></figure>
 <h3>Perfiles clave</h3>
 <div class="dos">
   <img src="img/claves_panel.png" alt="Panel de perfiles clave">
@@ -211,7 +219,71 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 <figure><img src="img/ret_plano2.jpg" alt="Plano de la retícula" style="max-width:640px"></figure>
 <div class="caja taller">Las ranuras salen con las esquinas interiores vivas. Con una fresa de radio r quedan redondeadas: usa una fresa bastante más estrecha que la ranura y repasa las esquinas con formón o lima, o déjalas en «hueso de perro» en el programa de CNC.</div>
 
-<h2 id="comprobar">10. Comprobaciones</h2>
+<h2 id="curva">10. Planta curva (arco y S)</h2>
+<p>Con <b>Costillas con varillas</b>, el apartado <b>Planta</b> permite que el mueble siga una curva vista desde arriba. Las costillas van <b>perpendiculares a la curva</b>, abiertas en abanico, y las varillas la siguen.</p>
+<div class="dos">
+  <figure><img src="img/curva_s.jpg" alt="Banco en S"><figcaption>Banco en S: las costillas se abren hacia fuera de cada curva.</figcaption></figure>
+  <figure><img src="img/curva_s_arriba.jpg" alt="Banco en S visto desde arriba"><figcaption>Visto desde arriba, con las varillas curvadas.</figcaption></figure>
+</div>
+<div class="dos">
+  <img src="img/planta_panel.png" alt="Apartado Planta">
+  <div>
+    <ul>
+      <li><b>Recta</b>: como siempre.</li>
+      <li><b>Arco</b>: el eje del mueble es un arco del <b>radio</b> que digas, curvado hacia delante o hacia detrás. Sirve para bancos que rodean una mesa, una chimenea o un árbol.</li>
+      <li><b>En S</b>: el eje ondula con la <b>amplitud</b> y el número de <b>ondas</b> que pongas.</li>
+      <li>La separación entre costillas se mide en el eje de la curva; por fuera de la curva quedan más separadas y por dentro, más juntas.</li>
+    </ul>
+  </div>
+</div>
+<p>Como las costillas no son paralelas, cada <b>separador</b> tiene un largo distinto: el despiece da el intervalo y el plano trae la lista de todos, costilla a costilla. El programa avisa si las costillas se tocan por el lado de dentro de la curva y dice el <b>radio mínimo</b> al que hay que curvar cada varilla.</p>
+<figure><img src="img/plano_curva.jpg" alt="Plano de la planta curva" style="max-width:640px"><figcaption>Hoja 2 del plano: planta con las costillas y las varillas, y los largos de los separadores.</figcaption></figure>
+<div class="caja taller">Curva las varillas antes de montar, con una curvadora de tubo o a mano sobre una plantilla de tablero cortada con el mismo radio. Si la curva es muy cerrada, usa varilla más fina (M8 o M6).</div>
+
+<h2 id="radial">11. Rebanadas radiales: lámparas y columnas</h2>
+<p>Con <b>Tipo de mueble → Radial</b>, las costillas no van una detrás de otra sino <b>alrededor de un eje vertical</b>, como los gajos de una naranja. Cada costilla es media sección de la pieza (desde el eje hacia fuera). Los perfiles clave se colocan por <b>ángulo</b> (de 0 a 360°), así que la forma puede cambiar al dar la vuelta: lóbulos, espirales…</p>
+<div class="dos">
+  <figure><img src="img/radial_lampara.jpg" alt="Lámpara de lóbulos"><figcaption>Lámpara de lóbulos: 12 costillas de 6 mm, tubo y 2 discos.</figcaption></figure>
+  <figure><img src="img/radial_columna.jpg" alt="Columna torsionada"><figcaption>Columna torsionada: 8 costillas de 18 mm con giro en espiral.</figcaption></figure>
+</div>
+<div class="dos">
+  <img src="img/radial_panel.png" alt="Apartado Radial">
+  <div>
+    <ul>
+      <li><b>Número de costillas</b> repartidas en la vuelta completa.</li>
+      <li><b>Tubo central</b>: el borde de dentro de cada costilla se recorta a su radio (más la holgura). Si es una lámpara, por dentro va el cable.</li>
+      <li><b>Discos de unión</b>: discos con una ranura por costilla. Cada costilla lleva una muesca que abraza el disco y así queda a su ángulo. Con radio 0, cada disco toma el mayor que cabe a su altura.</li>
+      <li>Plantillas: <b>Lámpara de lóbulos</b> y <b>Columna / pie de lámpara</b>, con altura, radios, panza, número y profundidad de los lóbulos y <b>giro en espiral</b>.</li>
+    </ul>
+  </div>
+</div>
+<p>Comprobaciones: avisa si las costillas se tocan junto al tubo (y dice el tubo mínimo), si un disco sobresale de alguna costilla o si no caben los discos. La explosión separa las costillas hacia fuera.</p>
+<div class="dos">
+  <figure><img src="img/radial_expl.jpg" alt="Explosión de la lámpara"><figcaption>Explosión: las costillas se separan del tubo.</figcaption></figure>
+  <figure><img src="img/plano_radial.jpg" alt="Plano radial"><figcaption>Hoja 2 del plano: planta, discos y su altura.</figcaption></figure>
+</div>
+<div class="caja">Para lámparas, usa tablero fino (3 a 6 mm, contrachapado de abedul) y bombillas LED, que no calientan.</div>
+
+<h2 id="pared">12. Paneles de pared</h2>
+<p>Con <b>Tipo de mueble → Panel de pared</b>, las costillas son <b>lamas</b> verticales que salen de la pared. El canto de las lamas dibuja un relieve: ondas, diagonales o cúpulas. En el editor de perfil, <b>u</b> es lo que sale la lama de la pared y <b>v</b> la altura.</p>
+<div class="dos">
+  <figure><img src="img/pared_ondas.jpg" alt="Panel ondulado"><figcaption>Panel de pared ondulado: ondas en diagonal sobre 3 rastreles.</figcaption></figure>
+  <figure><img src="img/pared_relieve.jpg" alt="Panel con relieve"><figcaption>Panel con relieve: dos «dunas» redondeadas.</figcaption></figure>
+</div>
+<div class="dos">
+  <img src="img/pared_panel.png" alt="Apartado Pared">
+  <div>
+    <ul>
+      <li><b>Rastreles</b>: listones horizontales atornillados a la pared. Cada lama lleva detrás una muesca por rastrel y encaja en ellos.</li>
+      <li><b>Alto</b> y <b>grueso</b> del rastrel, <b>margen</b> arriba y abajo y <b>holgura</b> de la muesca.</li>
+      <li>Con 0 rastreles, las lamas van sobre un tablero trasero (sale en la lista de compra).</li>
+      <li>Plantillas: <b>Panel de pared ondulado</b> (ondas a lo ancho, a lo alto y en diagonal) y <b>Panel de pared con relieve</b>.</li>
+    </ul>
+  </div>
+</div>
+<figure><img src="img/plano_pared.jpg" alt="Plano de la pared" style="max-width:640px"><figcaption>Hoja 2 del plano: alzado con las lamas numeradas y la altura de cada rastrel.</figcaption></figure>
+
+<h2 id="comprobar">13. Comprobaciones</h2>
 <figure><img src="img/comprobaciones.png" class="estrecha" alt="Comprobaciones"></figure>
 <p>El programa revisa el mueble cada vez que cambias algo y lo indica en el panel <b>Comprobaciones</b>. Haz clic en un aviso para ir a la costilla afectada.</p>
 <table>
@@ -226,7 +298,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 </table>
 <p>En la lista <b>Costillas</b> del panel derecho, las que tienen algún problema llevan un <b style="color:#c0392b">!</b>.</p>
 
-<h2 id="vista3d">11. La vista 3D</h2>
+<h2 id="vista3d">14. La vista 3D</h2>
 <div class="dos">
   <figure><img src="img/explosion.jpg" alt="Vista explosionada"><figcaption>💥 Explosión: separa las costillas para ver el montaje.</figcaption></figure>
   <figure><img src="img/volumen.jpg" alt="Volumen ideal"><figcaption>Volumen: la forma ideal, transparente, para comparar con las costillas.</figcaption></figure>
@@ -237,7 +309,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <li><b>📷 Imagen</b> guarda la vista 3D en PNG a alta resolución.</li>
 </ul>
 
-<h2 id="fabricar">12. Paso 5 · Fabricar: tableros y DXF</h2>
+<h2 id="fabricar">15. Paso 5 · Fabricar: tableros y DXF</h2>
 <figure><img src="img/fabricar.png" alt="Ventana Fabricar"></figure>
 <p><b>🪚 Fabricar</b> coloca todas las costillas en tableros y muestra cuántos hacen falta y el aprovechamiento. Puedes elegir:</p>
 <ul>
@@ -256,14 +328,14 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <tr><td>TABLERO</td><td>Borde del tablero</td><td>Solo de referencia</td></tr>
 </table>
 <p>El <b>SVG</b> tiene lo mismo, en milímetros, para la cortadora láser o para imprimir plantillas a escala 1:1.</p>
-<p><b>⬇ CSV de cortes</b> guarda una línea por costilla (nombre, largo y ancho de su rectángulo, cantidad y veta) con el mismo formato de despiece que lee el <b>Anidador</b> y que abre cualquier hoja de cálculo. <b>🧩 Anidador</b> abre el Anidador con las costillas por su forma real (sección 16).</p>
+<p><b>⬇ CSV de cortes</b> guarda una línea por costilla (nombre, largo y ancho de su rectángulo, cantidad y veta) con el mismo formato de despiece que lee el <b>Anidador</b> y que abre cualquier hoja de cálculo. <b>🧩 Anidador</b> abre el Anidador con las costillas por su forma real (sección 19).</p>
 <div class="caja taller">Taladra y vacía <b>los agujeros antes que el contorno</b>: si cortas primero la pieza, se puede mover al hacer los agujeros. Deja puentes (pestañas) si la pieza es pequeña.</div>
 
-<h2 id="despiece">13. Despiece y lista de compra</h2>
+<h2 id="despiece">16. Despiece y lista de compra</h2>
 <figure><img src="img/despiece.png" alt="Despiece"></figure>
 <p><b>📋 Despiece</b> muestra todas las costillas (posición, ancho, alto, superficie y agujeros) y la <b>lista de compra</b>: tableros, varillas con su largo, separadores con su número y largo, tuercas y arandelas y la broca de los agujeros. <b>⬇ Despiece (CSV)</b> la guarda para abrirla en una hoja de cálculo y <b>⬇ CSV de cortes</b> guarda la lista de cortes para el Anidador. Si está activa la maqueta, todo sale con las medidas de la maqueta.</p>
 
-<h2 id="maqueta">14. Maqueta a escala</h2>
+<h2 id="maqueta">17. Maqueta a escala</h2>
 <div class="dos">
   <img src="img/maqueta.png" alt="Apartado Maqueta a escala">
   <div>
@@ -278,7 +350,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 <p>Con la maqueta activa, <b>Fabricar</b> (con la etiqueta <b>1:5</b> en el botón), el DXF, el SVG, el despiece, el CSV de cortes, el plano y el Anidador salen <b>a escala</b>, con tableros de láser (600 × 400, 900 × 600, A3…). Los archivos llevan <code>_maqueta_1-5</code> en el nombre. El 3D y el panel <b>Resumen</b> siguen a tamaño real.</p>
 <div class="caja">Comprobaciones de la maqueta: avisa si las costillas se pisan (grosor de la maqueta mayor que la separación a escala), si queda menos de 1,5 mm de material alrededor de un agujero, y si el grosor no es proporcional al del tablero real (la maqueta se verá más llena o más calada que el mueble).</div>
 
-<h2 id="plano">15. Plano de montaje en PDF</h2>
+<h2 id="plano">18. Plano de montaje en PDF</h2>
 <p><b>📄 Plano</b> descarga un PDF apaisado (A4) para llevar al taller. Lleva:</p>
 <ol>
   <li><b>Conjunto</b>: el mueble en 3D, sus datos y la lista de compra.</li>
@@ -293,7 +365,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 </div>
 <p>Si está activa la maqueta, el plano sale con las medidas y los pasos de la maqueta.</p>
 
-<h2 id="anidador">16. Anidador de tableros</h2>
+<h2 id="anidador">19. Anidador de tableros</h2>
 <figure><img src="img/anidador.jpg" alt="Anidador dentro de Made-rebanadas"><figcaption>El Anidador dentro de Made-rebanadas, con las costillas de una maqueta 1:5 colocadas por su forma real.</figcaption></figure>
 <p><b>🧩 Anidador</b> (en la barra o en la ventana Fabricar) abre el <b>Anidador de tableros</b> de la Suite CNC dentro del programa. Le llegan solas todas las costillas, cada una con su contorno exterior y los agujeros de las varillas, y las medidas, el grosor y el margen del tablero de Fabricar. Coloca las piezas <b>por su forma real</b>: encaja unas en los huecos de otras y aprovecha mucho mejor el tablero que la colocación de Fabricar.</p>
 <ul>
@@ -304,11 +376,11 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 </ul>
 <div class="caja">El Anidador es un programa aparte de la Suite CNC: está en <code>assets/anidador/anidador.html</code> y también se puede abrir solo. Tiene su propia ayuda (❓).</div>
 
-<h2 id="archivos">17. Guardar, abrir y ejemplos</h2>
+<h2 id="archivos">20. Guardar, abrir y ejemplos</h2>
 <ul>
   <li><b>💾 Guardar</b> (<kbd>Ctrl</kbd>+<kbd>S</kbd>) descarga el proyecto en un archivo <code>.json</code> con todo: perfiles, costillas, varillas y material. <b>📂 Abrir</b> lo carga de nuevo.</li>
   <li><b>↶ ↷</b> (<kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd>) deshacen y rehacen.</li>
-  <li><b>🪑 Ejemplos</b>: banco ondulado de abedul, banco largo de pino, tumbona de jardín, pouf redondo, mesa baja lacada y estantería duna; y en retícula, banco, mesa baja y pouf.</li>
+  <li><b>🪑 Ejemplos</b>: banco ondulado de abedul, banco largo de pino, tumbona de jardín, pouf redondo, mesa baja lacada y estantería duna; en retícula, banco, mesa baja y pouf; banco en S y banco curvo en arco; lámpara de lóbulos y columna torsionada; y dos paneles de pared.</li>
 </ul>
 <div class="dos">
   <img src="img/ej_tumbona.jpg" alt="Tumbona">
@@ -317,7 +389,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <img src="img/ej_estante.jpg" alt="Estantería">
 </div>
 
-<h2 id="teclas">18. Atajos de teclado</h2>
+<h2 id="teclas">21. Atajos de teclado</h2>
 <table>
   <tr><th>Tecla</th><th>Acción</th></tr>
   <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Deshacer / rehacer</td></tr>
@@ -331,9 +403,9 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <tr><td><kbd>Esc</kbd></td><td>Cancelar la colocación de una varilla y quitar la selección</td></tr>
 </table>
 
-<h2 id="taller">19. Consejos de taller</h2>
+<h2 id="taller">22. Consejos de taller</h2>
 <ul>
-  <li>Corta antes una <b>maqueta</b> (sección 14): es barata, se hace en minutos con la láser y descubre los fallos de forma y de montaje.</li>
+  <li>Corta antes una <b>maqueta</b> (sección 17): es barata, se hace en minutos con la láser y descubre los fallos de forma y de montaje.</li>
   <li>Comprueba el <b>grosor real</b> del tablero con el calibre: un contrachapado «de 18» puede medir 17,5. Pon ese valor (Grosor → Otro…).</li>
   <li>Para un asiento, una separación de <b>2,5 a 3,5 veces el grosor</b> queda bien y no pellizca. Para apoyar objetos, mejor más juntas.</li>
   <li>Con <b>3 varillas</b> repartidas en triángulo el mueble no se retuerce. En bancos largos (más de 2 m), pon 4.</li>
@@ -342,9 +414,10 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <li>Lija los cantos de las costillas antes de montar: después no se llega bien a los huecos.</li>
 </ul>
 
-<h2 id="limites">20. Limitaciones de esta versión</h2>
+<h2 id="limites">23. Limitaciones de esta versión</h2>
 <ul>
-  <li>Hace costillas separadas y retícula entrelazada; las rebanadas radiales quedan para otra versión. En la retícula, las costillas son perpendiculares al largo y los largueros paralelos a él (no hay ángulos libres).</li>
+  <li>La retícula solo se hace en planta recta. En la retícula, las costillas son perpendiculares al largo y los largueros paralelos a él (no hay ángulos libres).</li>
+  <li>En la planta curva, las varillas se dibujan curvadas: hay que curvarlas en el taller al radio que indica el plano.</li>
   <li>Las ranuras se dibujan con esquinas vivas: el redondeo de la fresa (hueso de perro) se hace en el programa de CNC.</li>
   <li>Los contornos del DXF son polilíneas de muchos tramos rectos cortos (no arcos), con una tolerancia de 0,05 mm.</li>
   <li>La colocación de <b>Fabricar</b> usa el rectángulo que envuelve cada costilla; para encajarlas por su forma, usa el <b>Anidador</b>.</li>

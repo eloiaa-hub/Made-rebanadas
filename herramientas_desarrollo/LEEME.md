@@ -16,6 +16,7 @@ No hacen falta para usar el programa: solo para cambiarlo.
 | `01_base.js` | Utilidades, materiales, estado del proyecto |
 | `02_geometria.js` | Curvas de los perfiles, mezcla entre perfiles clave, recortes, costillas, varillas, comprobaciones, colocación automática de varillas |
 | `02b_reticula.js` | Retícula entrelazada: largueros sacados del volumen, cruces y ranuras a media madera, comprobaciones |
+| `02c_disposicion.js` | Dónde va cada costilla (recta, curva, radial, pared), varillas curvas, tubo y discos, rastreles, comprobaciones de radial y pared |
 | `03_plantillas.js` | Plantillas paramétricas (banco, tumbona, pouf, mesa, estantería, libre) |
 | `04_editor2d.js` | Editor del perfil clave y vista de la costilla |
 | `05_tres.js` | Vista 3D (Three.js) |
@@ -37,6 +38,9 @@ No hacen falta para usar el programa: solo para cambiarlo.
 - `esquinas`: por punto, `true` = esquina, `false` = curva.
 - `costillas`: grosor, reparto (`separacion` o `numero`), recortes de base y techo, material.
 - `varillas`: tipo, diámetro, holgura, madera al borde, separadores y `lista` de posiciones `[u, v]`.
-- `tipo`: `costillas` (con varillas) o `reticula`.
+- `tipo`: `costillas` (con varillas), `reticula`, `radial` o `pared`. En `radial`, la posición de los perfiles clave (`x`) es un ángulo de 0 a 360°.
+- `planta`: forma (`recta`, `arco`, `s`), radio, sentido, amplitud y ondas.
+- `radial`: Ø del tubo, holgura, número y radio de los discos (0 = automático), holgura de las ranuras.
+- `pared`: número, alto, grueso, margen y holgura de los rastreles.
 - `reticula`: número de largueros, margen, vuelo, holgura de la ranura y si las ranuras de las costillas van desde arriba.
 - `maqueta`: activa, escala, grosor, diámetro de la varilla y holgura.

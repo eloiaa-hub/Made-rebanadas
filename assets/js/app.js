@@ -8,7 +8,7 @@
 'use strict';
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
-const VERSION = '1.2';
+const VERSION = '1.3';
 const T = window.THREE;
 
 /* ===================== UTILIDADES ===================== */
@@ -76,9 +76,12 @@ function proyectoBase() {
     interp: 'curva',
     costillas: { grosor: 18, modo: 'separacion', separacion: 60, numero: 25, base: true, tope: false, topeAlt: 400, material: 'abedul', color: '#f2efe8' },
     varillas: { tipo: 'roscada', diam: 10, holgura: 0.5, margen: 20, tramo: 'todas', separadores: true, sepD: 22, sobra: 12, autoN: 3, lista: [] },
-    vista: { explosion: 0, fantasma: false, varillas: true, resalta: true },
+    vista: { explosion: 0, fantasma: false, varillas: true, resalta: true, claves: true },
     maqueta: { activa: false, escala: 5, grosor: 3, diam: 3, holgura: 0.2 },
     reticula: { num: 4, margen: 40, holgura: 0.3, xArriba: true, vuelo: 25 },
+    planta: { forma: 'recta', radio: 2500, sentido: 1, amplitud: 150, ondas: 1 },
+    radial: { tubo: 20, holguraTubo: 0.5, discos: 2, rDisco: 0, holgura: 0.3 },
+    pared: { rastreles: 3, alto: 45, grueso: 20, margen: 120, holgura: 0.5, verPared: true },
   };
 }
 
@@ -166,6 +169,8 @@ function recortaY(poly, y0, quedarArriba) {
   // quita puntos repetidos
   return out.filter((p, i) => { const q = out[(i + 1) % out.length]; return Math.hypot(p[0] - q[0], p[1] - q[1]) > 1e-6; });
 }
+// recorte por la recta vertical u = u0 (se queda lo de la derecha)
+function recortaU(poly, u0) { return recortaY(poly.map(p => [p[1], p[0]]), u0, true).map(p => [p[1], p[0]]); }
 // simplificación Douglas–Peucker de un polígono cerrado (para DXF / SVG)
 function simplificaCerrado(poly, tol) {
   if (poly.length < 5) return poly.slice();
@@ -216,6 +221,7 @@ function contornoDe(ctrl) {
   let poly = curvaCerrada(ctrl, P.esquinas);
   if (P.costillas.base) poly = recortaY(poly, 0, true);
   if (P.costillas.tope) poly = recortaY(poly, P.costillas.topeAlt, false);
+  if (P.tipo === 'radial') poly = recortaU(poly, radioTubo());
   if (poly.length >= 3 && areaFirmada(poly) < 0) poly.reverse();
   return poly;
 }
@@ -225,13 +231,17 @@ function grosor() { return P.costillas.grosor; }
 // en la retícula, las costillas de los extremos se meten hacia dentro el «vuelo» de los largueros
 const vueloRet = () => P.tipo === 'reticula' ? clamp(P.reticula.vuelo || 0, 0, P.largo / 4) : 0;
 function reparto() {
+  if (P.tipo === 'radial') { // costillas repartidas en la vuelta completa (grados)
+    const n = clamp(Math.round(P.costillas.numero), 3, 360), s = 360 / n;
+    return { n, s, hueco: PI2 * radioTubo() / n - grosor(), ini: 0, xs: Array.from({ length: n }, (_, i) => i * s), radial: true };
+  }
   const e = grosor(), v = vueloRet(), L = P.largo - 2 * v, c = P.costillas;
   let n;
   if (c.modo === 'numero') n = Math.max(2, Math.round(c.numero));
   else n = Math.max(2, Math.round((L - e) / Math.max(1, c.separacion)) + 1);
   n = Math.min(n, 600);
   const s = (L - e) / (n - 1);
-  return { n, s, hueco: s - e, ini: v };
+  return { n, s, hueco: s - e, ini: v, xs: Array.from({ length: n }, (_, i) => v + e / 2 + i * s) };
 }
 function radioAgujero() { return (P.varillas.diam + P.varillas.holgura) / 2; }
 
@@ -239,13 +249,20 @@ function calcular() {
   const e = grosor(), rep = reparto(), V = P.varillas;
   const res = { n: rep.n, sep: rep.s, hueco: rep.hueco, costillas: [], varillas: [], avisos: [] };
   for (let i = 0; i < rep.n; i++) {
-    const x = rep.ini + e / 2 + i * rep.s, ctrl = perfilEn(x), poly = contornoDe(ctrl);
+    const x = rep.xs[i], ctrl = perfilEn(x), poly = contornoDe(ctrl);
     const ok = poly.length >= 3 && Math.abs(areaFirmada(poly)) > 25;
     const caja = ok ? cajaDe(poly) : { x0: 0, y0: 0, x1: 0, y1: 0, w: 0, h: 0 };
     res.costillas.push({ i, x, poly: ok ? poly : [], base: ok ? poly : [], ok, caja, area: ok ? areaFirmada(poly) : 0, agujeros: [], nVar: 0, ranuras: [], etq: String(i + 1), nombre: 'Costilla ' + (i + 1) });
   }
-  res.largueros = []; res.cruces = [];
-  if (P.tipo === 'reticula') { reticula(res); avisosReticula(res); return res; }
+  res.largueros = []; res.cruces = []; res.discos = []; res.rastreles = []; res.ranurasMal = [];
+  // centro del fondo de las costillas (en radial y pared, el eje o la pared: 0)
+  const okc = res.costillas.filter(c => c.ok);
+  res.uc = P.tipo === 'radial' || P.tipo === 'pared' || !okc.length ? 0 : (Math.min(...okc.map(c => c.caja.x0)) + Math.max(...okc.map(c => c.caja.x1))) / 2;
+  ucActual = res.uc;
+  const fin = () => { res.otras = [...res.largueros, ...res.discos]; res.otras.forEach((o, k) => o.i = res.n + k); return res; };
+  if (P.tipo === 'reticula') { reticula(res); avisosReticula(res); return fin(); }
+  if (P.tipo === 'radial') { radialExtras(res); aplicarRanuras(res, e + P.radial.holgura); avisosRadial(res); return fin(); }
+  if (P.tipo === 'pared') { paredExtras(res); aplicarRanuras(res, e); avisosPared(res); return fin(); }
   // varillas: ¿caben en cada costilla?
   const need = radioAgujero() + V.margen;
   V.lista.forEach((p, k) => {
@@ -263,10 +280,11 @@ function calcular() {
     const fallan = [];
     for (let i = a; i <= b && usada; i++) { if (cabe[i]) { res.costillas[i].agujeros.push(k); res.costillas[i].nVar++; } else fallan.push(i); }
     res.varillas.push({ k, u: p[0], v: p[1], cabe, a, b, usada, fallan,
-      largo: usada ? (b - a) * rep.s + e + 2 * V.sobra : 0 });
+      largo: usada ? (b - a) * rep.s + e + 2 * V.sobra : 0, dists: usada ? new Array(b - a).fill(rep.s) : [] });
   });
+  if (disposicion() === 'curva') varillasCurvas(res);
   avisosDe(res, need);
-  return res;
+  return fin();
 }
 
 function lista(nums) { // «3, 4, 5 y 9» a partir de índices (se muestran desde 1)
@@ -293,6 +311,12 @@ function avisosDe(res, need) {
   for (let i = 0; i < V.lista.length; i++) for (let j = i + 1; j < V.lista.length; j++) {
     const d = Math.hypot(V.lista[i][0] - V.lista[j][0], V.lista[i][1] - V.lista[j][1]);
     if (d < 2 * radioAgujero() + V.margen) add('error', `Las varillas ${i + 1} y ${j + 1} están demasiado juntas (${fmt(d, 0)} mm entre centros).`);
+  }
+  // planta curva
+  if (disposicion() === 'curva') {
+    if (res.tocanCurva && res.tocanCurva.length) add('error', `Por el lado de dentro de la curva se tocan con la siguiente: ${cst(res.tocanCurva)}. Sube la separación o abre la curva.`, res.tocanCurva[0]);
+    const curvas = res.varillas.filter(v => v.usada && isFinite(v.radioMin));
+    if (curvas.length) { const rm = Math.min(...curvas.map(v => v.radioMin)); add(rm < 25 * V.diam ? 'atencion' : 'info', `Planta curva: las varillas se curvan hasta un radio de ${fmt(rm)} mm${rm < 25 * V.diam ? ' (muy cerrado para Ø ' + V.diam + ': usa varilla más fina o abre la curva)' : ''}. Los separadores tienen largos distintos (ver Despiece).`); }
   }
   if (V.lista.length) {
     const sueltas = res.costillas.filter(c => c.ok && c.nVar === 0).map(c => c.i);
@@ -430,7 +454,10 @@ function hacerRanura(poly, r, w) {
 // aplica las ranuras de una pieza con un ancho dado (en sus coordenadas); devuelve el polígono y las que fallan
 function ranurar(base, ranuras, w) {
   let poly = base; const fallan = [];
-  for (const r of ranuras) { const nuevo = hacerRanura(poly, r, w); if (nuevo) poly = nuevo; else fallan.push(r); }
+  for (const r of ranuras) {
+    const ww = r.ancho != null ? r.ancho : w, nuevo = r.lat ? hacerRanuraLat(poly, r, ww) : hacerRanura(poly, r, ww);
+    if (nuevo) poly = nuevo; else fallan.push(r);
+  }
   return { poly, fallan };
 }
 
@@ -532,6 +559,197 @@ function avisosReticula(res) {
   if (P.costillas.base && alto.length && alto.length < res.n) add('info', `No llegan al suelo (las sujetan los largueros): ${cst(alto)}.`, alto[0]);
   avisosMaqueta(res, add);
   if (!A.some(a => a.tipo === 'error' || a.tipo === 'atencion')) add('ok', `Todo correcto: ${res.cruces.length} cruces a media madera entre ${res.costillas.filter(c => c.ok).length} costillas y ${res.largueros.length} largueros.`);
+}
+
+/* ===================== DISPOSICIÓN DE LAS COSTILLAS =====================
+   Dónde va cada costilla en el espacio y con qué orientación:
+   - recta:  planos paralelos a lo largo de X (costillas, retícula)
+   - curva:  planos perpendiculares a un eje curvo en planta (arco o S)
+   - radial: planos que pasan por un eje vertical (lámparas, columnas); la posición es un ángulo en grados
+   - pared:  como recta, con el fondo (u) saliendo de la pared hacia delante */
+function disposicion() {
+  if (P.tipo === 'radial') return 'radial';
+  if (P.tipo === 'pared') return 'pared';
+  if (P.tipo === 'costillas' && P.planta && P.planta.forma !== 'recta') return 'curva';
+  return 'recta';
+}
+const unidadPos = () => P.tipo === 'radial' ? '°' : 'mm';
+const textoPos = x => P.tipo === 'radial' ? fmt(x, 1) + '°' : fmt(x) + ' mm';
+
+// eje de la planta curva: punto (X, Z) y ángulo de la tangente en la posición x (mm a lo largo)
+function ejePlanta(x) {
+  const L = P.largo, Pl = P.planta;
+  if (Pl.forma === 'arco') {
+    const Rr = Math.max(150, Pl.radio) * (Pl.sentido === -1 ? -1 : 1), f = (x - L / 2) / Rr;
+    const zc = Rr * (1 - Math.cos(L / 2 / Rr)) / 2;
+    return { X: Rr * Math.sin(f), Z: Rr * (1 - Math.cos(f)) - zc, f };
+  }
+  const k = PI2 * (Pl.ondas || 1) / L, A = Pl.amplitud || 0;
+  return { X: x - L / 2, Z: A * Math.sin(k * x), f: Math.atan(A * k * Math.cos(k * x)) };
+}
+// marco de una costilla en la posición x: origen O y dirección del fondo Au (en el plano horizontal X-Z)
+let ucActual = 0;   // centro del fondo del cálculo en curso
+function marcoEn(x) {
+  const d = disposicion(), uc = ucActual;
+  if (d === 'radial') { const t = x * Math.PI / 180; return { O: [0, 0, 0], Au: [Math.cos(t), 0, -Math.sin(t)] }; }
+  if (d === 'curva') { const s = ejePlanta(x), sf = Math.sin(s.f), cf = Math.cos(s.f); return { O: [s.X - sf * uc, 0, s.Z + cf * uc], Au: [sf, 0, -cf] }; }
+  if (d === 'pared') return { O: [x - P.largo / 2, 0, 0], Au: [0, 0, 1] };
+  return { O: [x - P.largo / 2, 0, uc], Au: [0, 0, -1] };
+}
+const puntoMarco = (m, u, v) => [m.O[0] + m.Au[0] * u, v, m.O[2] + m.Au[2] * u];
+const ejeGrosor = m => [-m.Au[2], 0, m.Au[0]];           // perpendicular a la costilla (Au × Y)
+
+// ranura que entra de lado (por el borde de u pequeño): se traspone el polígono y se usa hacerRanura
+function hacerRanuraLat(poly, r, w) {
+  const tr = poly.map(p => [p[1], p[0]]).reverse();
+  const res = hacerRanura(tr, { c: r.c, mid: r.mid, borde: r.borde, arriba: false }, w);
+  return res ? res.map(p => [p[1], p[0]]).reverse() : null;
+}
+// tramos horizontales [u0, u1] en los que la recta v = y corta al polígono
+function intervalosH(poly, y) { return intervalosV(poly.map(p => [p[1], p[0]]), y); }
+
+/* ---------- planta curva: varillas que siguen la curva ---------- */
+function varillasCurvas(res) {
+  const e = grosor(), V = P.varillas;
+  res.varillas.forEach(rv => {
+    if (!rv.usada) return;
+    const pts = [];
+    for (let i = rv.a; i <= rv.b; i++) { const m = marcoEn(res.costillas[i].x), p = puntoMarco(m, rv.u, rv.v); pts.push([p[0], p[2]]); }
+    rv.dists = []; let L = 0;
+    for (let i = 1; i < pts.length; i++) { const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); rv.dists.push(d); L += d; }
+    rv.largo = L + e + 2 * V.sobra;
+    // radio de curvatura mínimo (por tres puntos)
+    let rmin = Infinity;
+    for (let i = 1; i + 1 < pts.length; i++) {
+      const [a, b, c] = [pts[i - 1], pts[i], pts[i + 1]];
+      const ab = Math.hypot(b[0] - a[0], b[1] - a[1]), bc = Math.hypot(c[0] - b[0], c[1] - b[1]), ca = Math.hypot(a[0] - c[0], a[1] - c[1]);
+      const ar = Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])) / 2;
+      if (ar > 1e-6) rmin = Math.min(rmin, ab * bc * ca / (4 * ar));
+    }
+    rv.radioMin = rmin;
+  });
+  // ¿se tocan las costillas por el lado de dentro de la curva?
+  const toc = [];
+  for (let i = 0; i + 1 < res.n; i++) {
+    const a = res.costillas[i], b = res.costillas[i + 1]; if (!a.ok || !b.ok) continue;
+    for (const u of [Math.min(a.caja.x0, b.caja.x0), Math.max(a.caja.x1, b.caja.x1)]) {
+      const pa = puntoMarco(marcoEn(a.x), u, 0), pb = puntoMarco(marcoEn(b.x), u, 0);
+      if (Math.hypot(pb[0] - pa[0], pb[2] - pa[2]) - e < 0.5) { toc.push(i); break; }
+    }
+  }
+  res.tocanCurva = toc;
+}
+
+/* ---------- radial: tubo central y discos de unión ---------- */
+function radioTubo() { return P.radial.tubo / 2 + P.radial.holguraTubo; }
+function radialExtras(res) {
+  const Rd = P.radial, e = grosor(), rT = radioTubo(), cs = res.costillas.filter(c => c.ok);
+  res.discos = []; res.discosMal = [];
+  // tramo vertical común del borde de dentro (junto al tubo)
+  let vA = -Infinity, vB = Infinity;
+  cs.forEach(c => {
+    const ints = intervalosV(c.poly, rT + 0.5); if (!ints.length) { vA = Infinity; return; }
+    const I = ints.reduce((m, J) => J[1] - J[0] > m[1] - m[0] ? J : m);
+    vA = Math.max(vA, I[0]); vB = Math.min(vB, I[1]);
+  });
+  res.tuboV = [Math.min(...cs.map(c => c.caja.y0)), Math.max(...cs.map(c => c.caja.y1))];
+  res.comun = [vA, vB];
+  const nd = Math.max(0, Math.round(Rd.discos));
+  if (!nd || !(vB - vA > 4 * e)) return;
+  const m = Math.max(2 * e, 0.12 * (vB - vA));
+  const alturas = nd === 1 ? [(vA + vB) / 2] : Array.from({ length: nd }, (_, j) => vA + m + j * (vB - vA - 2 * m) / (nd - 1));
+  const angs = res.costillas.map(c => c.x);
+  alturas.forEach((vD, j) => {
+    // radio del disco: el pedido o, con 0, el que cabe a esa altura (60 % de lo que queda de costilla)
+    let libre = Infinity;
+    res.costillas.forEach(c => { if (!c.ok) return; const I = intervalosH(c.poly, vD).find(J => J[0] <= rT + 1 && J[1] >= rT + 0.5); libre = Math.min(libre, I ? I[1] : rT); });
+    const rD = Rd.rDisco > 0 ? Math.max(rT + 3 * e, Rd.rDisco) : Math.max(rT + 2 * e, rT + 0.6 * (libre - rT)), mid = (rT + rD) / 2;
+    res.costillas.forEach(c => {
+      if (!c.ok) return;
+      const I = intervalosH(c.poly, vD).find(J => J[0] <= rT + 1 && J[1] >= rT + 0.5);
+      if (!I || I[1] < rD + 2) res.discosMal.push({ j, i: c.i });
+      c.ranuras.push({ lat: true, c: vD, mid, borde: rT, disco: j });
+    });
+    const d = {
+      i: 0, k: j, z: true, disco: true, etq: 'D' + (j + 1), nombre: 'Disco ' + (j + 1), v: vD, x: vD, u: 0, rD, ok: true,
+      agujeros: [], ranuras: [], nVar: 0, huecos: [{ x: 0, y: 0, r: rT }],
+      generar: w => poligonoDisco(rD, mid, angs, w),
+    };
+    d.base = d.poly = d.generar(e + Rd.holgura); d.caja = cajaDe(d.poly); d.area = areaFirmada(d.poly) - Math.PI * rT * rT;
+    res.discos.push(d);
+  });
+}
+// disco con una ranura radial por costilla, desde el borde hasta mid, de ancho w
+function poligonoDisco(rD, mid, angulosGrados, w) {
+  const ts = angulosGrados.map(a => a * Math.PI / 180).sort((a, b) => a - b), dl = Math.asin(Math.min(0.99, (w / 2) / rD)), out = [];
+  ts.forEach((t, i) => {
+    const tPrev = (i ? ts[i - 1] : ts[ts.length - 1] - PI2) + dl, t0 = t - dl;
+    const nArc = Math.max(1, Math.ceil((t0 - tPrev) / (Math.PI / 60)));
+    for (let k = 0; k <= nArc; k++) { const a = tPrev + (t0 - tPrev) * k / nArc; out.push([rD * Math.cos(a), rD * Math.sin(a)]); }
+    const c = [Math.cos(t), Math.sin(t)], pp = [-Math.sin(t), Math.cos(t)];
+    out.push([mid * c[0] - w / 2 * pp[0], mid * c[1] - w / 2 * pp[1]], [mid * c[0] + w / 2 * pp[0], mid * c[1] + w / 2 * pp[1]]);
+  });
+  return out;
+}
+
+/* ---------- pared: rastreles detrás de las lamas ---------- */
+function paredExtras(res) {
+  const Pa = P.pared, cs = res.costillas.filter(c => c.ok);
+  res.rastreles = []; res.rastrelesMal = [];
+  const n = Math.max(0, Math.round(Pa.rastreles));
+  if (!n || !cs.length) return;
+  let vA = -Infinity, vB = Infinity;
+  cs.forEach(c => { const ints = intervalosV(c.poly, c.caja.x0 + 0.5); if (!ints.length) return; const I = ints.reduce((m, J) => J[1] - J[0] > m[1] - m[0] ? J : m); vA = Math.max(vA, I[0]); vB = Math.min(vB, I[1]); });
+  if (!(vB - vA > Pa.alto * 1.5)) return;
+  const m = clamp(Pa.margen, Pa.alto / 2, (vB - vA) / 2 - Pa.alto / 2);
+  const alturas = n === 1 ? [(vA + vB) / 2] : Array.from({ length: n }, (_, j) => vA + m + j * (vB - vA - 2 * m) / (n - 1));
+  alturas.forEach((v, j) => {
+    res.rastreles.push({ j, v });
+    cs.forEach(c => {
+      const I = intervalosH(c.poly, v).find(J => J[0] <= c.caja.x0 + 1);
+      if (!I || I[1] < c.caja.x0 + Pa.grueso + 8) res.rastrelesMal.push(c.i);
+      c.ranuras.push({ lat: true, c: v, mid: c.caja.x0 + Pa.grueso, borde: c.caja.x0, ancho: Pa.alto + Pa.holgura, rastrel: j });
+    });
+  });
+}
+// aplica a todas las piezas sus ranuras (de la retícula, discos o rastreles) con el ancho real
+function aplicarRanuras(res, w) {
+  res.ranurasMal = res.ranurasMal || [];
+  res.costillas.forEach(p => {
+    if (!p.ok || !p.ranuras.length) return;
+    const r = ranurar(p.base, p.ranuras, w);
+    p.poly = r.poly; p.caja = cajaDe(p.poly); p.area = areaFirmada(p.poly);
+    if (r.fallan.length && !res.ranurasMal.includes(p)) res.ranurasMal.push(p);
+  });
+}
+
+/* ---------- comprobaciones de radial y pared ---------- */
+function avisosRadial(res) {
+  const A = res.avisos, e = grosor(), Rd = P.radial, add = (tipo, txt, cost) => A.push({ tipo, txt, cost });
+  const vacias = res.costillas.filter(c => !c.ok).map(c => c.i);
+  if (vacias.length) add('error', `Sin forma (más estrechas que el tubo): ${cst(vacias)}.`, vacias[0]);
+  const paso = PI2 * radioTubo() / res.n;
+  if (paso < e + 0.5) add('error', `Las ${res.n} costillas de ${fmt(e, 1)} mm se tocan junto al tubo: hace falta un tubo de al menos Ø ${fmt((res.n * (e + 1)) / Math.PI - 2 * Rd.holguraTubo, 0)} mm o menos costillas.`);
+  if (!Math.round(Rd.discos)) add('atencion', 'Sin discos de unión: las costillas solo se pueden encolar al tubo.');
+  else if (!res.discos.length) add('error', 'No caben los discos: el borde de dentro de las costillas es muy corto o no es común a todas.');
+  const malD = [...new Set(res.discosMal.map(d => d.i))];
+  if (malD.length) add('error', `El disco sobresale de ${cstLa(malD)} (la costilla es más estrecha que el disco a esa altura): baja el radio de los discos.`, malD[0]);
+  if (res.ranurasMal.length) add('error', `No se pudo hacer la muesca de algún disco en ${cstLa(res.ranurasMal.map(p => p.i))}.`, res.ranurasMal[0].i);
+  avisosMaqueta(res, add);
+  if (!A.some(a => a.tipo === 'error' || a.tipo === 'atencion')) add('ok', `Todo correcto: ${res.n} costillas alrededor de un tubo de Ø ${fmt(Rd.tubo)} mm` + (res.discos.length ? ` con ${res.discos.length} disco${res.discos.length > 1 ? 's' : ''} de unión.` : '.'));
+}
+function avisosPared(res) {
+  const A = res.avisos, e = grosor(), Pa = P.pared, add = (tipo, txt, cost) => A.push({ tipo, txt, cost });
+  if (res.hueco < -0.01) add('error', `La separación (${fmt(res.sep, 1)} mm) es menor que el grosor (${fmt(e, 1)} mm): las lamas se pisan.`);
+  const vacias = res.costillas.filter(c => !c.ok).map(c => c.i);
+  if (vacias.length) add('error', `Sin forma: ${cst(vacias)}.`, vacias[0]);
+  if (!Math.round(Pa.rastreles)) add('info', 'Sin rastreles: las lamas se fijan a un tablero trasero (va en la lista de compra) o directamente a la pared con escuadras.');
+  else if (!res.rastreles.length) add('error', 'No caben los rastreles: las lamas son demasiado bajas para su altura y margen.');
+  const mal = [...new Set(res.rastrelesMal)];
+  if (mal.length) add('atencion', `Lamas poco profundas a la altura de un rastrel (la muesca de ${fmt(Pa.grueso)} mm las deja muy finas): ${cst(mal)}.`, mal[0]);
+  if (res.ranurasMal.length) add('error', `No se pudo hacer la muesca del rastrel en ${cstLa(res.ranurasMal.map(p => p.i))}.`, res.ranurasMal[0].i);
+  avisosMaqueta(res, add);
+  if (!A.some(a => a.tipo === 'error' || a.tipo === 'atencion')) add('ok', `Todo correcto: ${res.n} lamas` + (res.rastreles.length ? ` sobre ${res.rastreles.length} rastreles de ${fmt(Pa.alto)} × ${fmt(Pa.grueso)} mm.` : '.'));
 }
 
 /* ===================== PLANTILLAS PARAMÉTRICAS =====================
@@ -702,6 +920,105 @@ const PLANTILLAS = {
   },
 };
 
+// ---------- plantillas radiales (la posición de cada perfil es un ángulo: 0 a 360°) ----------
+function generarRevolucion(p) {
+  const M = 7, esquinas = [true, true, ...new Array(M - 2).fill(false), true, true];
+  const K = clamp(Math.round(p.lobulos) * 4, 8, 48) + 1, H = p.alto;
+  const gam = Math.log(0.5) / Math.log(clamp(p.panza, 0.1, 0.9));
+  const claves = [];
+  for (let k = 0; k < K; k++) {
+    const th = 360 * k / (K - 1), pts = [[0, 0]];
+    for (let j = 0; j < M; j++) {
+      const t = j / (M - 1), v = t * H, lin = lerp(p.abajo, p.arriba, t);
+      const base = lin + (p.radio - lin) * Math.sin(Math.PI * Math.pow(t, gam));
+      const lob = Math.round(p.lobulos) ? 1 + (p.amplitud / p.radio) * Math.cos((th - p.giro * t) * Math.PI / 180 * Math.round(p.lobulos)) : 1;
+      pts.push([Math.max(1, (j === 0 || j === M - 1) ? lin : base * lob), v]);
+    }
+    pts.push([0, H]);
+    claves.push({ x: Math.round(th * 100) / 100, pts: redondeaPts(pts) });
+  }
+  return { largo: 360, esquinas, claves };
+}
+PLANTILLAS.lampara = {
+  nombre: 'Lámpara de lóbulos', grupo: 'radial',
+  desc: 'Pantalla colgante en forma de bulbo, con lóbulos que pueden girar en espiral.',
+  params: [
+    { id: 'alto', nombre: 'Altura', min: 150, max: 1200, paso: 5, valor: 420 },
+    { id: 'radio', nombre: 'Radio mayor', min: 60, max: 600, paso: 5, valor: 180 },
+    { id: 'abajo', nombre: 'Radio abajo', min: 10, max: 500, paso: 5, valor: 70 },
+    { id: 'arriba', nombre: 'Radio arriba', min: 10, max: 500, paso: 5, valor: 30 },
+    { id: 'panza', nombre: 'Altura de la panza (0 a 1)', min: 0.15, max: 0.85, paso: 0.01, valor: 0.5 },
+    { id: 'lobulos', nombre: 'Lóbulos', min: 0, max: 12, paso: 1, valor: 6 },
+    { id: 'amplitud', nombre: 'Profundidad de los lóbulos', min: 0, max: 150, paso: 1, valor: 28 },
+    { id: 'giro', nombre: 'Giro en espiral (°)', min: -180, max: 180, paso: 1, valor: 40 },
+  ],
+  generar: generarRevolucion,
+};
+PLANTILLAS.columna = {
+  nombre: 'Columna / pie de lámpara', grupo: 'radial',
+  desc: 'Pieza alta de revolución con cintura y lóbulos torsionados: pie de lámpara, columna o peana.',
+  params: [
+    { id: 'alto', nombre: 'Altura', min: 300, max: 2400, paso: 10, valor: 1100 },
+    { id: 'radio', nombre: 'Radio mayor', min: 60, max: 500, paso: 5, valor: 150 },
+    { id: 'abajo', nombre: 'Radio abajo', min: 20, max: 500, paso: 5, valor: 170 },
+    { id: 'arriba', nombre: 'Radio arriba', min: 20, max: 500, paso: 5, valor: 110 },
+    { id: 'panza', nombre: 'Altura de la panza (0 a 1)', min: 0.15, max: 0.85, paso: 0.01, valor: 0.3 },
+    { id: 'lobulos', nombre: 'Lóbulos', min: 0, max: 12, paso: 1, valor: 4 },
+    { id: 'amplitud', nombre: 'Profundidad de los lóbulos', min: 0, max: 150, paso: 1, valor: 35 },
+    { id: 'giro', nombre: 'Giro en espiral (°)', min: -360, max: 360, paso: 1, valor: 180 },
+  ],
+  generar: generarRevolucion,
+};
+// ---------- plantillas de pared (u = lo que sale de la pared, v = altura) ----------
+function generarPared(p, prof) {
+  const M = 13, H = p.alto, esquinas = [true, true, ...new Array(M - 2).fill(false), true, true];
+  const K = clamp(Math.round((p.ondasX || 1) * 6) + 1, 7, 31);
+  const claves = clavesUniformes(K, p.largo, t => {
+    const pts = [[0, 0]];
+    for (let j = 0; j < M; j++) { const v = H * j / (M - 1); pts.push([Math.max(4, prof(t, v / H)), v]); }
+    pts.push([0, H]);
+    return redondeaPts(pts);
+  });
+  return { largo: p.largo, esquinas, claves };
+}
+PLANTILLAS.pared_ondas = {
+  nombre: 'Panel de pared ondulado', grupo: 'pared',
+  desc: 'Lamas verticales cuyo canto dibuja ondas en horizontal y en vertical (o en diagonal).',
+  params: [
+    { id: 'largo', nombre: 'Ancho del panel', min: 400, max: 6000, paso: 10, valor: 1800 },
+    { id: 'alto', nombre: 'Alto del panel', min: 300, max: 3000, paso: 10, valor: 1200 },
+    { id: 'fondo', nombre: 'Fondo mínimo', min: 10, max: 300, paso: 1, valor: 35 },
+    { id: 'relieve', nombre: 'Relieve (lo que sale la onda)', min: 0, max: 400, paso: 1, valor: 90 },
+    { id: 'ondasX', nombre: 'Ondas a lo ancho', min: 0.5, max: 5, paso: 0.5, valor: 1.5 },
+    { id: 'ondasY', nombre: 'Ondas a lo alto', min: 0, max: 4, paso: 0.5, valor: 1 },
+    { id: 'diagonal', nombre: 'Diagonal (0 = cuadrícula, 1 = diagonal)', min: 0, max: 1, paso: 0.05, valor: 0.6 },
+  ],
+  generar(p) {
+    return generarPared(p, (t, y) => p.fondo + p.relieve * (0.5 + 0.25 * Math.sin(PI2 * p.ondasX * t) + 0.25 * Math.sin(PI2 * (p.ondasY * y + p.diagonal * p.ondasX * t))));
+  },
+};
+PLANTILLAS.pared_relieve = {
+  nombre: 'Panel de pared con relieve', grupo: 'pared',
+  desc: 'Lamas que forman uno o dos relieves redondeados (cúpula o duna) sobre la pared.',
+  params: [
+    { id: 'largo', nombre: 'Ancho del panel', min: 400, max: 6000, paso: 10, valor: 1600 },
+    { id: 'alto', nombre: 'Alto del panel', min: 300, max: 3000, paso: 10, valor: 1100 },
+    { id: 'fondo', nombre: 'Fondo mínimo', min: 10, max: 300, paso: 1, valor: 30 },
+    { id: 'relieve', nombre: 'Altura del relieve', min: 0, max: 500, paso: 1, valor: 160 },
+    { id: 'anchura', nombre: 'Anchura del relieve (0 a 1)', min: 0.1, max: 1, paso: 0.01, valor: 0.35 },
+    { id: 'cx', nombre: 'Posición a lo ancho (0 a 1)', min: 0, max: 1, paso: 0.01, valor: 0.4 },
+    { id: 'cy', nombre: 'Posición a lo alto (0 a 1)', min: 0, max: 1, paso: 0.01, valor: 0.55 },
+    { id: 'dos', nombre: 'Segundo relieve (0 = no, 1 = igual)', min: 0, max: 1, paso: 0.05, valor: 0.5 },
+  ],
+  generar(p) {
+    const g = (t, y, cx, cy) => Math.exp(-((t - cx) ** 2 + (y - cy) ** 2) / (p.anchura * p.anchura * 0.5));
+    p.ondasX = 2;
+    return generarPared(p, (t, y) => p.fondo + p.relieve * Math.min(1, g(t, y, p.cx, p.cy) + p.dos * g(t, y, 1 - p.cx * 0.6, 1 - p.cy)));
+  },
+};
+const grupoDe = id => PLANTILLAS[id].grupo || 'lineal';
+const grupoTipo = t => t === 'radial' ? 'radial' : t === 'pared' ? 'pared' : 'lineal';
+
 function paramsDefecto(id) { const o = {}; PLANTILLAS[id].params.forEach(q => o[q.id] = q.valor); return o; }
 // genera la forma desde la plantilla; si solo cambia el largo y hay retoques a mano, escala las claves
 function aplicarPlantilla(soloLargo) {
@@ -844,6 +1161,18 @@ function dibujarPerfil(ctx, V) {
   V.camino(ctx, k.pts); ctx.stroke(); ctx.setLineDash([]);
   // varillas
   const r = radioAgujero(), Vv = P.varillas;
+  // radial: tubo central y discos; pared: la pared y los rastreles
+  if (P.tipo === 'radial') {
+    const [xt] = V.aPantalla(radioTubo(), 0);
+    ctx.fillStyle = 'rgba(150,156,164,.25)'; ctx.fillRect(V.aPantalla(0, 0)[0], 0, xt - V.aPantalla(0, 0)[0], V.h);
+    ctx.fillStyle = '#5f6b78'; ctx.font = '11px system-ui'; ctx.fillText('tubo', xt + 4, 46);
+    R.discos.forEach(d => { const [a, y] = V.aPantalla(radioTubo(), d.v), [b] = V.aPantalla(d.rD, 0); ctx.fillStyle = 'rgba(95,107,120,.35)'; ctx.fillRect(a, y - grosor() / 2 * V.sc, b - a, grosor() * V.sc); ctx.fillStyle = '#5f6b78'; ctx.fillText(d.etq, b + 4, y + 4); });
+  }
+  if (P.tipo === 'pared') {
+    const [xp] = V.aPantalla(0, 0);
+    ctx.fillStyle = 'rgba(150,156,164,.28)'; ctx.fillRect(0, 0, xp, V.h); ctx.fillStyle = '#5f6b78'; ctx.font = '11px system-ui'; ctx.fillText('pared', Math.max(4, xp - 40), 46);
+    R.rastreles.forEach(rr => { const [a, y] = V.aPantalla(0, rr.v + P.pared.alto / 2), [b] = V.aPantalla(P.pared.grueso, 0); ctx.fillStyle = 'rgba(205,179,138,.6)'; ctx.fillRect(a, y, b - a, P.pared.alto * V.sc); });
+  }
   // retícula: posición de los largueros
   if (P.tipo === 'reticula') {
     const vistos = new Set();
@@ -855,7 +1184,7 @@ function dibujarPerfil(ctx, V) {
       ctx.fillStyle = ctx.strokeStyle; ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center'; ctx.fillText(letra(z.j), x, 58); ctx.textAlign = 'left';
     });
   }
-  if (P.tipo !== 'reticula') Vv.lista.forEach((p, i) => {
+  if (P.tipo === 'costillas') Vv.lista.forEach((p, i) => {
     const info = R.varillas[i], mal = info && (!info.usada || info.fallan.length), [x, y] = V.aPantalla(p[0], p[1]);
     const col = mal ? cssVar('--peligro') : '#5f6b78';
     ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
@@ -894,7 +1223,7 @@ function puntoCerca(mx, my) {
   return mejor;
 }
 function varillaCerca(mx, my) {
-  if (P.tipo === 'reticula') return -1;
+  if (P.tipo !== 'costillas') return -1;
   let mejor = -1, md = Infinity; const r = radioAgujero();
   P.varillas.lista.forEach((p, i) => { const [x, y] = VP.aPantalla(p[0], p[1]), d = Math.hypot(x - mx, y - my); if (d < Math.max(9, r * VP.sc + 4) && d < md) { md = d; mejor = i; } });
   return mejor;
@@ -1034,20 +1363,21 @@ function selCostilla(i, encuadrar) {
   const li = $('#listaCost').children[UI.costilla]; if (li) li.scrollIntoView({ block: 'nearest' });
 }
 // pieza seleccionada: costilla o larguero (retícula)
-const nPiezas = () => R.n + (R.largueros ? R.largueros.length : 0);
-const piezaSel = () => R ? (UI.costilla < R.n ? R.costillas[UI.costilla] : R.largueros[UI.costilla - R.n]) : null;
+const nPiezas = () => R.n + (R.otras ? R.otras.length : 0);
+const piezaSel = () => R ? (UI.costilla < R.n ? R.costillas[UI.costilla] : R.otras[UI.costilla - R.n]) : null;
 function encuadrarCostilla() { const c = piezaSel(); if (c && c.ok) VC.encuadrar(c.caja, 40); else VC.pintar(); }
 function refrescarCostilla() {
   const c = piezaSel(); if (!c) return;
-  $('#tipoPieza').textContent = c.z ? 'Larguero' : 'Costilla';
+  $('#tipoPieza').textContent = c.disco ? 'Disco' : c.z ? 'Larguero' : P.tipo === 'pared' ? 'Lama' : 'Costilla';
   $('#numCost').textContent = c.etq;
-  $('#infoCost').textContent = c.z ? `z = ${fmt(c.u)} mm · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm · ${c.ranuras.length} ranuras`
-    : `de ${R.n} · x = ${fmt(c.x)} mm · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm` + (c.ranuras.length ? ` · ${c.ranuras.length} ranuras` : '');
+  $('#infoCost').textContent = c.disco ? `a ${fmt(c.v)} mm de altura · Ø ${fmt(2 * c.rD)} mm · ${R.n} ranuras`
+    : c.z ? `z = ${fmt(c.u)} mm · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm · ${c.ranuras.length} ranuras`
+    : `de ${R.n} · ${P.tipo === 'radial' ? 'ángulo' : 'x'} = ${textoPos(c.x)} · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm` + (c.ranuras.length ? ` · ${c.ranuras.length} ${P.tipo === 'reticula' ? 'ranuras' : 'muescas'}` : '');
   $$('#listaCost li').forEach((li, i) => li.classList.toggle('sel', i === UI.costilla));
 }
 
 /* ===================== VISTA 3D ===================== */
-const G = { renderer: null, scene: null, cam: null, ctl: null, modelo: null, fantasma: null, costillas: [], largueros: [], varillas: [], separadores: [], tuercas: [], suelo: null, rejilla: null, luz: null, pend: false, cacheTex: {}, cacheMat: {} };
+const G = { renderer: null, scene: null, cam: null, ctl: null, modelo: null, fantasma: null, costillas: [], largueros: [], claves3d: [], varillas: [], separadores: [], tuercas: [], suelo: null, rejilla: null, luz: null, pend: false, cacheTex: {}, cacheMat: {} };
 
 function textura(clave, mm) {
   const ck = clave + ':' + mm; if (G.cacheTex[ck]) return G.cacheTex[ck];
@@ -1104,6 +1434,9 @@ function iniciar3D() {
     if (!abajo || Math.hypot(ev.clientX - abajo[0], ev.clientY - abajo[1]) > 4 || ev.button !== 0) return;
     const rc = cv.getBoundingClientRect(), ray = new T.Raycaster();
     ray.setFromCamera(new T.Vector2((ev.clientX - rc.left) / rc.width * 2 - 1, -(ev.clientY - rc.top) / rc.height * 2 + 1), G.cam);
+    ray.params.Line.threshold = Math.max(4, Math.max(...(G.dims || [500])) * 0.006);
+    const hk = (G.claves3d || []).length ? ray.intersectObjects(G.claves3d, false)[0] : null;
+    if (hk) { UI.clave = hk.object.userData.clave; UI.punto = -1; refrescarClaves(); VP.pintar(); construirClaves3D(); $('#estado').textContent = 'Perfil clave ' + (UI.clave + 1); return; }
     const hit = ray.intersectObjects([...G.costillas, ...G.largueros].filter(Boolean), false)[0];
     if (hit) selCostilla(hit.object.userData.i);
   });
@@ -1138,102 +1471,180 @@ function limpiar(obj) {
   });
 }
 
-// desplazamiento por la vista explosionada
-function xExpl(x) { const k = P.tipo === 'reticula' ? 0 : (P.vista.explosion || 0) * 1.4; return x + (x - P.largo / 2) * k; }
+// desplazamiento por la vista explosionada (en recta, curva y pared, a lo largo; en radial, hacia fuera)
+function xExpl(x) { const k = P.tipo === 'reticula' || P.tipo === 'radial' ? 0 : (P.vista.explosion || 0) * 1.4; return x + (x - P.largo / 2) * k; }
+function marcoExpl(x) {
+  const m = marcoEn(xExpl(x));
+  if (P.tipo === 'radial') { const d = (P.vista.explosion || 0) * (G.rmax || 200) * 0.8; m.O = [m.O[0] + m.Au[0] * d, 0, m.O[2] + m.Au[2] * d]; }
+  return m;
+}
+// coloca una malla extruida (forma en u, v; grosor centrado) con el marco m
+function ponerEnMarco(obj, m, dy = 0) {
+  const ae = ejeGrosor(m), M4 = new T.Matrix4();
+  M4.makeBasis(new T.Vector3(...m.Au), new T.Vector3(0, 1, 0), new T.Vector3(...ae)).setPosition(m.O[0], m.O[1] + dy, m.O[2]);
+  obj.matrixAutoUpdate = false; obj.matrix.copy(M4); obj.matrixWorldNeedsUpdate = true;
+}
+const V3 = a => new T.Vector3(a[0], a[1], a[2]);
+// cilindro de a a b (puntos 3D) con radio r
+function cilindroEntre(a, b, r, mat, lados = 18) {
+  const va = V3(a), vb = V3(b), d = vb.clone().sub(va), L = d.length();
+  const m = new T.Mesh(new T.CylinderGeometry(r, r, Math.max(0.1, L), lados), mat);
+  m.position.copy(va.clone().add(vb).multiplyScalar(0.5));
+  m.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), d.normalize()); m.castShadow = true;
+  return m;
+}
+function extruir(poly, huecos, e) {
+  const sh = new T.Shape(poly.map(p => new T.Vector2(p[0], p[1])));
+  (huecos || []).forEach(h => { const pa = new T.Path(); pa.absarc(h.x, h.y, h.r, 0, PI2, true); sh.holes.push(pa); });
+  const g = new T.ExtrudeGeometry(sh, { depth: e, bevelEnabled: false, curveSegments: 24 });
+  g.translate(0, 0, -e / 2); return g;
+}
 
 function construir3D() {
   if (!G.scene || !R) return;
-  limpiar(G.modelo); G.modelo.clear();
-  G.costillas = []; G.largueros = []; G.varillas = []; G.separadores = []; G.tuercas = [];
+  limpiar(G.modelo); G.modelo.clear(); G.modelo.position.set(0, 0, 0);
+  G.costillas = []; G.largueros = []; G.varillas = []; G.claves3d = [];
   const e = grosor(), mats = materialesTablero(), rh = radioAgujero(), V = P.varillas;
-  // centro del mueble en el fondo (u)
-  let u0 = Infinity, u1 = -Infinity, alto = 0;
-  R.costillas.forEach(c => { if (c.ok) { u0 = Math.min(u0, c.caja.x0); u1 = Math.max(u1, c.caja.x1); alto = Math.max(alto, c.caja.y1); } });
-  if (!isFinite(u0)) { u0 = 0; u1 = 1; }
-  G.uc = (u0 + u1) / 2; G.fondo = u1 - u0; G.alto = alto;
-  G.modelo.position.set(-P.largo / 2, 0, G.uc);
+  // medidas del mueble montado
+  const bb = new T.Box3(), cs = R.costillas.filter(c => c.ok);
+  cs.forEach(c => { const m = marcoEn(c.x); for (let k = 0; k < c.poly.length; k += 3) bb.expandByPoint(V3(puntoMarco(m, c.poly[k][0], c.poly[k][1]))); });
+  if (bb.isEmpty()) bb.set(new T.Vector3(-1, 0, -1), new T.Vector3(1, 1, 1));
+  const sz = bb.getSize(new T.Vector3());
+  G.dims = [sz.x, sz.z, sz.y]; G.alto = sz.y; G.fondo = sz.z; G.rmax = Math.max(sz.x, sz.z) / 2;
   // costillas
   R.costillas.forEach(c => {
     if (!c.ok) { G.costillas.push(null); return; }
-    const sh = new T.Shape(c.poly.map(p => new T.Vector2(p[0], p[1])));
-    c.agujeros.forEach(k => { const h = new T.Path(); h.absarc(V.lista[k][0], V.lista[k][1], rh, 0, PI2, true); sh.holes.push(h); });
-    const geo = new T.ExtrudeGeometry(sh, { depth: e, bevelEnabled: false, curveSegments: 24 });
-    const m = new T.Mesh(geo, mats);
-    m.rotation.y = Math.PI / 2; m.castShadow = m.receiveShadow = true;
+    const hs = c.agujeros.map(k => ({ x: V.lista[k][0], y: V.lista[k][1], r: rh }));
+    const m = new T.Mesh(extruir(c.poly, hs, e), mats); m.castShadow = m.receiveShadow = true;
     m.userData = { i: c.i, x: c.x };
     G.modelo.add(m); G.costillas.push(m);
   });
-  // retícula: largueros en el plano (x, v), con su grosor hacia el fondo
-  (R.largueros || []).forEach(z => {
+  // retícula: largueros en el plano (x, v)
+  R.largueros.forEach(z => {
     if (!z.ok) return;
-    const geo = new T.ExtrudeGeometry(new T.Shape(z.poly.map(p => new T.Vector2(p[0], p[1]))), { depth: e, bevelEnabled: false, curveSegments: 24 });
-    const m = new T.Mesh(geo, mats); m.castShadow = m.receiveShadow = true;
+    const m = new T.Mesh(extruir(z.poly, [], e), mats); m.castShadow = m.receiveShadow = true;
     m.userData = { i: z.i, u: z.u, z: true };
     G.modelo.add(m); G.largueros.push(m);
   });
-  // varillas, separadores y tuercas
-  const tv = VARILLA_TIPOS[V.tipo] || VARILLA_TIPOS.roscada;
-  const mVar = new T.MeshStandardMaterial({ color: tv.hex, metalness: tv.metal ? .85 : 0, roughness: tv.metal ? .35 : .7 });
-  const mMal = new T.MeshStandardMaterial({ color: '#d0453a', roughness: .5 });
-  const mSep = new T.MeshStandardMaterial({ color: tv.metal ? '#9ea3a8' : '#c9a36d', metalness: tv.metal ? .8 : 0, roughness: .4 });
-  const mTu = new T.MeshStandardMaterial({ color: '#8d9399', metalness: .9, roughness: .3 });
-  [mVar, mMal, mSep, mTu].forEach(m => m.userData.propio = true);
-  R.varillas.forEach(rv => {
-    if (!rv.usada) return;
-    const xa = R.costillas[rv.a].x - e / 2 - V.sobra, xb = R.costillas[rv.b].x + e / 2 + V.sobra;
-    const geo = new T.CylinderGeometry(V.diam / 2, V.diam / 2, xb - xa, 20);
-    const m = new T.Mesh(geo, rv.fallan.length ? mMal : mVar); m.userData.propio = false;
-    m.rotation.z = Math.PI / 2; m.castShadow = true;
-    m.userData = { xa, xb, v: rv.v, u: rv.u };
-    G.modelo.add(m); G.varillas.push(m);
-    if (V.tipo !== 'madera') for (const [x, lado] of [[R.costillas[rv.a].x - e / 2, -1], [R.costillas[rv.b].x + e / 2, 1]]) {
-      const t = new T.Mesh(new T.CylinderGeometry(V.diam * 0.95, V.diam * 0.95, V.diam * 0.8, 6), mTu);
-      t.rotation.z = Math.PI / 2; t.castShadow = true; t.userData = { x: x + lado * (V.diam * 0.4 + 1.5), v: rv.v, u: rv.u, lado };
-      G.modelo.add(t); G.tuercas.push(t);
-    }
-    if (V.separadores && R.hueco > 0.5) for (let i = rv.a; i < rv.b; i++) {
-      if (!rv.cabe[i] || !rv.cabe[i + 1]) continue;
-      const s = new T.Mesh(new T.CylinderGeometry(V.sepD / 2, V.sepD / 2, R.hueco, 20), mSep);
-      s.rotation.z = Math.PI / 2; s.castShadow = true; s.userData = { x: (R.costillas[i].x + R.costillas[i + 1].x) / 2, v: rv.v, u: rv.u };
-      G.modelo.add(s); G.separadores.push(s);
-    }
+  // radial: discos (horizontales) y tubo central
+  R.discos.forEach(d => {
+    const g = extruir(d.poly, d.huecos, e); g.rotateX(-Math.PI / 2);
+    const m = new T.Mesh(g, mats); m.castShadow = m.receiveShadow = true; m.userData = { i: d.i, disco: true, v: d.v };
+    G.modelo.add(m); G.largueros.push(m);
   });
+  const mMet = new T.MeshStandardMaterial({ color: '#b8bcc0', metalness: .85, roughness: .35 }); mMet.userData.propio = true;
+  if (P.tipo === 'radial' && R.tuboV) {
+    const t = cilindroEntre([0, R.tuboV[0] - 20, 0], [0, R.tuboV[1] + 20, 0], P.radial.tubo / 2, mMet, 28);
+    t.userData.extra = 'tubo'; G.modelo.add(t); G.varillas.push(t);
+  }
+  // pared: rastreles y la pared
+  if (P.tipo === 'pared') {
+    const mR = new T.MeshStandardMaterial({ color: '#cdb38a', roughness: .8 }); mR.userData.propio = true;
+    const x0 = R.costillas[0].x - e / 2 - 30, x1 = R.costillas[R.n - 1].x + e / 2 + 30, Pa = P.pared;
+    R.rastreles.forEach(r => {
+      const b = new T.Mesh(new T.BoxGeometry(x1 - x0, Pa.alto, Pa.grueso), mR);
+      b.position.set((x0 + x1) / 2 - P.largo / 2, r.v, Pa.grueso / 2); b.castShadow = true; b.userData.extra = 'rastrel'; G.modelo.add(b);
+    });
+    if (Pa.verPared) {
+      const mP = new T.MeshStandardMaterial({ color: '#e9e5de', roughness: .95 }); mP.userData.propio = true;
+      const w = new T.Mesh(new T.PlaneGeometry(Math.max(P.largo * 1.6, 2000), Math.max(G.alto * 1.5, 1500)), mP);
+      w.position.set(0, Math.max(G.alto * 1.5, 1500) / 2 - 1, -0.5); w.receiveShadow = true; w.userData.extra = 'pared'; G.modelo.add(w);
+    }
+  }
+  construirVarillas3D();
+  construirClaves3D();
   colocarExplosion();
   construirFantasma();
   resaltar3D();
   // luz y suelo a la medida
-  const tam = Math.max(P.largo, G.fondo, G.alto);
-  G.suelo.scale.set(tam * 4, tam * 4, 1);
+  const tam = Math.max(sz.x, sz.y, sz.z, 300);
+  G.suelo.scale.set(tam * 5, tam * 5, 1);
   const L = G.luz; L.position.set(-tam * 0.9, tam * 1.6, tam * 1.1); L.target.position.set(0, G.alto / 3, 0);
-  const sc = L.shadow.camera; sc.left = sc.bottom = -tam * 0.95; sc.right = sc.top = tam * 0.95; sc.near = 10; sc.far = tam * 5; sc.updateProjectionMatrix();
+  const sc = L.shadow.camera; sc.left = sc.bottom = -tam * 1.2; sc.right = sc.top = tam * 1.2; sc.near = 10; sc.far = tam * 6; sc.updateProjectionMatrix();
+  pedirRender();
+}
+// varillas, separadores y tuercas (siguen la planta, recta o curva)
+function construirVarillas3D() {
+  G.varillas.filter(m => !m.userData.extra).forEach(m => { G.modelo.remove(m); m.geometry.dispose(); });
+  G.varillas = G.varillas.filter(m => m.userData.extra);
+  if (P.tipo !== 'costillas') return;
+  const e = grosor(), V = P.varillas, tv = VARILLA_TIPOS[V.tipo] || VARILLA_TIPOS.roscada;
+  if (!G.matVar) {
+    G.matVar = new T.MeshStandardMaterial({ color: tv.hex, metalness: tv.metal ? .85 : 0, roughness: tv.metal ? .35 : .7 });
+    G.matMal = new T.MeshStandardMaterial({ color: '#d0453a', roughness: .5 });
+    G.matSep = new T.MeshStandardMaterial({ color: tv.metal ? '#9ea3a8' : '#c9a36d', metalness: tv.metal ? .8 : 0, roughness: .4 });
+    G.matTu = new T.MeshStandardMaterial({ color: '#8d9399', metalness: .9, roughness: .3 });
+  }
+  G.matVar.color.set(tv.hex); G.matVar.metalness = tv.metal ? .85 : 0;
+  const add = m => { m.userData.var = true; G.modelo.add(m); G.varillas.push(m); };
+  R.varillas.forEach(rv => {
+    if (!rv.usada) return;
+    const pts = [];
+    for (let i = rv.a; i <= rv.b; i++) pts.push(puntoMarco(marcoExpl(R.costillas[i].x), rv.u, rv.v));
+    const dirIni = ejeGrosor(marcoExpl(R.costillas[rv.a].x)), dirFin = ejeGrosor(marcoExpl(R.costillas[rv.b].x));
+    const sg = pts.length > 1 ? Math.sign((pts[1][0] - pts[0][0]) * dirIni[0] + (pts[1][2] - pts[0][2]) * dirIni[2]) || 1 : 1;
+    const ext = e / 2 + V.sobra, ini = pts[0].map((v, k) => v - sg * dirIni[k] * ext), fin = pts[pts.length - 1].map((v, k) => v + sg * dirFin[k] * ext);
+    const mat = rv.fallan.length ? G.matMal : G.matVar;
+    if (disposicion() === 'curva' && pts.length > 2) {
+      const curva = new T.CatmullRomCurve3([ini, ...pts, fin].map(V3));
+      const m = new T.Mesh(new T.TubeGeometry(curva, pts.length * 6, V.diam / 2, 12), mat); m.castShadow = true; add(m);
+    } else add(cilindroEntre(ini, fin, V.diam / 2, mat, 20));
+    if (V.tipo !== 'madera') {
+      const tu = (p, d) => add(cilindroEntre(p.map((v, k) => v - d[k] * (V.diam * 0.4)), p.map((v, k) => v + d[k] * (V.diam * 0.4)), V.diam * 0.95, G.matTu, 6));
+      tu(pts[0].map((v, k) => v - sg * dirIni[k] * (e / 2 + V.diam * 0.45)), dirIni);
+      tu(pts[pts.length - 1].map((v, k) => v + sg * dirFin[k] * (e / 2 + V.diam * 0.45)), dirFin);
+    }
+    if (V.separadores && R.hueco > 0.5) for (let i = 0; i + 1 < pts.length; i++) {
+      if (!rv.cabe[rv.a + i] || !rv.cabe[rv.a + i + 1]) continue;
+      const a = V3(pts[i]), b = V3(pts[i + 1]), d = b.clone().sub(a), L = d.length(); if (L <= e + 0.5) continue;
+      d.normalize();
+      add(cilindroEntre(a.clone().addScaledVector(d, e / 2).toArray(), b.clone().addScaledVector(d, -e / 2).toArray(), V.sepD / 2, G.matSep, 20));
+    }
+  });
+  G.varillas.forEach(m => m.visible = P.vista.varillas || !!m.userData.extra);
+}
+// perfiles clave en el 3D: líneas que se pueden pinchar para editarlas
+function construirClaves3D() {
+  (G.claves3d || []).forEach(l => { G.modelo.remove(l); l.geometry.dispose(); l.material.dispose(); });
+  G.claves3d = [];
+  if (!P.vista.claves) return;
+  const C = clavesOrdenadas(), acento = cssVar('--acento') || '#1f6fd1';
+  C.forEach((k, i) => {
+    if (P.tipo === 'radial' && k.x >= 359.999 && C.length > 1) return;     // la de 360° es la misma que la de 0°
+    const poly = contornoDe(k.pts); if (poly.length < 3) return;
+    const m = marcoExpl(k.x), sel = i === UI.clave, ae = ejeGrosor(m), off = grosor() / 2 + 0.6;
+    const pts = [];
+    for (const lado of sel ? [-1, 1] : [1]) poly.concat([poly[0]]).forEach(p => { const q = puntoMarco(m, p[0], p[1]); pts.push(new T.Vector3(q[0] + ae[0] * off * lado, q[1], q[2] + ae[2] * off * lado)); });
+    const g = new T.BufferGeometry().setFromPoints(pts);
+    const l = new T.Line(g, new T.LineBasicMaterial({ color: sel ? '#ff7a1a' : acento, transparent: true, opacity: sel ? 1 : (P.tipo === 'radial' ? .22 : .45), depthTest: false }));
+    l.renderOrder = 10; l.userData = { clave: i };
+    G.modelo.add(l); G.claves3d.push(l);
+  });
   pedirRender();
 }
 function colocarExplosion() {
-  const e = grosor(), k = (P.vista.explosion || 0) * 1.4;
-  G.costillas.forEach(m => { if (m) m.position.set(P.tipo === 'reticula' ? m.userData.x - e / 2 : xExpl(m.userData.x) - e / 2, 0, 0); });
-  // en la retícula, la explosión levanta los largueros (así se ve cómo encajan)
-  G.largueros.forEach(m => m.position.set(0, (P.vista.explosion || 0) * (G.alto || 400) * 1.1, -(m.userData.u + e / 2)));
-  G.varillas.forEach(m => {
-    const d = m.userData, xa = xExpl(d.xa + P.varillas.sobra) - P.varillas.sobra, xb = xExpl(d.xb - P.varillas.sobra) + P.varillas.sobra;
-    m.scale.y = (xb - xa) / (d.xb - d.xa); m.position.set((xa + xb) / 2, d.v, -d.u);
+  const e = grosor(), ex = P.vista.explosion || 0;
+  G.costillas.forEach(m => { if (m) ponerEnMarco(m, marcoExpl(m.userData.x)); });
+  G.largueros.forEach(m => {
+    if (m.userData.disco) { m.position.set(0, m.userData.v, 0); return; }
+    // en la retícula, la explosión levanta los largueros (así se ve cómo encajan)
+    m.position.set(-P.largo / 2, ex * (G.alto || 400) * 1.1, -(m.userData.u - (R.uc || 0)));
   });
-  G.tuercas.forEach(m => { const d = m.userData; m.position.set(xExpl(d.x - d.lado * (P.varillas.diam * 0.4 + 1.5)) + d.lado * (P.varillas.diam * 0.4 + 1.5), d.v, -d.u); });
-  G.separadores.forEach(m => { const d = m.userData; m.position.set(xExpl(d.x), d.v, -d.u); });
-  const ver = P.vista.varillas;
-  [...G.varillas, ...G.tuercas, ...G.separadores].forEach(m => m.visible = ver);
+  construirVarillas3D();
+  construirClaves3D();
   pedirRender();
 }
 function construirFantasma() {
   if (G.fantasma) { G.modelo.remove(G.fantasma); G.fantasma.geometry.dispose(); G.fantasma.material.dispose(); G.fantasma = null; }
   if (!P.vista.fantasma) return;
-  const N = 64, anillos = [];
+  const N = P.tipo === 'radial' ? 72 : 64, anillos = [], X = P.tipo === 'radial' ? 360 : P.largo;
   for (let i = 0; i <= N; i++) {
-    const x = P.largo * i / N; let c = curvaCerrada(perfilEn(x), P.esquinas);
-    c = c.map(p => [p[0], clamp(p[1], P.costillas.base ? 0 : -1e9, P.costillas.tope ? P.costillas.topeAlt : 1e9)]);
-    anillos.push({ x, c });
+    const x = X * i / N; let c = curvaCerrada(perfilEn(x), P.esquinas);
+    c = c.map(p => [P.tipo === 'radial' ? Math.max(p[0], radioTubo()) : p[0], clamp(p[1], P.costillas.base ? 0 : -1e9, P.costillas.tope ? P.costillas.topeAlt : 1e9)]);
+    anillos.push({ m: marcoExpl(x), c });
   }
   const M = anillos[0].c.length, pos = [], idx = [];
-  anillos.forEach(a => a.c.forEach(p => pos.push(xExpl(a.x), p[1], -p[0])));
+  anillos.forEach(a => a.c.forEach(p => pos.push(...puntoMarco(a.m, p[0], p[1]))));
   for (let i = 0; i < N; i++) for (let j = 0; j < M; j++) {
     const a = i * M + j, b = i * M + (j + 1) % M, c = (i + 1) * M + j, d = (i + 1) * M + (j + 1) % M;
     idx.push(a, c, b, b, c, d);
@@ -1253,15 +1664,16 @@ function resaltar3D() {
   pedirRender();
 }
 function camara(tipo) {
-  // distancia para que quepa la esfera que envuelve el mueble, con el campo de visión más estrecho
-  const ex = P.vista.explosion || 0, ret = P.tipo === 'reticula';
-  const L = P.largo * (ret ? 1 : 1 + 1.4 * ex), F = G.fondo || 500, H = (G.alto || 500) * (ret ? 1 + 1.1 * ex : 1), y = H * 0.45;
-  const radio = 0.5 * Math.sqrt(L * L + F * F + H * H);
+  // encuadra la caja de todo lo que se ve (con la explosión incluida)
+  const bb = new T.Box3();
+  G.modelo.traverse(o => { if (o.isMesh && o.visible && o !== G.fantasma && o.userData.extra !== 'pared') { o.geometry.computeBoundingBox(); const b = o.geometry.boundingBox.clone(); o.updateMatrixWorld(true); b.applyMatrix4(o.matrixWorld); bb.union(b); } });
+  if (bb.isEmpty()) bb.set(new T.Vector3(-500, 0, -500), new T.Vector3(500, 500, 500));
+  const c = bb.getCenter(new T.Vector3()), radio = bb.getSize(new T.Vector3()).length() / 2;
   const fv = G.cam.fov * Math.PI / 180, fh = 2 * Math.atan(Math.tan(fv / 2) * G.cam.aspect);
   const d = radio / Math.sin(Math.min(fv, fh) / 2) * 1.04;
   const dir = { tres4: [-0.55, 0.42, 0.72], frente: [0, 0.18, 1], lado: [-1, 0.18, 0.0001], arriba: [0, 1, 0.0001] }[tipo === 'encuadrar' ? 'tres4' : tipo];
   const n = Math.hypot(...dir);
-  G.cam.position.set(dir[0] / n * d, y + dir[1] / n * d, dir[2] / n * d); G.ctl.target.set(0, y, 0); G.ctl.update(); pedirRender();
+  G.cam.position.set(c.x + dir[0] / n * d, c.y + dir[1] / n * d, c.z + dir[2] / n * d); G.ctl.target.copy(c); G.ctl.update(); pedirRender();
 }
 function imagenPNG() {
   const r = G.renderer, pr = r.getPixelRatio();
@@ -1328,12 +1740,11 @@ function encuadrarSiHaceFalta() { encuadrarPerfil(); encuadrarCostilla(); }
 
 function iniciarPanel() {
   const sp = $('#sPlantilla');
-  Object.entries(PLANTILLAS).forEach(([id, pl]) => sp.add(new Option(pl.nombre, id)));
   sp.onchange = () => {
     if (P.editado && !confirm('Se perderán los retoques hechos a mano en los perfiles. ¿Cambiar de plantilla?')) { sp.value = P.plantilla; return; }
     P.plantilla = sp.value; P.params = paramsDefecto(sp.value); P.nombre = PLANTILLAS[sp.value].nombre;
     aplicarPlantilla(); UI.clave = 0;
-    autoVarillas(P.varillas.autoN);
+    if (P.tipo === 'costillas') { R = calcular(); autoVarillas(P.varillas.autoN); }
     construirParams(); cambio('Plantilla: ' + PLANTILLAS[sp.value].nombre);
     encuadrarSiHaceFalta(); camara('tres4');
   };
@@ -1380,12 +1791,45 @@ function iniciarPanel() {
   $('#bVarQuitar').onclick = () => { if (!V().lista.length) return; V().lista = []; UI.varilla = -1; cambio('Varillas quitadas'); };
   // tipo de mueble y retícula
   enlazar('#sTipo', () => {
-    P.tipo = $('#sTipo').value;
-    if (P.tipo === 'reticula' && P.costillas.modo === 'separacion' && P.costillas.separacion < 3 * grosor()) { P.costillas.separacion = Math.round(Math.max(100, 6 * grosor())); ponerControles(); }
-    if (P.tipo !== 'reticula' && !P.varillas.lista.length) { R = calcular(); autoVarillas(P.varillas.autoN); }
-    UI.costilla = Math.min(UI.costilla, R.n - 1);
-    cambio(P.tipo === 'reticula' ? 'Retícula entrelazada' : 'Costillas con varillas');
+    const nuevo = $('#sTipo').value, gN = grupoTipo(nuevo);
+    if (gN !== grupoDe(P.plantilla) && P.editado && !confirm('Este tipo de mueble usa otras plantillas: se perderán los retoques de los perfiles. ¿Seguir?')) { $('#sTipo').value = P.tipo; return; }
+    P.tipo = nuevo;
+    if (gN !== grupoDe(P.plantilla)) {
+      const id = Object.keys(PLANTILLAS).find(k => grupoDe(k) === gN);
+      P.plantilla = id; P.params = paramsDefecto(id); P.nombre = PLANTILLAS[id].nombre; aplicarPlantilla(); UI.clave = 0;
+    }
+    if (P.tipo === 'radial') { P.costillas.modo = 'numero'; P.costillas.numero = clamp(P.costillas.numero, 3, 48); if (P.costillas.numero > 24) P.costillas.numero = 12;
+      if (grosor() > 10 && confirm('Las piezas radiales (lámparas) suelen hacerse con tablero fino. ¿Pasar a contrachapado de 6 mm?')) P.costillas.grosor = 6;
+      const tMin = Math.ceil(P.costillas.numero * (grosor() + 1) / Math.PI); if (P.radial.tubo < tMin) P.radial.tubo = tMin; }
+    if (P.tipo === 'reticula' && P.costillas.modo === 'separacion' && P.costillas.separacion < 3 * grosor()) P.costillas.separacion = Math.round(Math.max(100, 6 * grosor()));
+    if (P.tipo !== 'radial' && P.costillas.modo === 'numero' && grupoDe(P.plantilla) !== 'radial') P.costillas.modo = 'separacion';
+    R = calcular();
+    if (P.tipo === 'costillas' && !P.varillas.lista.length) autoVarillas(P.varillas.autoN);
+    UI.costilla = 0; ponerControles();
+    cambio({ costillas: 'Costillas con varillas', reticula: 'Retícula entrelazada', radial: 'Rebanadas radiales', pared: 'Panel de pared' }[P.tipo]);
+    encuadrarSiHaceFalta(); camara('tres4');
   });
+  // planta curva
+  enlazar('#plForma', () => { P.planta.forma = $('#plForma').value; mostrarSecciones(); cambio('Planta ' + $('#plForma').selectedOptions[0].text.toLowerCase()); camara('tres4'); });
+  enlazar('#plRadio', () => { P.planta.radio = Math.max(150, +$('#plRadio').value || 2500); cambio(); });
+  enlazar('#plSentido', () => { P.planta.sentido = +$('#plSentido').value; cambio(); });
+  enlazar('#plAmp', () => { P.planta.amplitud = Math.max(0, +$('#plAmp').value || 0); cambio(); });
+  enlazar('#plOndas', () => { P.planta.ondas = clamp(+$('#plOndas').value || 1, 0.5, 4); cambio(); });
+  // radial
+  enlazar('#raNum', () => { P.costillas.numero = clamp(Math.round(+$('#raNum').value || 12), 3, 120); cambio(P.costillas.numero + ' costillas'); });
+  enlazar('#raTubo', () => { P.radial.tubo = Math.max(4, +$('#raTubo').value || 20); cambio(); });
+  enlazar('#raHolTubo', () => { P.radial.holguraTubo = Math.max(0, +$('#raHolTubo').value || 0); cambio(); });
+  enlazar('#raDiscos', () => { P.radial.discos = clamp(Math.round(+$('#raDiscos').value || 0), 0, 6); cambio(); });
+  enlazar('#raRDisco', () => { P.radial.rDisco = Math.max(0, +$('#raRDisco').value || 0); cambio(); });
+  enlazar('#raHolgura', () => { P.radial.holgura = clamp(+$('#raHolgura').value || 0, 0, 3); cambio(); });
+  // pared
+  enlazar('#paNum', () => { P.pared.rastreles = clamp(Math.round(+$('#paNum').value || 0), 0, 10); cambio(); });
+  enlazar('#paAlto', () => { P.pared.alto = Math.max(10, +$('#paAlto').value || 45); cambio(); });
+  enlazar('#paGrueso', () => { P.pared.grueso = Math.max(5, +$('#paGrueso').value || 20); cambio(); });
+  enlazar('#paMargen', () => { P.pared.margen = Math.max(0, +$('#paMargen').value || 0); cambio(); });
+  enlazar('#paHolgura', () => { P.pared.holgura = clamp(+$('#paHolgura').value || 0, 0, 3); cambio(); });
+  enlazar('#paVer', () => { P.pared.verPared = $('#paVer').checked; construir3D(); });
+  enlazar('#cClaves3d', () => { P.vista.claves = $('#cClaves3d').checked; construirClaves3D(); });
   enlazar('#rNum', () => { P.reticula.num = clamp(Math.round(+$('#rNum').value || 1), 1, 20); cambio(P.reticula.num + ' largueros'); });
   enlazar('#rMargen', () => { P.reticula.margen = Math.max(0, +$('#rMargen').value || 0); cambio(); });
   enlazar('#rVuelo', () => { P.reticula.vuelo = Math.max(0, +$('#rVuelo').value || 0); cambio(); });
@@ -1434,8 +1878,30 @@ function iniciarPanel() {
 }
 
 // pone los controles con los valores del proyecto
+// plantillas del grupo del tipo de mueble
+function llenarPlantillas() {
+  const sp = $('#sPlantilla'), g = grupoTipo(P.tipo); sp.innerHTML = '';
+  Object.entries(PLANTILLAS).forEach(([id, pl]) => { if ((pl.grupo || 'lineal') === g) sp.add(new Option(pl.nombre, id)); });
+  sp.value = P.plantilla;
+}
+// enseña los apartados de cada tipo de mueble
+function mostrarSecciones() {
+  const t = P.tipo;
+  $('#secVarillas').classList.toggle('oculto', t !== 'costillas');
+  $('#secReticula').classList.toggle('oculto', t !== 'reticula');
+  $('#secPlanta').classList.toggle('oculto', t !== 'costillas');
+  $('#secRadial').classList.toggle('oculto', t !== 'radial');
+  $('#secPared').classList.toggle('oculto', t !== 'pared');
+  $$('.filaArco').forEach(f => f.classList.toggle('oculto', P.planta.forma !== 'arco'));
+  $$('.filaS').forEach(f => f.classList.toggle('oculto', P.planta.forma !== 's'));
+  const rad = t === 'radial';
+  $('#cModo').closest('label').classList.toggle('oculto', rad);
+  $('#filaSep').classList.toggle('oculto', rad || P.costillas.modo !== 'separacion');
+  $('#filaNum').classList.toggle('oculto', rad || P.costillas.modo !== 'numero');
+  $('#kPosTit').textContent = rad ? 'Posición (°)' : 'Posición (mm)';
+}
 function ponerControles() {
-  $('#sPlantilla').value = P.plantilla;
+  llenarPlantillas();
   const C = P.costillas, V = P.varillas;
   const op = [...$('#cGrosor').options].map(o => o.value);
   if (op.includes(String(C.grosor))) { $('#cGrosor').value = String(C.grosor); $('#filaGrosorOtro').classList.add('oculto'); }
@@ -1449,6 +1915,11 @@ function ponerControles() {
   $('#filaSepD').classList.toggle('oculto', !V.separadores);
   $('#kInterp').value = P.interp;
   $('#sTipo').value = P.tipo; const Rt = P.reticula; $('#rNum').value = Rt.num; $('#rMargen').value = Rt.margen; $('#rVuelo').value = Rt.vuelo; $('#rHolgura').value = Rt.holgura; $('#rArriba').value = Rt.xArriba !== false ? '1' : '0';
+  const Pl = P.planta; $('#plForma').value = Pl.forma; $('#plRadio').value = Pl.radio; $('#plSentido').value = String(Pl.sentido === -1 ? -1 : 1); $('#plAmp').value = Pl.amplitud; $('#plOndas').value = Pl.ondas;
+  const Ra = P.radial; $('#raNum').value = P.costillas.numero; $('#raTubo').value = Ra.tubo; $('#raHolTubo').value = Ra.holguraTubo; $('#raDiscos').value = Ra.discos; $('#raRDisco').value = Ra.rDisco; $('#raHolgura').value = Ra.holgura;
+  const Pa = P.pared; $('#paNum').value = Pa.rastreles; $('#paAlto').value = Pa.alto; $('#paGrueso').value = Pa.grueso; $('#paMargen').value = Pa.margen; $('#paHolgura').value = Pa.holgura; $('#paVer').checked = Pa.verPared;
+  $('#cClaves3d').checked = P.vista.claves !== false;
+  mostrarSecciones();
   const M = P.maqueta; $('#mActiva').checked = M.activa; $('#mEscala').value = String(M.escala); $('#mGrosor').value = M.grosor; $('#mDiam').value = M.diam; $('#mHolgura').value = M.holgura;
   $('#rExplosion').value = P.vista.explosion; $('#cFantasma').checked = P.vista.fantasma; $('#cVarillas3d').checked = P.vista.varillas; $('#cResalta').checked = P.vista.resalta;
   construirParams();
@@ -1460,13 +1931,14 @@ function refrescarClaves() {
   C.forEach((k, i) => s.add(new Option(`Perfil clave ${i + 1}`, i)));
   s.value = UI.clave;
   const k = C[UI.clave];
-  $('#infoClave').textContent = `en x = ${fmt(k.x)} mm (${fmt(k.x / P.largo * 100)} %)`;
+  $('#infoClave').textContent = P.tipo === 'radial' ? `a ${fmt(k.x, 1)}°` : `en x = ${fmt(k.x)} mm (${fmt(k.x / P.largo * 100)} %)`;
+  if (G.modelo) construirClaves3D();
   $('#kPos').value = k.x;
   $('#nClaves').textContent = C.length;
   const ul = $('#listaClaves'); ul.innerHTML = '';
   C.forEach((o, i) => {
     const li = document.createElement('li'); li.className = i === UI.clave ? 'sel' : '';
-    li.innerHTML = `<span class="icono">◆</span><span class="nom">Perfil clave ${i + 1}</span><span class="pos">x ${fmt(o.x)} mm</span>`;
+    li.innerHTML = `<span class="icono">◆</span><span class="nom">Perfil clave ${i + 1}</span><span class="pos">${P.tipo === 'radial' ? '' : 'x '}${textoPos(o.x)}</span>`;
     li.onclick = () => { UI.clave = i; UI.punto = -1; refrescarClaves(); VP.pintar(); };
     ul.appendChild(li);
   });
@@ -1475,17 +1947,19 @@ function refrescarClaves() {
 
 function refrescarListas() {
   // resumen del reparto
-  $('#resCost').innerHTML = `<b>${R.n}</b> costillas · separación <b>${fmt(R.sep, 1)}</b> mm · hueco <b>${fmt(Math.max(0, R.hueco), 1)}</b> mm`;
+  $('#resCost').innerHTML = P.tipo === 'radial' ? `<b>${R.n}</b> costillas cada <b>${fmt(R.sep, 1)}°</b> · junto al tubo quedan <b>${fmt(Math.max(0, R.hueco), 1)}</b> mm entre ellas`
+    : `<b>${R.n}</b> ${P.tipo === 'pared' ? 'lamas' : 'costillas'} · separación <b>${fmt(R.sep, 1)}</b> mm · hueco <b>${fmt(Math.max(0, R.hueco), 1)}</b> mm`;
   // costillas y largueros
   const ret = P.tipo === 'reticula';
-  $('#nCost').textContent = R.n + (ret ? ' + ' + R.largueros.length : '');
+  $('#nCost').textContent = R.n + (R.otras.length ? ' + ' + R.otras.length : '');
   const malas = new Set(); R.avisos.forEach(a => { if (a.tipo === 'error') R.varillas.forEach(v => v.fallan.forEach(i => malas.add(i))); });
-  if (!ret) R.costillas.forEach(c => { if (!c.ok || (P.varillas.lista.length && c.nVar === 0)) malas.add(c.i); });
+  if (P.tipo === 'costillas') R.costillas.forEach(c => { if (!c.ok || (P.varillas.lista.length && c.nVar === 0)) malas.add(c.i); });
+  else if (!ret) { R.costillas.forEach(c => { if (!c.ok) malas.add(c.i); }); (R.ranurasMal || []).forEach(p => malas.add(p.i)); (R.discosMal || []).forEach(d => malas.add(d.i)); (R.rastrelesMal || []).forEach(i => malas.add(i)); }
   else { R.costillas.forEach(c => { if (!c.ok || !c.ranuras.length) malas.add(c.i); }); (R.ranurasMal || []).forEach(p => malas.add(p.i)); }
   const ul = $('#listaCost'); ul.innerHTML = '';
-  [...R.costillas, ...R.largueros].forEach(c => {
+  [...R.costillas, ...R.otras].forEach(c => {
     const li = document.createElement('li'); li.className = c.i === UI.costilla ? 'sel' : '';
-    li.innerHTML = `<span class="icono">${malas.has(c.i) ? '<span class="mal">!</span>' : c.z ? '▬' : '▮'}</span><span class="nom">${c.nombre}</span><span class="med">${c.ok ? fmt(c.caja.w) + ' × ' + fmt(c.caja.h) : 'vacía'}</span>`;
+    li.innerHTML = `<span class="icono">${malas.has(c.i) ? '<span class="mal">!</span>' : c.disco ? '◎' : c.z ? '▬' : '▮'}</span><span class="nom">${c.nombre}</span><span class="med">${c.ok ? fmt(c.caja.w) + ' × ' + fmt(c.caja.h) : 'vacía'}</span>`;
     li.onclick = () => selCostilla(c.i);
     ul.appendChild(li);
   });
@@ -1500,20 +1974,21 @@ function refrescarListas() {
   // resumen (siempre a tamaño real)
   const cm = calcularCompra(), largoV = cm.varillas.reduce((a, v) => a + v.largo, 0);
   $('#resumen').innerHTML = `<table>
-    <tr><td>Medidas totales</td><td>${fmt(P.largo)} × ${fmt(G.fondo || 0)} × ${fmt(G.alto || 0)} mm</td></tr>
-    <tr><td>Costillas</td><td>${R.n} de ${fmt(grosor(), 1)} mm</td></tr>
+    <tr><td>Medidas totales</td><td>${(G.dims || [0, 0, 0]).map(v => fmt(v)).join(' × ')} mm</td></tr>
+    <tr><td>${P.tipo === 'pared' ? 'Lamas' : 'Costillas'}</td><td>${R.n} de ${fmt(grosor(), 1)} mm</td></tr>
     <tr><td>Superficie de tablero</td><td>${fmt(cm.area / 1e6, 2)} m²</td></tr>
     <tr><td>Tableros ${fmt(cm.tablero[0])}×${fmt(cm.tablero[1])}</td><td>${cm.nTableros}</td></tr>
-    ${ret ? `<tr><td>Largueros</td><td>${R.largueros.length} de ${fmt(grosor(), 1)} mm</td></tr>
+    ${P.tipo === 'radial' ? `<tr><td>Tubo central</td><td>Ø ${fmt(P.radial.tubo)} mm</td></tr><tr><td>Discos de unión</td><td>${R.discos.length}</td></tr>`
+    : P.tipo === 'pared' ? `<tr><td>Rastreles ${fmt(P.pared.alto)} × ${fmt(P.pared.grueso)}</td><td>${R.rastreles.length} de ${fmt(P.largo)} mm</td></tr>`
+    : ret ? `<tr><td>Largueros</td><td>${R.largueros.length} de ${fmt(grosor(), 1)} mm</td></tr>
     <tr><td>Cruces a media madera</td><td>${R.cruces.length}</td></tr>
     <tr><td>Ancho de las ranuras</td><td>${fmt(grosor() + P.reticula.holgura, 2)} mm</td></tr>` : `
     <tr><td>${esc(VARILLA_TIPOS[P.varillas.tipo].nombre)} Ø${P.varillas.diam}</td><td>${cm.varillas.length} · ${fmt(largoV)} mm</td></tr>
-    ${cm.nSep ? `<tr><td>Separadores Ø${P.varillas.sepD} × ${fmt(cm.hueco, 1)}</td><td>${cm.nSep}</td></tr>` : ''}
+    ${cm.nSep ? `<tr><td>Separadores Ø${P.varillas.sepD} × ${cm.sepMax - cm.sepMin > 0.2 ? fmt(cm.sepMin) + '–' + fmt(cm.sepMax) : fmt(cm.sepMin, 1)}</td><td>${cm.nSep}</td></tr>` : ''}
     ${cm.nTuercas ? `<tr><td>Tuercas y arandelas M${P.varillas.diam}</td><td>${cm.nTuercas}</td></tr>` : ''}
     <tr><td>Broca para los agujeros</td><td>Ø ${fmt(P.varillas.diam + P.varillas.holgura, 1)} mm</td></tr>`}
   </table>`;
-  $('#secVarillas').classList.toggle('oculto', ret);
-  $('#secReticula').classList.toggle('oculto', !ret);
+  mostrarSecciones();
   if (ret) { const mz = R.largueros.reduce((m, z) => Math.max(m, z.caja.w), 0); $('#resRet').innerHTML = `<b>${R.largueros.length}</b> largueros (hasta ${fmt(mz)} mm de largo) · <b>${R.cruces.length}</b> cruces · ranura de <b>${fmt(grosor() + P.reticula.holgura, 2)}</b> mm`; }
   // maqueta
   const M = P.maqueta;
@@ -1522,7 +1997,7 @@ function refrescarListas() {
   $('#bFabricar').innerHTML = '<span>🪚</span><span class="txt"> Fabricar</span>' + (M.activa ? '<span class="barra-maq">1:' + M.escala + '</span>' : '');
   if (M.activa) {
     const cf = calcularCompraFab(), mayor = R.costillas.reduce((m, c) => c.ok && c.caja.w * c.caja.h > m.w * m.h ? c.caja : m, { w: 0, h: 0 }), k = 1 / M.escala;
-    $('#resMaq').innerHTML = `Mueble de <b>${fmt(P.largo * k)} × ${fmt((G.fondo || 0) * k)} × ${fmt((G.alto || 0) * k)}</b> mm · separación <b>${fmt(cf.sep, 1)}</b> mm · hueco <b>${fmt(Math.max(0, cf.hueco), 1)}</b> mm · costilla mayor ${fmt(mayor.w * k)} × ${fmt(mayor.h * k)} mm · <b>${cf.nTableros}</b> tablero${cf.nTableros === 1 ? '' : 's'} de ${fmt(cf.tablero[0])} × ${fmt(cf.tablero[1])}`;
+    $('#resMaq').innerHTML = `Mueble de <b>${(G.dims || [0, 0, 0]).map(v => fmt(v * k)).join(' × ')}</b> mm · ` + (P.tipo === 'radial' ? '' : `separación <b>${fmt(cf.sep, 1)}</b> mm · hueco <b>${fmt(Math.max(0, cf.hueco), 1)}</b> mm · `) + ` costilla mayor ${fmt(mayor.w * k)} × ${fmt(mayor.h * k)} mm · <b>${cf.nTableros}</b> tablero${cf.nTableros === 1 ? '' : 's'} de ${fmt(cf.tablero[0])} × ${fmt(cf.tablero[1])}`;
   }
   $('#version').textContent = 'v' + VERSION;
   document.title = (P.nombre ? P.nombre + ' — ' : '') + 'Made-rebanadas';
@@ -1560,16 +2035,18 @@ const diamVarFab = () => enMaqueta() ? P.maqueta.diam : P.varillas.diam;
 const textoEscala = () => enMaqueta() ? 'maqueta 1:' + P.maqueta.escala : 'tamaño real';
 // medidas de una costilla tal y como se fabrica (a escala si es maqueta)
 // todas las piezas que se cortan: costillas y, en la retícula, largueros
-const piezasFab = () => [...R.costillas, ...(R.largueros || [])].filter(c => c.ok);
-const holguraRanuraFab = () => enMaqueta() ? P.maqueta.holgura : P.reticula.holgura;
+const piezasFab = () => [...R.costillas, ...(R.otras || [])].filter(c => c.ok);
+const holguraRanuraFab = () => enMaqueta() ? P.maqueta.holgura : P.tipo === 'radial' ? P.radial.holgura : P.reticula.holgura;
 function geoFab(c) {
   const k = escalaFab();
   // las ranuras se rehacen con el grosor de fabricación (el de la maqueta, si lo es)
-  const base = c.ranuras && c.ranuras.length ? ranurar(c.base, c.ranuras, (grosorFab() + holguraRanuraFab()) / k).poly : c.poly;
+  const wF = (grosorFab() + holguraRanuraFab()) / k;
+  const base = c.generar ? c.generar(wF) : c.ranuras && c.ranuras.length ? ranurar(c.base, c.ranuras, wF).poly : c.poly;
   const poly = base.map(p => [p[0] * k, p[1] * k]);
   return {
     c, poly, caja: cajaDe(poly), r: radioFab(), area: Math.abs(c.area) * k * k,
-    agujeros: c.agujeros.map(j => [P.varillas.lista[j][0] * k, P.varillas.lista[j][1] * k]),
+    // agujeros [x, y, radio]: los de las varillas y los propios de la pieza (el tubo en los discos)
+    agujeros: c.agujeros.map(j => [P.varillas.lista[j][0] * k, P.varillas.lista[j][1] * k, radioFab()]).concat((c.huecos || []).map(h => [h.x * k, h.y * k, h.r * k])),
     etiqueta: puntoEtiqueta(c).map(v => v * k),
   };
 }
@@ -1687,7 +2164,7 @@ function dibujarTableros(ctx, col, f, Wc, opciones = {}) {
       ctx.beginPath();
       pz.g.poly.forEach((p, i) => { const [x, y] = P2(...aTablero(pz, p)); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
       ctx.closePath(); ctx.fillStyle = 'rgba(168,116,63,.35)'; ctx.fill(); ctx.strokeStyle = '#7a5226'; ctx.stroke();
-      pz.g.agujeros.forEach(q => { const [x, y] = P2(...aTablero(pz, q)); ctx.beginPath(); ctx.arc(x, y, Math.max(1.2, pz.g.r * sc), 0, PI2); ctx.strokeStyle = '#c0392b'; ctx.stroke(); });
+      pz.g.agujeros.forEach(q => { const [x, y] = P2(...aTablero(pz, q)); ctx.beginPath(); ctx.arc(x, y, Math.max(1.2, q[2] * sc), 0, PI2); ctx.strokeStyle = '#c0392b'; ctx.stroke(); });
       if (f.numeros) {
         const [x, y] = P2(...aTablero(pz, pz.g.etiqueta));
         ctx.fillStyle = '#1f4f8a'; ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(pz.c.etq, x, y);
@@ -1733,7 +2210,7 @@ function dxf() {
     if (f.modo !== 'fila') poli('TABLERO', [[ox, 0], [ox + f.ancho, 0], [ox + f.ancho, f.alto], [ox, f.alto]]);
     t.piezas.forEach(pz => {
       poli('CORTE', simplificaCerrado(pz.g.poly, 0.05).map(p => { const q = aTablero(pz, p); return [ox + q[0], q[1]]; }));
-      pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); g(0, 'CIRCLE'); g(8, 'TALADROS'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(pz.g.r)); });
+      pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); g(0, 'CIRCLE'); g(8, 'TALADROS'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(a[2])); });
       if (f.numeros) {
         const q = aTablero(pz, pz.g.etiqueta), h = altoTexto(pz.g);
         g(0, 'TEXT'); g(8, 'GRABADO'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(h)); g(1, pz.c.etq); g(72, 1); g(11, n(ox + q[0])); g(21, n(q[1] - h / 2)); g(31, 0);
@@ -1757,7 +2234,7 @@ function svg() {
     t.piezas.forEach(pz => {
       const d = simplificaCerrado(pz.g.poly, 0.05).map((p, i) => { const q = aTablero(pz, p); return (i ? 'L' : 'M') + n(ox + q[0]) + ' ' + n(Y(q[1])); }).join(' ') + ' Z';
       partes.push(`<path d="${d}" fill="none" stroke="#000" stroke-width="0.2"/>`);
-      pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); partes.push(`<circle cx="${n(ox + q[0])}" cy="${n(Y(q[1]))}" r="${n(pz.g.r)}" fill="none" stroke="#d00" stroke-width="0.2"/>`); });
+      pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); partes.push(`<circle cx="${n(ox + q[0])}" cy="${n(Y(q[1]))}" r="${n(a[2])}" fill="none" stroke="#d00" stroke-width="0.2"/>`); });
       if (f.numeros) { const q = aTablero(pz, pz.g.etiqueta); partes.push(`<text x="${n(ox + q[0])}" y="${n(Y(q[1]))}" font-family="Arial" font-size="${n(altoTexto(pz.g))}" text-anchor="middle" dominant-baseline="middle" fill="#00f">${pz.c.etq}</text>`); }
     });
     W += tw + 200;
@@ -1768,46 +2245,65 @@ function svg() {
 function exportarSVG() { descargar(nombreArchivo(P.nombre) + '_costillas' + sufijoFab() + '.svg', svg(), 'image/svg+xml'); aviso('SVG guardado'); }
 
 // ---------- despiece y lista de compra ----------
-function calcularCompraFab() { // como calcularCompra, pero con las medidas de fabricación (maqueta o real)
-  const V = P.varillas, k = escalaFab(), f = fabActual(), col = colocarEnTableros(f);
-  const usadas = P.tipo === 'reticula' ? [] : R.varillas.filter(v => v.usada);
-  const sepF = R.sep * k, hueco = sepF - grosorFab(), sobra = enMaqueta() ? Math.max(2, V.sobra * k) : V.sobra;
-  let nSep = 0;
-  if (V.separadores && hueco > 0.5 && P.tipo !== 'reticula') usadas.forEach(v => { for (let i = v.a; i < v.b; i++) if (v.cabe[i] && v.cabe[i + 1]) nSep++; });
+function calcularCompraFab() { // material con las medidas de fabricación (maqueta o real)
+  const V = P.varillas, k = escalaFab(), f = fabActual(), col = colocarEnTableros(f), eF = grosorFab();
+  const usadas = P.tipo === 'costillas' ? R.varillas.filter(v => v.usada) : [];
+  const sobra = enMaqueta() ? Math.max(2, V.sobra * k) : V.sobra, seps = [];
+  const varillas = usadas.map(v => {
+    if (V.separadores) v.dists.forEach((d, i) => { const L = d * k - eF; if (L > 0.5 && v.cabe[v.a + i] && v.cabe[v.a + i + 1]) seps.push(L); });
+    return { k: v.k, largo: v.dists.reduce((a, d) => a + d, 0) * k + eF + 2 * sobra };
+  });
+  const sepF = (P.tipo === 'radial' ? 0 : R.sep * k);
   return {
-    area: piezasFab().reduce((s, c) => s + Math.abs(c.area) * k * k, 0), nSep, hueco, sep: sepF,
-    varillas: usadas.map(v => ({ k: v.k, largo: (v.b - v.a) * sepF + grosorFab() + 2 * sobra })),
+    area: piezasFab().reduce((s, c) => s + Math.abs(c.area) * k * k, 0), sep: sepF, hueco: sepF - eF,
+    varillas, nSep: seps.length, seps, sepMin: seps.length ? Math.min(...seps) : 0, sepMax: seps.length ? Math.max(...seps) : 0,
     nTuercas: V.tipo === 'madera' || enMaqueta() ? 0 : usadas.length * 2,
+    tubo: P.tipo === 'radial' && R.tuboV ? (R.tuboV[1] - R.tuboV[0] + 40) * k : 0,
+    rastrel: P.tipo === 'pared' && R.rastreles.length ? (R.costillas[R.n - 1].x - R.costillas[0].x + grosor() + 60) * k : 0,
     tablero: [f.ancho, f.alto], nTableros: col.tableros.length, colocacion: col,
   };
 }
-function filasDespiece() {
-  const mat = enMaqueta() ? `Maqueta ${fmt(P.maqueta.grosor, 1)} mm` : MATERIALES[P.costillas.material].nombre;
-  return piezasFab().map(c => { const g = geoFab(c); return { n: c.etq, nombre: c.nombre, x: (c.z ? c.u : c.x) * escalaFab(), eje: c.z ? 'z' : 'x', ranuras: c.ranuras.length, w: g.caja.w, h: g.caja.h, e: grosorFab(), area: g.area, ag: c.agujeros.length, dA: fmt(2 * g.r, 2), mat }; });
-}
 function listaCompra() {
-  const cm = calcularCompraFab(), V = P.varillas, tv = VARILLA_TIPOS[V.tipo], L = [];
+  const cm = calcularCompraFab(), V = P.varillas, tv = VARILLA_TIPOS[V.tipo], L = [], maq = enMaqueta(), k = escalaFab();
+  const tablero = maq ? `Tablero de maqueta (DM, contrachapado…) de ${fmt(P.maqueta.grosor, 1)} mm` : `${MATERIALES[P.costillas.material].nombre}, ${fmt(grosor(), 1)} mm`;
+  L.push([tablero, `${cm.nTableros} tablero${cm.nTableros === 1 ? '' : 's'} de ${fmt(cm.tablero[0])} × ${fmt(cm.tablero[1])} mm (${maq ? fmt(cm.area / 100, 0) + ' cm²' : fmt(cm.area / 1e6, 2) + ' m²'} de piezas)`]);
   if (P.tipo === 'reticula') {
-    const nX = R.costillas.filter(c => c.ok).length, nZ = (R.largueros || []).filter(z => z.ok).length;
-    L.push([enMaqueta() ? `Tablero de maqueta de ${fmt(P.maqueta.grosor, 1)} mm` : `${MATERIALES[P.costillas.material].nombre}, ${fmt(grosor(), 1)} mm`, `${cm.nTableros} tablero${cm.nTableros === 1 ? '' : 's'} de ${fmt(cm.tablero[0])} × ${fmt(cm.tablero[1])} mm (${enMaqueta() ? fmt(cm.area / 100, 0) + ' cm²' : fmt(cm.area / 1e6, 2) + ' m²'} de piezas)`]);
-    L.push(['Piezas', `${nX} costillas y ${nZ} largueros, con ${R.cruces.length} cruces`]);
+    L.push(['Piezas', `${R.costillas.filter(c => c.ok).length} costillas y ${R.largueros.filter(z => z.ok).length} largueros, con ${R.cruces.length} cruces`]);
     L.push(['Ranuras a media madera', `${fmt(grosorFab() + holguraRanuraFab(), 2)} mm de ancho`]);
     L.push(['Herrajes', 'ninguno (cola en los cruces, si se quiere fijo)']);
     return L;
   }
-  if (enMaqueta()) {
-    L.push([`Tablero de maqueta (DM, contrachapado…) de ${fmt(P.maqueta.grosor, 1)} mm`, `${cm.nTableros} de ${fmt(cm.tablero[0])} × ${fmt(cm.tablero[1])} mm (${fmt(cm.area / 100, 0)} cm² de piezas)`]);
-    cm.varillas.forEach(v => L.push([`Varilla de Ø ${fmt(P.maqueta.diam, 1)} mm (bambú, madera o alambre) — varilla ${v.k + 1}`, fmt(v.largo) + ' mm']));
-    if (cm.nSep) L.push([`Separadores de ${fmt(cm.hueco, 1)} mm (tubito, pajita o arandela de cartón)`, `${cm.nSep} piezas`]);
-    L.push(['Agujeros', `Ø ${fmt(P.maqueta.diam + P.maqueta.holgura, 2)} mm`]);
+  if (P.tipo === 'radial') {
+    L.push([`Tubo central Ø ${fmt(P.radial.tubo * k, 1)} mm (${maq ? 'pajita, varilla o tubo' : 'acero, aluminio, latón o madera'})`, fmt(cm.tubo) + ' mm']);
+    if (R.discos.length) L.push([`Discos de unión (salen del mismo tablero)`, `${R.discos.length} de Ø ${fmt(2 * R.discos[0].rD * k)} mm`]);
+    L.push(['Cola', 'para fijar los discos al tubo y las costillas a los discos']);
+    if (!maq) L.push(['Si es lámpara', 'portalámparas, cable, florón y bombilla LED (que no caliente)']);
     return L;
   }
-  L.push([`${MATERIALES[P.costillas.material].nombre}, ${fmt(grosor(), 1)} mm`, `${cm.nTableros} tablero${cm.nTableros === 1 ? '' : 's'} de ${fmt(cm.tablero[0])} × ${fmt(cm.tablero[1])} mm (${fmt(cm.area / 1e6, 2)} m² de piezas)`]);
-  cm.varillas.forEach(v => L.push([`${tv.nombre} ${V.tipo === 'roscada' ? 'M' : 'Ø '}${V.diam} — varilla ${v.k + 1}`, fmt(v.largo) + ' mm']));
-  if (cm.nSep) L.push([`${tv.sep} Ø ${V.sepD} mm (agujero interior > ${V.diam} mm)`, `${cm.nSep} piezas de ${fmt(cm.hueco, 1)} mm (${fmt(cm.nSep * cm.hueco)} mm en total)`]);
+  if (P.tipo === 'pared') {
+    const Pa = P.pared;
+    if (R.rastreles.length) L.push([`Rastrel (listón) de ${fmt(Pa.alto * k, 1)} × ${fmt(Pa.grueso * k, 1)} mm`, `${R.rastreles.length} de ${fmt(cm.rastrel)} mm`]);
+    else L.push(['Tablero trasero (o escuadras)', `${fmt(cm.rastrel || P.largo * k)} × ${fmt((G.alto || 0) * k)} mm`]);
+    if (!maq) { L.push(['Tacos y tornillos para la pared', `${R.rastreles.length * Math.max(2, Math.ceil(cm.rastrel / 500))} (uno cada 50 cm de rastrel)`]); L.push(['Tornillos o cola para las lamas', `${R.n * Math.max(1, R.rastreles.length)} (uno en cada cruce con un rastrel)`]); }
+    return L;
+  }
+  const curva = disposicion() === 'curva';
+  cm.varillas.forEach(v => L.push([maq ? `Varilla de Ø ${fmt(P.maqueta.diam, 1)} mm${curva ? ' (que se pueda curvar: alambre)' : ' (bambú, madera o alambre)'} — varilla ${v.k + 1}` : `${tv.nombre} ${V.tipo === 'roscada' ? 'M' : 'Ø '}${V.diam}${curva ? ' (curvada)' : ''} — varilla ${v.k + 1}`, fmt(v.largo) + ' mm']));
+  if (cm.nSep) {
+    const txt = Math.abs(cm.sepMax - cm.sepMin) < 0.2 ? `${cm.nSep} piezas de ${fmt(cm.sepMin, 1)} mm (${fmt(cm.seps.reduce((a, b) => a + b, 0))} mm en total)` : `${cm.nSep} piezas de ${fmt(cm.sepMin, 1)} a ${fmt(cm.sepMax, 1)} mm (cada largo en el plano; ${fmt(cm.seps.reduce((a, b) => a + b, 0))} mm en total)`;
+    L.push([maq ? 'Separadores (tubito, pajita o arandela de cartón)' : `${tv.sep} Ø ${V.sepD} mm (agujero interior > ${V.diam} mm)`, txt]);
+  }
   if (cm.nTuercas) L.push([`Tuercas M${V.diam} (mejor ciegas) y arandelas`, `${cm.nTuercas} + ${cm.nTuercas}`]);
-  L.push(['Broca para los agujeros', `Ø ${fmt(V.diam + V.holgura, 1)} mm`]);
+  L.push([maq ? 'Agujeros' : 'Broca para los agujeros', `Ø ${fmt(2 * radioFab(), maq ? 2 : 1)} mm`]);
   return L;
+}
+function filasDespiece() {
+  const mat = enMaqueta() ? `Maqueta ${fmt(P.maqueta.grosor, 1)} mm` : MATERIALES[P.costillas.material].nombre;
+  return piezasFab().map(c => {
+    const g = geoFab(c), rad = P.tipo === 'radial' && !c.disco;
+    return { n: c.etq, nombre: c.nombre, x: (c.disco ? c.v : c.z ? c.u : c.x) * (rad ? 1 : escalaFab()), eje: c.disco ? 'altura' : c.z ? 'z' : rad ? 'ángulo' : 'x',
+      ranuras: c.ranuras.length + (c.disco ? R.n : 0), w: g.caja.w, h: g.caja.h, e: grosorFab(), area: g.area, ag: g.agujeros.length, dA: g.agujeros.length ? fmt(2 * g.agujeros[0][2], 2) : '', mat };
+  });
 }
 function abrirDespiece() {
   if (!R) return;
@@ -1815,7 +2311,7 @@ function abrirDespiece() {
   modal('📋 Despiece y lista de compra' + (enMaqueta() ? ' · maqueta 1:' + P.maqueta.escala : ''), `
     <h4>Costillas</h4>
     <div style="max-height:46vh;overflow:auto"><table class="tabla"><tr><th class="n">Pieza</th><th class="n">Posición</th><th class="n">Ancho</th><th class="n">Alto</th><th class="n">Grosor</th><th class="n">Superficie</th><th class="n">Agujeros / ranuras</th></tr>
-    ${F.map(f => `<tr><td class="n">${esc(f.nombre)}</td><td class="n">${f.eje} = ${fmt(f.x)} mm</td><td class="n">${fmt(f.w, enMaqueta() ? 1 : 0)}</td><td class="n">${fmt(f.h, enMaqueta() ? 1 : 0)}</td><td class="n">${fmt(f.e, 1)}</td><td class="n">${fmt(f.area / 100)} cm²</td><td class="n">${f.ranuras ? f.ranuras + ' ranuras' : f.ag + ' × Ø' + f.dA}</td></tr>`).join('')}
+    ${F.map(f => `<tr><td class="n">${esc(f.nombre)}</td><td class="n">${f.eje} = ${f.eje === 'ángulo' ? fmt(f.x, 1) + '°' : fmt(f.x) + ' mm'}</td><td class="n">${fmt(f.w, enMaqueta() ? 1 : 0)}</td><td class="n">${fmt(f.h, enMaqueta() ? 1 : 0)}</td><td class="n">${fmt(f.e, 1)}</td><td class="n">${fmt(f.area / 100)} cm²</td><td class="n">${f.ranuras ? f.ranuras + ' ranuras' : f.ag + ' × Ø' + f.dA}</td></tr>`).join('')}
     </table></div>
     <h4>Lista de compra</h4>
     <table class="tabla">${L.map(l => `<tr><td>${esc(l[0])}</td><td class="n">${esc(l[1])}</td></tr>`).join('')}</table>`,
@@ -1984,11 +2480,12 @@ function planoPDF() {
   let y = tabla(x2, M + 18, a2, [
     { titulo: 'Datos' },
     ['Medidas (largo × fondo × alto)', `${fmt(P.largo * k)} × ${fmt(fondo * k)} × ${fmt(alto * k)} mm`],
-    ['Costillas', `${R.n} de ${fmt(e, 1)} mm`],
-    ['Separación entre centros', `${fmt(cm.sep, 1)} mm`],
-    ['Hueco entre costillas', `${fmt(Math.max(0, cm.hueco), 1)} mm`],
+    [P.tipo === 'pared' ? 'Lamas' : 'Costillas', `${R.n} de ${fmt(e, 1)} mm`],
+    ...(P.tipo === 'radial' ? [['Ángulo entre costillas', `${fmt(R.sep, 1)}°`], ['Tubo central', `Ø ${fmt(P.radial.tubo * k, 1)} mm`], ['Discos de unión', `${R.discos.length}`]]
+      : [['Separación entre centros', `${fmt(cm.sep, 1)} mm${disposicion() === 'curva' ? ' (en el eje de la curva)' : ''}`], ['Hueco entre costillas', `${fmt(Math.max(0, cm.hueco), 1)} mm`]]),
+    ...(P.tipo === 'pared' ? [['Rastreles', R.rastreles.length ? `${R.rastreles.length} de ${fmt(P.pared.alto * k, 1)} × ${fmt(P.pared.grueso * k, 1)} mm` : 'sin rastreles']] : []),
     ['Material', maq ? `Maqueta de ${fmt(P.maqueta.grosor, 1)} mm` : MATERIALES[P.costillas.material].nombre],
-    ...(ret ? [['Largueros', `${R.largueros.length} de ${fmt(e, 1)} mm`], ['Cruces a media madera', `${R.cruces.length}, ranura de ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm`]] : [
+    ...(P.tipo === 'radial' || P.tipo === 'pared' ? [] : ret ? [['Largueros', `${R.largueros.length} de ${fmt(e, 1)} mm`], ['Cruces a media madera', `${R.cruces.length}, ranura de ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm`]] : [
     ['Varillas', maq ? `${cm.varillas.length} de Ø ${fmt(P.maqueta.diam, 1)} mm` : `${cm.varillas.length} × ${VARILLA_TIPOS[V.tipo].nombre} Ø ${V.diam}`],
     ['Agujeros', `Ø ${fmt(2 * radioFab(), 2)} mm`]]),
   ]);
@@ -1997,7 +2494,11 @@ function planoPDF() {
   if (aviso1.length) D.parrafo(M, M + 22 + ih, iw, '¡Atención! El proyecto tiene errores: ' + aviso1.map(a => a.txt).join(' '), { pt: 8.5, col: rojo });
 
   const cs = R.costillas.filter(c => c.ok);
-  if (ret) hojaReticula(D, cabecera, tabla, { M, W, H, k, e, maq, gris, azul, madera, rojo });
+  const oH = { M, W, H, k, e, maq, gris, azul, madera, rojo, cm };
+  if (ret) hojaReticula(D, cabecera, tabla, oH);
+  else if (P.tipo === 'radial') hojaRadial(D, cabecera, tabla, oH);
+  else if (P.tipo === 'pared') hojaPared(D, cabecera, tabla, oH);
+  else if (disposicion() === 'curva') hojaCurva(D, cabecera, tabla, oH);
   else {
   // ---- hoja 2: vista lateral (orden de montaje) y perfil con las varillas ----
   cabecera('2. Orden de montaje y posición de las varillas');
@@ -2054,7 +2555,7 @@ function planoPDF() {
   const mw = Math.max(...cs.map(c => c.caja.w)), mh = Math.max(...cs.map(c => c.caja.h));
   const s3 = Math.min((cw - 10) / mw, (ch - 16) / mh);
   for (let h0 = 0; h0 < cs.length; h0 += porHoja) {
-    cabecera(`3. Costillas ${cs[h0].i + 1} a ${cs[Math.min(cs.length, h0 + porHoja) - 1].i + 1} (todas a la misma escala, 1:${fmt(k / s3, 0)} aprox.)`);
+    cabecera(`3. ${P.tipo === 'pared' ? 'Lamas' : 'Costillas'} ${cs[h0].i + 1} a ${cs[Math.min(cs.length, h0 + porHoja) - 1].i + 1} (todas a la misma escala, 1:${fmt(k / s3, 0)} aprox.)`);
     cs.slice(h0, h0 + porHoja).forEach((c, j) => {
       const g = geoFab(c), cx = M + (j % cols) * cw, cy = M + 18 + Math.floor(j / cols) * ch;
       D.trazo([225, 225, 225]).grosor(0.2).rect(cx + 1, cy + 1, cw - 2, ch - 2);
@@ -2066,9 +2567,9 @@ function planoPDF() {
       D.relleno([0, 0, 0]).trazo();
       const et = puntoEtiqueta(c);
       D.texto(PX(et[0]), PY(et[1]) + 2.2, c.etq, { pt: 14, b: true, al: 'c', col: azul });
-      D.texto(cx + 3, cy + 6, `Costilla ${c.i + 1}`, { pt: 9, b: true });
+      D.texto(cx + 3, cy + 6, `${P.tipo === 'pared' ? 'Lama' : 'Costilla'} ${c.i + 1}`, { pt: 9, b: true });
       D.texto(cx + cw - 3, cy + 6, `${fmt(g.caja.w, maq ? 1 : 0)} × ${fmt(g.caja.h, maq ? 1 : 0)} mm`, { pt: 8.5, al: 'r', col: gris });
-      D.texto(cx + 3, cy + ch - 3.5, `x = ${fmt(c.x * k)} mm · ` + (ret ? `${c.ranuras.length} ranuras` : `${c.agujeros.length} agujeros`), { pt: 7.5, col: gris });
+      D.texto(cx + 3, cy + ch - 3.5, (P.tipo === 'radial' ? `a ${fmt(c.x, 1)}° · ` : `x = ${fmt(c.x * k)} mm · `) + (ret ? `${c.ranuras.length} ranuras` : P.tipo === 'radial' || P.tipo === 'pared' ? `${c.ranuras.length} muescas` : `${c.agujeros.length} agujeros`), { pt: 7.5, col: gris });
     });
   }
 
@@ -2117,7 +2618,22 @@ function planoPDF() {
   // ---- montaje paso a paso ----
   cabecera('5. Montaje paso a paso');
   const wR = fmt(grosorFab() + holguraRanuraFab(), 2), nZ = (R.largueros || []).length, ultZ = nZ ? R.largueros[nZ - 1].etq : '';
-  const pasos = ret ? [
+  const tabla2 = maq ? `tablero de ${fmt(P.maqueta.grosor, 1)} mm` : `${MATERIALES[P.costillas.material].nombre.toLowerCase()} de ${fmt(grosor(), 1)} mm`;
+  const pasos = P.tipo === 'radial' ? [
+    `Corta las ${R.n} costillas y los ${R.discos.length} discos en ${tabla2}. Las muescas y ranuras son de ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm: prueba antes una en un retal.`,
+    `Corta el tubo central de Ø ${fmt(P.radial.tubo * k, 1)} mm a ${fmt(cm.tubo)} mm.` + (maq ? '' : ' Si es una lámpara, pasa antes el cable por dentro.'),
+    'Mete los discos en el tubo a su altura (hoja 2) y fíjalos con una gota de cola, con las ranuras de los dos discos alineadas.',
+    `Encaja las costillas de una en una, en orden (1 a ${R.n}): cada una entra de lado en las ranuras de los discos y su muesca abraza el disco.`,
+    'Comprueba que todas quedan a su ángulo y a la misma altura; encola si se quiere fijo.',
+    maq ? 'Mira la maqueta desde todos los lados antes de cortar la pieza real.' : 'Acabado y, si es lámpara, usa una bombilla LED (no calienta) y un florón para colgarla.',
+  ] : P.tipo === 'pared' ? [
+    `Corta las ${R.n} lamas en ${tabla2}${R.rastreles.length ? `, con sus muescas de ${fmt((P.pared.alto + P.pared.holgura) * k, 1)} × ${fmt(P.pared.grueso * k, 1)} mm detrás` : ''}.`,
+    R.rastreles.length ? `Corta ${R.rastreles.length} rastreles de ${fmt(P.pared.alto * k, 1)} × ${fmt(P.pared.grueso * k, 1)} mm a ${fmt(cm.rastrel)} mm.` : 'Prepara el tablero trasero (o las escuadras) donde irán las lamas.',
+    R.rastreles.length ? 'Marca en la pared la altura de cada rastrel (hoja 2) con nivel, y atorníllalos con tacos (uno cada 50 cm).' : 'Fija el tablero trasero a la pared con tacos y tornillos.',
+    `Coloca las lamas en orden de la 1 a la ${R.n}, encajadas en los rastreles, a ${fmt(cm.sep, 1)} mm entre centros (usa un taco separador de ${fmt(Math.max(0, cm.hueco), 1)} mm).`,
+    'Fija cada lama con un tornillo o cola en cada rastrel. Empieza por el centro si quieres que el dibujo quede centrado en la pared.',
+    'Acabado: mejor antes de montar (aceite, barniz o pintura), para llegar a todas las caras.',
+  ] : ret ? [
     `Corta las ${R.n} costillas (1 a ${R.n}) y los ${nZ} largueros (A a ${ultZ}) en ${maq ? 'tablero de ' + fmt(P.maqueta.grosor, 1) + ' mm' : MATERIALES[P.costillas.material].nombre.toLowerCase() + ' de ' + fmt(grosor(), 1) + ' mm'}. Las ranuras son de ${wR} mm: ${maq ? 'prueba antes una en un retal' : 'en la CNC, con una fresa menor que el ancho de la ranura, y repasa las esquinas interiores con formón o lima (o déjalas en «hueso de perro»)'}.`,
     'Lija los cantos y comprueba con un retal que una ranura entra en otra sin forzar: tiene que entrar a mano, con un poco de roce.',
     `Pon las costillas de pie, en orden de la 1 a la ${R.n}, con sus ranuras ${P.reticula.xArriba !== false ? 'hacia arriba' : 'hacia abajo'}, más o menos a su distancia.`,
@@ -2146,7 +2662,7 @@ function planoPDF() {
     D.texto(M + 4, yp + 0.1, String(i + 1), { pt: 9, b: true, al: 'c', col: [255, 255, 255] });
     yp = D.parrafo(M + 11, yp, 170, t, { pt: 10 }) + 3;
   });
-  D.texto(M, H - M - 4, 'Herramientas: ' + (ret ? (maq ? 'cortadora láser o cúter, lija fina.' : 'CNC (fresa menor que la ranura), formón o lima, mazo de goma, lija.') : maq ? 'cortadora láser o cúter, cola blanca.' : `CNC o sierra de calar, broca de Ø ${fmt(2 * radioFab(), 1)}, lija, llaves para las tuercas M${V.diam}.`), { pt: 9, col: gris });
+  D.texto(M, H - M - 4, 'Herramientas: ' + (P.tipo === 'radial' ? (maq ? 'cortadora láser o cúter, cola.' : 'CNC o láser, sierra para el tubo, cola, lija.') : P.tipo === 'pared' ? 'CNC o sierra de calar, taladro, tacos y tornillos, nivel, taco separador.' : ret ? (maq ? 'cortadora láser o cúter, lija fina.' : 'CNC (fresa menor que la ranura), formón o lima, mazo de goma, lija.') : maq ? 'cortadora láser o cúter, cola blanca.' : `CNC o sierra de calar, broca de Ø ${fmt(2 * radioFab(), 1)}, lija, llaves para las tuercas M${V.diam}.`), { pt: 9, col: gris });
 
   // pies de página
   hojas.forEach((p, i) => { D.p = p; D.trazo([200, 200, 200]).grosor(0.2).linea(M, H - 8, W - M, H - 8); D.texto(M, H - 4.5, 'Made-rebanadas', { pt: 7.5, col: gris }); D.texto(W - M, H - 4.5, `Hoja ${i + 1} de ${hojas.length}`, { pt: 7.5, al: 'r', col: gris }); });
@@ -2199,6 +2715,88 @@ function hojaReticula(D, cabecera, tabla, o) {
   tabla(M + 184, M + 98, W - M - (M + 184), filas, { c1: 38 });
 }
 
+// hoja 2 de la planta curva: vista desde arriba con el eje, las costillas y las varillas
+function hojaCurva(D, cabecera, tabla, o) {
+  const { M, W, k, gris, azul, madera, cm } = o;
+  cabecera('2. Planta curva: orden de montaje, varillas y separadores');
+  const cs = R.costillas.filter(c => c.ok), segs = [];
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  cs.forEach(c => { const m = marcoEn(c.x); const a = puntoMarco(m, c.caja.x0, 0), b = puntoMarco(m, c.caja.x1, 0); segs.push([a, b, c]); [a, b].forEach(p => { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); z0 = Math.min(z0, p[2]); z1 = Math.max(z1, p[2]); }); });
+  const zona = { x: M + 8, y: M + 24, w: W - 2 * M - 16, h: 92 }, s = Math.min(zona.w / (x1 - x0), zona.h / (z1 - z0));
+  const PX = x => zona.x + (x - x0) * s + (zona.w - (x1 - x0) * s) / 2, PZ = z => zona.y + (z - z0) * s;
+  D.texto(zona.x, zona.y - 4, `Planta (vista desde arriba): ${R.n} costillas perpendiculares a la curva y las varillas, que la siguen.`, { pt: 8.5, col: gris });
+  D.trazo(madera).grosor(Math.max(0.25, grosor() * s));
+  segs.forEach(([a, b]) => D.linea(PX(a[0]), PZ(a[2]), PX(b[0]), PZ(b[2])));
+  D.trazo([80, 88, 98]).grosor(0.45);
+  R.varillas.filter(v => v.usada).forEach(v => {
+    const pts = []; for (let i = v.a; i <= v.b; i++) { const p = puntoMarco(marcoEn(R.costillas[i].x), v.u, v.v); pts.push([PX(p[0]), PZ(p[2])]); }
+    D.poli(pts, false); D.texto(pts[pts.length - 1][0] + 2, pts[pts.length - 1][1] + 1, 'V' + (v.k + 1), { pt: 7.5, b: true });
+  });
+  D.trazo();
+  const paso = Math.max(1, Math.ceil(cs.length / 30));
+  segs.forEach(([a, b, c], i) => { if (i % paso === 0 || i === segs.length - 1) D.texto(PX(a[0]), PZ(a[2]) - 1.5, String(c.i + 1), { pt: 6.5, al: 'c', col: azul }); });
+  const filas = [{ titulo: 'Varillas y separadores' }];
+  R.varillas.filter(v => v.usada).forEach(v => {
+    const L = cm.varillas.find(q => q.k === v.k).largo, sp = v.dists.map(d => d * k - grosorFab()).filter(x => x > 0.5);
+    filas.push([`V${v.k + 1}: atrás ${fmt(v.u * k, 1)} · suelo ${fmt(v.v * k, 1)} mm`, `largo ${fmt(L)} mm · radio mín. ${fmt(v.radioMin * k)} mm` + (sp.length ? ` · separadores de ${fmt(Math.min(...sp), 1)} a ${fmt(Math.max(...sp), 1)} mm` : '')]);
+  });
+  const fy = tabla(M, M + 126, W - 2 * M, filas, { c1: 80 });
+  // largos de los separadores, costilla a costilla
+  if (P.varillas.separadores) {
+    const us = R.varillas.filter(v => v.usada);
+    let txt = 'Separadores (entre la costilla n y la n+1, en mm): ';
+    us.forEach(v => { txt += `V${v.k + 1}: ` + v.dists.map((d, i) => `${v.a + i + 1}-${v.a + i + 2} ${fmt(d * k - grosorFab(), 1)}`).join(', ') + '. '; });
+    D.parrafo(M, fy + 6, W - 2 * M, txt, { pt: 7.5, col: gris });
+  }
+}
+// hoja 2 radial: planta con las costillas alrededor del tubo y perfil con los discos
+function hojaRadial(D, cabecera, tabla, o) {
+  const { M, W, k, gris, azul, madera } = o;
+  cabecera('2. Planta, discos de unión y orden de montaje');
+  const cs = R.costillas.filter(c => c.ok), rT = radioTubo(), rmax = Math.max(...cs.map(c => c.caja.x1));
+  const cx = M + 52, cy = M + 72, s = 46 / rmax;
+  D.texto(M, M + 22, 'Planta: costillas en orden.', { pt: 8.5, col: gris });
+  D.trazo([150, 150, 150]).grosor(0.3).circulo(cx, cy, rT * s);
+  R.discos.forEach(d => D.trazo([190, 190, 190]).rayas(1).circulo(cx, cy, d.rD * s).rayas(0));
+  D.trazo(madera).grosor(Math.max(0.3, grosor() * s));
+  cs.forEach(c => { const t = c.x * Math.PI / 180, ca = Math.cos(t), sa = -Math.sin(t); D.linea(cx + ca * c.caja.x0 * s, cy + sa * c.caja.x0 * s, cx + ca * c.caja.x1 * s, cy + sa * c.caja.x1 * s); D.texto(cx + ca * (c.caja.x1 * s + 4), cy + sa * (c.caja.x1 * s + 4) + 1.2, String(c.i + 1), { pt: 7, al: 'c', col: azul }); });
+  D.trazo();
+  // perfil de la costilla central con los discos
+  const c0 = cs[0], zx = M + 125, zy = M + 30, zh = 150, sp = Math.min(70 / (c0.caja.x1), zh / c0.caja.y1);
+  const PX = u => zx + u * sp, PY = v => zy + zh - v * sp;
+  D.texto(zx + 14, zy - 2, 'Costilla 1 y altura de los discos.', { pt: 8.5, col: gris });
+  D.relleno([200, 200, 200]).rect(PX(0), PY(c0.caja.y1 + 10), rT * sp, (c0.caja.y1 + 20) * sp, 'f');
+  D.relleno([240, 228, 208]).trazo(madera).grosor(0.35).poli(simplificaCerrado(c0.poly, 0.1).map(p => [PX(p[0]), PY(p[1])]), true, 'b');
+  D.relleno([0, 0, 0]).trazo([95, 107, 120]).grosor(0.3);
+  R.discos.forEach(d => { D.linea(PX(0), PY(d.v), PX(d.rD) + 6, PY(d.v)); D.texto(PX(d.rD) + 7, PY(d.v) + 1.2, d.etq, { pt: 8, b: true }); });
+  D.trazo();
+  const filas = [{ titulo: 'Tubo y discos' }, ['Tubo central', `Ø ${fmt(P.radial.tubo * k, 1)} mm · largo ${fmt(o.cm.tubo)} mm`], ['Ángulo entre costillas', `${fmt(R.sep, 2)}°`]];
+  R.discos.forEach(d => filas.push([`Disco ${d.etq}`, `a ${fmt(d.v * k)} mm del suelo · Ø ${fmt(2 * d.rD * k)} mm · ${R.n} ranuras`]));
+  filas.push(['Muescas y ranuras', `${fmt(grosorFab() + holguraRanuraFab(), 2)} mm de ancho`]);
+  tabla(M + 200, M + 24, W - M - (M + 200), filas, { c1: 30 });
+}
+// hoja 2 de la pared: alzado con las lamas y los rastreles
+function hojaPared(D, cabecera, tabla, o) {
+  const { M, W, k, gris, azul, madera, cm } = o;
+  cabecera('2. Alzado de la pared, rastreles y orden de colocación');
+  const cs = R.costillas.filter(c => c.ok), Pa = P.pared, H = Math.max(...cs.map(c => c.caja.y1));
+  const zona = { x: M + 10, y: M + 24, w: W - 2 * M - 20, h: 100 }, s = Math.min(zona.w / P.largo, zona.h / H);
+  const PX = x => zona.x + x * s, PY = v => zona.y + zona.h - v * s;
+  D.texto(zona.x, zona.y - 4, `Alzado (de frente): ${R.n} lamas numeradas y ${R.rastreles.length} rastreles detrás.`, { pt: 8.5, col: gris });
+  D.relleno([205, 179, 138]);
+  R.rastreles.forEach(r => D.rect(PX(R.costillas[0].x - grosor() / 2 - 30), PY(r.v + Pa.alto / 2), (R.costillas[R.n - 1].x - R.costillas[0].x + grosor() + 60) * s, Pa.alto * s, 'f'));
+  D.relleno([226, 205, 172]).trazo(madera).grosor(0.15);
+  cs.forEach(c => D.rect(PX(c.x - grosor() / 2), PY(c.caja.y1), Math.max(0.3, grosor() * s), (c.caja.y1 - c.caja.y0) * s, 'b'));
+  D.relleno([0, 0, 0]).trazo();
+  const paso = Math.max(1, Math.ceil(cs.length / 40));
+  cs.forEach((c, i) => { if (i % paso === 0 || i === cs.length - 1) D.texto(PX(c.x), PY(c.caja.y1) - 1.5, String(c.i + 1), { pt: 6.5, al: 'c', col: azul }); });
+  const filas = [{ titulo: 'Rastreles (altura de su centro desde abajo)' }];
+  R.rastreles.forEach(r => filas.push([`Rastrel ${r.j + 1}`, `a ${fmt(r.v * k)} mm · ${fmt(Pa.alto * k, 1)} × ${fmt(Pa.grueso * k, 1)} × ${fmt(cm.rastrel)} mm`]));
+  filas.push(['Separación entre lamas', `${fmt(cm.sep, 1)} mm entre centros (hueco ${fmt(Math.max(0, cm.hueco), 1)} mm)`]);
+  filas.push(['Medidas del panel', `${(G.dims || [0, 0, 0]).map(v => fmt(v * k)).join(' × ')} mm (ancho × fondo × alto)`]);
+  tabla(M, M + 134, W - 2 * M, filas, { c1: 70 });
+}
+
 /* ===================== ANIDADOR DE TABLEROS (assets/anidador) =====================
    Se abre en una ventana dentro del programa. Cuando avisa «anidador-listo», recibe las costillas
    como piezas del Calcador (contorno exterior y agujeros de las varillas) y las medidas del tablero. */
@@ -2210,7 +2808,7 @@ function piezaCalcador(c) {
   // cada agujero: círculo de dos medias vueltas (bulge 1)
   g.agujeros.forEach(a => {
     const x = a[0] - b.x0, y = a[1] - b.y0;
-    contornos.push({ pts: [{ x: r3(x + g.r), y: r3(y) }, { x: r3(x - g.r), y: r3(y) }], b: [1, 1], cerrado: true, tipo: 'interior', mec: { op: 'corte', prof: null, puentes: { ...PUENTES0 } } });
+    contornos.push({ pts: [{ x: r3(x + a[2]), y: r3(y) }, { x: r3(x - a[2]), y: r3(y) }], b: [1, 1], cerrado: true, tipo: 'interior', mec: { op: 'corte', prof: null, puentes: { ...PUENTES0 } } });
   });
   return { nombre: c.nombre, cantidad: 1, veta: false, calcador: { contornos } };
 }
@@ -2284,6 +2882,7 @@ function proyectoDePlantilla(id, extra) {
     if (extra.varillas) Object.assign(p.varillas, extra.varillas);
     if (extra.reticula) Object.assign(p.reticula, extra.reticula);
     if (extra.tipo) p.tipo = extra.tipo;
+    ['planta', 'radial', 'pared'].forEach(k => { if (extra[k]) Object.assign(p[k], extra[k]); });
     if (extra.nombre) p.nombre = extra.nombre;
   }
   return p;
@@ -2292,7 +2891,7 @@ function cargarProyecto(p, autoVar) {
   P = p; UI.clave = 0; UI.punto = -1; UI.varilla = -1; UI.costilla = 0;
   if (!P.claves || !P.claves.length) aplicarPlantilla();
   R = calcular();
-  if (autoVar && P.tipo !== 'reticula' && !P.varillas.lista.length) { autoVarillas(P.varillas.autoN); }
+  if (autoVar && P.tipo === 'costillas' && !P.varillas.lista.length) { autoVarillas(P.varillas.autoN); }
   HIST.pila = []; HIST.pos = -1; guardarHistoria();
   ponerControles(); recalcular(); refrescarClaves();
   // edita de entrada el perfil clave más cercano al centro del mueble
@@ -2310,7 +2909,8 @@ function validarProyecto(o) {
   p.vista = Object.assign(proyectoBase().vista, o.vista || {});
   p.maqueta = Object.assign(proyectoBase().maqueta, o.maqueta || {});
   p.reticula = Object.assign(proyectoBase().reticula, o.reticula || {});
-  if (p.tipo !== 'reticula') p.tipo = 'costillas';
+  ['planta', 'radial', 'pared'].forEach(k => p[k] = Object.assign(proyectoBase()[k], o[k] || {}));
+  if (!['reticula', 'radial', 'pared'].includes(p.tipo)) p.tipo = 'costillas';
   if (!PLANTILLAS[p.plantilla]) p.plantilla = 'libre';
   p.params = Object.assign(paramsDefecto(p.plantilla), o.params || {});
   const n = p.claves[0].pts.length;

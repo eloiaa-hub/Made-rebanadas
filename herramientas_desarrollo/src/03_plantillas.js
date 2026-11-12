@@ -167,6 +167,105 @@ const PLANTILLAS = {
   },
 };
 
+// ---------- plantillas radiales (la posición de cada perfil es un ángulo: 0 a 360°) ----------
+function generarRevolucion(p) {
+  const M = 7, esquinas = [true, true, ...new Array(M - 2).fill(false), true, true];
+  const K = clamp(Math.round(p.lobulos) * 4, 8, 48) + 1, H = p.alto;
+  const gam = Math.log(0.5) / Math.log(clamp(p.panza, 0.1, 0.9));
+  const claves = [];
+  for (let k = 0; k < K; k++) {
+    const th = 360 * k / (K - 1), pts = [[0, 0]];
+    for (let j = 0; j < M; j++) {
+      const t = j / (M - 1), v = t * H, lin = lerp(p.abajo, p.arriba, t);
+      const base = lin + (p.radio - lin) * Math.sin(Math.PI * Math.pow(t, gam));
+      const lob = Math.round(p.lobulos) ? 1 + (p.amplitud / p.radio) * Math.cos((th - p.giro * t) * Math.PI / 180 * Math.round(p.lobulos)) : 1;
+      pts.push([Math.max(1, (j === 0 || j === M - 1) ? lin : base * lob), v]);
+    }
+    pts.push([0, H]);
+    claves.push({ x: Math.round(th * 100) / 100, pts: redondeaPts(pts) });
+  }
+  return { largo: 360, esquinas, claves };
+}
+PLANTILLAS.lampara = {
+  nombre: 'Lámpara de lóbulos', grupo: 'radial',
+  desc: 'Pantalla colgante en forma de bulbo, con lóbulos que pueden girar en espiral.',
+  params: [
+    { id: 'alto', nombre: 'Altura', min: 150, max: 1200, paso: 5, valor: 420 },
+    { id: 'radio', nombre: 'Radio mayor', min: 60, max: 600, paso: 5, valor: 180 },
+    { id: 'abajo', nombre: 'Radio abajo', min: 10, max: 500, paso: 5, valor: 70 },
+    { id: 'arriba', nombre: 'Radio arriba', min: 10, max: 500, paso: 5, valor: 30 },
+    { id: 'panza', nombre: 'Altura de la panza (0 a 1)', min: 0.15, max: 0.85, paso: 0.01, valor: 0.5 },
+    { id: 'lobulos', nombre: 'Lóbulos', min: 0, max: 12, paso: 1, valor: 6 },
+    { id: 'amplitud', nombre: 'Profundidad de los lóbulos', min: 0, max: 150, paso: 1, valor: 28 },
+    { id: 'giro', nombre: 'Giro en espiral (°)', min: -180, max: 180, paso: 1, valor: 40 },
+  ],
+  generar: generarRevolucion,
+};
+PLANTILLAS.columna = {
+  nombre: 'Columna / pie de lámpara', grupo: 'radial',
+  desc: 'Pieza alta de revolución con cintura y lóbulos torsionados: pie de lámpara, columna o peana.',
+  params: [
+    { id: 'alto', nombre: 'Altura', min: 300, max: 2400, paso: 10, valor: 1100 },
+    { id: 'radio', nombre: 'Radio mayor', min: 60, max: 500, paso: 5, valor: 150 },
+    { id: 'abajo', nombre: 'Radio abajo', min: 20, max: 500, paso: 5, valor: 170 },
+    { id: 'arriba', nombre: 'Radio arriba', min: 20, max: 500, paso: 5, valor: 110 },
+    { id: 'panza', nombre: 'Altura de la panza (0 a 1)', min: 0.15, max: 0.85, paso: 0.01, valor: 0.3 },
+    { id: 'lobulos', nombre: 'Lóbulos', min: 0, max: 12, paso: 1, valor: 4 },
+    { id: 'amplitud', nombre: 'Profundidad de los lóbulos', min: 0, max: 150, paso: 1, valor: 35 },
+    { id: 'giro', nombre: 'Giro en espiral (°)', min: -360, max: 360, paso: 1, valor: 180 },
+  ],
+  generar: generarRevolucion,
+};
+// ---------- plantillas de pared (u = lo que sale de la pared, v = altura) ----------
+function generarPared(p, prof) {
+  const M = 13, H = p.alto, esquinas = [true, true, ...new Array(M - 2).fill(false), true, true];
+  const K = clamp(Math.round((p.ondasX || 1) * 6) + 1, 7, 31);
+  const claves = clavesUniformes(K, p.largo, t => {
+    const pts = [[0, 0]];
+    for (let j = 0; j < M; j++) { const v = H * j / (M - 1); pts.push([Math.max(4, prof(t, v / H)), v]); }
+    pts.push([0, H]);
+    return redondeaPts(pts);
+  });
+  return { largo: p.largo, esquinas, claves };
+}
+PLANTILLAS.pared_ondas = {
+  nombre: 'Panel de pared ondulado', grupo: 'pared',
+  desc: 'Lamas verticales cuyo canto dibuja ondas en horizontal y en vertical (o en diagonal).',
+  params: [
+    { id: 'largo', nombre: 'Ancho del panel', min: 400, max: 6000, paso: 10, valor: 1800 },
+    { id: 'alto', nombre: 'Alto del panel', min: 300, max: 3000, paso: 10, valor: 1200 },
+    { id: 'fondo', nombre: 'Fondo mínimo', min: 10, max: 300, paso: 1, valor: 35 },
+    { id: 'relieve', nombre: 'Relieve (lo que sale la onda)', min: 0, max: 400, paso: 1, valor: 90 },
+    { id: 'ondasX', nombre: 'Ondas a lo ancho', min: 0.5, max: 5, paso: 0.5, valor: 1.5 },
+    { id: 'ondasY', nombre: 'Ondas a lo alto', min: 0, max: 4, paso: 0.5, valor: 1 },
+    { id: 'diagonal', nombre: 'Diagonal (0 = cuadrícula, 1 = diagonal)', min: 0, max: 1, paso: 0.05, valor: 0.6 },
+  ],
+  generar(p) {
+    return generarPared(p, (t, y) => p.fondo + p.relieve * (0.5 + 0.25 * Math.sin(PI2 * p.ondasX * t) + 0.25 * Math.sin(PI2 * (p.ondasY * y + p.diagonal * p.ondasX * t))));
+  },
+};
+PLANTILLAS.pared_relieve = {
+  nombre: 'Panel de pared con relieve', grupo: 'pared',
+  desc: 'Lamas que forman uno o dos relieves redondeados (cúpula o duna) sobre la pared.',
+  params: [
+    { id: 'largo', nombre: 'Ancho del panel', min: 400, max: 6000, paso: 10, valor: 1600 },
+    { id: 'alto', nombre: 'Alto del panel', min: 300, max: 3000, paso: 10, valor: 1100 },
+    { id: 'fondo', nombre: 'Fondo mínimo', min: 10, max: 300, paso: 1, valor: 30 },
+    { id: 'relieve', nombre: 'Altura del relieve', min: 0, max: 500, paso: 1, valor: 160 },
+    { id: 'anchura', nombre: 'Anchura del relieve (0 a 1)', min: 0.1, max: 1, paso: 0.01, valor: 0.35 },
+    { id: 'cx', nombre: 'Posición a lo ancho (0 a 1)', min: 0, max: 1, paso: 0.01, valor: 0.4 },
+    { id: 'cy', nombre: 'Posición a lo alto (0 a 1)', min: 0, max: 1, paso: 0.01, valor: 0.55 },
+    { id: 'dos', nombre: 'Segundo relieve (0 = no, 1 = igual)', min: 0, max: 1, paso: 0.05, valor: 0.5 },
+  ],
+  generar(p) {
+    const g = (t, y, cx, cy) => Math.exp(-((t - cx) ** 2 + (y - cy) ** 2) / (p.anchura * p.anchura * 0.5));
+    p.ondasX = 2;
+    return generarPared(p, (t, y) => p.fondo + p.relieve * Math.min(1, g(t, y, p.cx, p.cy) + p.dos * g(t, y, 1 - p.cx * 0.6, 1 - p.cy)));
+  },
+};
+const grupoDe = id => PLANTILLAS[id].grupo || 'lineal';
+const grupoTipo = t => t === 'radial' ? 'radial' : t === 'pared' ? 'pared' : 'lineal';
+
 function paramsDefecto(id) { const o = {}; PLANTILLAS[id].params.forEach(q => o[q.id] = q.valor); return o; }
 // genera la forma desde la plantilla; si solo cambia el largo y hay retoques a mano, escala las claves
 function aplicarPlantilla(soloLargo) {

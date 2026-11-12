@@ -40,7 +40,7 @@
       <h3>Forma</h3>
       <div class="sec-cuerpo">
         <label class="fila" title="Costillas separadas unidas con varillas, o retícula de costillas y largueros que se cruzan con ranuras a media madera">Tipo de mueble
-          <select id="sTipo"><option value="costillas">Costillas con varillas</option><option value="reticula">Retícula (ranuras a media madera)</option></select></label>
+          <select id="sTipo"><option value="costillas">Costillas con varillas</option><option value="reticula">Retícula (ranuras a media madera)</option><option value="radial">Radial (lámparas, columnas)</option><option value="pared">Panel de pared (lamas)</option></select></label>
         <label class="fila">Plantilla <select id="sPlantilla"></select></label>
         <p class="nota" id="descPlantilla"></p>
         <div id="params"></div>
@@ -68,6 +68,45 @@
         <label class="fila">Material
           <select id="cMaterial"></select></label>
         <label class="fila oculto" id="filaColor">Color <input type="color" id="cColor" value="#f2efe8"></label>
+      </div>
+    </section>
+
+    <section id="secPlanta">
+      <h3>Planta</h3>
+      <div class="sec-cuerpo">
+        <p class="nota">Las costillas pueden seguir una curva en planta: van perpendiculares a ella y las varillas se curvan con ella.</p>
+        <label class="fila">Forma de la planta
+          <select id="plForma"><option value="recta">Recta</option><option value="arco">Arco</option><option value="s">En S (ondulada)</option></select></label>
+        <label class="fila filaArco">Radio del arco (mm) <input type="number" id="plRadio" min="150" step="10" value="2500"></label>
+        <label class="fila filaArco">Curva hacia <select id="plSentido"><option value="1">Delante</option><option value="-1">Detrás</option></select></label>
+        <label class="fila filaS">Amplitud de la S (mm) <input type="number" id="plAmp" min="0" step="5" value="150"></label>
+        <label class="fila filaS">Ondas de la S <input type="number" id="plOndas" min="0.5" max="4" step="0.5" value="1"></label>
+      </div>
+    </section>
+
+    <section id="secRadial">
+      <h3>Radial: tubo y discos</h3>
+      <div class="sec-cuerpo">
+        <p class="nota">Las costillas se colocan alrededor de un tubo vertical. Unos discos con ranuras las abrazan y las mantienen a su ángulo.</p>
+        <label class="fila">Número de costillas <input type="number" id="raNum" min="3" max="120" step="1" value="12"></label>
+        <label class="fila">Ø del tubo central (mm) <input type="number" id="raTubo" min="4" step="1" value="20"></label>
+        <label class="fila" title="Holgura entre el tubo y el borde de dentro de las costillas">Holgura con el tubo (mm) <input type="number" id="raHolTubo" min="0" step="0.1" value="0.5"></label>
+        <label class="fila">Discos de unión <input type="number" id="raDiscos" min="0" max="6" step="1" value="2"></label>
+        <label class="fila" title="0 = automático: el mayor que cabe a la altura de cada disco">Radio de los discos (mm, 0 = auto) <input type="number" id="raRDisco" min="0" step="1" value="0"></label>
+        <label class="fila">Holgura de las ranuras (mm) <input type="number" id="raHolgura" min="0" max="3" step="0.05" value="0.3"></label>
+      </div>
+    </section>
+
+    <section id="secPared">
+      <h3>Pared: rastreles</h3>
+      <div class="sec-cuerpo">
+        <p class="nota">Las lamas llevan detrás unas muescas por las que pasan unos rastreles horizontales atornillados a la pared.</p>
+        <label class="fila">Número de rastreles <input type="number" id="paNum" min="0" max="10" step="1" value="3"></label>
+        <label class="fila">Alto del rastrel (mm) <input type="number" id="paAlto" min="10" step="1" value="45"></label>
+        <label class="fila">Grueso del rastrel (mm) <input type="number" id="paGrueso" min="5" step="1" value="20"></label>
+        <label class="fila" title="Distancia del primer y último rastrel al borde de abajo y de arriba">Margen arriba y abajo (mm) <input type="number" id="paMargen" min="0" step="5" value="120"></label>
+        <label class="fila">Holgura de la muesca (mm) <input type="number" id="paHolgura" min="0" max="3" step="0.1" value="0.5"></label>
+        <label class="fila chk"><input type="checkbox" id="paVer" checked> Ver la pared en el 3D</label>
       </div>
     </section>
 
@@ -150,6 +189,7 @@
           <label class="chk3d" title="Volumen ideal de la forma, transparente"><input type="checkbox" id="cFantasma"> Volumen</label>
           <label class="chk3d"><input type="checkbox" id="cVarillas3d" checked> Varillas</label>
           <label class="chk3d" title="Colorea la costilla seleccionada"><input type="checkbox" id="cResalta" checked> Resaltar</label>
+          <label class="chk3d" title="Dibuja los perfiles clave; pincha uno para editarlo"><input type="checkbox" id="cClaves3d" checked> Perfiles</label>
         </div>
       </div>
       <div class="vista vperfil" id="vPerfil">
@@ -184,7 +224,7 @@
       <div class="sec-cuerpo">
         <p class="nota">La forma se define con unos pocos perfiles a lo largo del mueble; cada costilla es la mezcla suave de los que tiene a los lados.</p>
         <ul id="listaClaves" class="lista corta"></ul>
-        <label class="fila">Posición (mm) <input type="number" id="kPos" step="1"></label>
+        <label class="fila"><span id="kPosTit">Posición (mm)</span> <input type="number" id="kPos" step="1"></label>
         <div class="col3">
           <button id="bClaveMas" title="Añade un perfil clave en la costilla seleccionada">＋ Clave</button>
           <button id="bClaveCopia" title="Copia este perfil en todas las claves">⧉ A todas</button>

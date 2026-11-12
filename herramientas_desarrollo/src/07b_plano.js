@@ -144,11 +144,12 @@ function planoPDF() {
   let y = tabla(x2, M + 18, a2, [
     { titulo: 'Datos' },
     ['Medidas (largo × fondo × alto)', `${fmt(P.largo * k)} × ${fmt(fondo * k)} × ${fmt(alto * k)} mm`],
-    ['Costillas', `${R.n} de ${fmt(e, 1)} mm`],
-    ['Separación entre centros', `${fmt(cm.sep, 1)} mm`],
-    ['Hueco entre costillas', `${fmt(Math.max(0, cm.hueco), 1)} mm`],
+    [P.tipo === 'pared' ? 'Lamas' : 'Costillas', `${R.n} de ${fmt(e, 1)} mm`],
+    ...(P.tipo === 'radial' ? [['Ángulo entre costillas', `${fmt(R.sep, 1)}°`], ['Tubo central', `Ø ${fmt(P.radial.tubo * k, 1)} mm`], ['Discos de unión', `${R.discos.length}`]]
+      : [['Separación entre centros', `${fmt(cm.sep, 1)} mm${disposicion() === 'curva' ? ' (en el eje de la curva)' : ''}`], ['Hueco entre costillas', `${fmt(Math.max(0, cm.hueco), 1)} mm`]]),
+    ...(P.tipo === 'pared' ? [['Rastreles', R.rastreles.length ? `${R.rastreles.length} de ${fmt(P.pared.alto * k, 1)} × ${fmt(P.pared.grueso * k, 1)} mm` : 'sin rastreles']] : []),
     ['Material', maq ? `Maqueta de ${fmt(P.maqueta.grosor, 1)} mm` : MATERIALES[P.costillas.material].nombre],
-    ...(ret ? [['Largueros', `${R.largueros.length} de ${fmt(e, 1)} mm`], ['Cruces a media madera', `${R.cruces.length}, ranura de ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm`]] : [
+    ...(P.tipo === 'radial' || P.tipo === 'pared' ? [] : ret ? [['Largueros', `${R.largueros.length} de ${fmt(e, 1)} mm`], ['Cruces a media madera', `${R.cruces.length}, ranura de ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm`]] : [
     ['Varillas', maq ? `${cm.varillas.length} de Ø ${fmt(P.maqueta.diam, 1)} mm` : `${cm.varillas.length} × ${VARILLA_TIPOS[V.tipo].nombre} Ø ${V.diam}`],
     ['Agujeros', `Ø ${fmt(2 * radioFab(), 2)} mm`]]),
   ]);
@@ -157,7 +158,11 @@ function planoPDF() {
   if (aviso1.length) D.parrafo(M, M + 22 + ih, iw, '¡Atención! El proyecto tiene errores: ' + aviso1.map(a => a.txt).join(' '), { pt: 8.5, col: rojo });
 
   const cs = R.costillas.filter(c => c.ok);
-  if (ret) hojaReticula(D, cabecera, tabla, { M, W, H, k, e, maq, gris, azul, madera, rojo });
+  const oH = { M, W, H, k, e, maq, gris, azul, madera, rojo, cm };
+  if (ret) hojaReticula(D, cabecera, tabla, oH);
+  else if (P.tipo === 'radial') hojaRadial(D, cabecera, tabla, oH);
+  else if (P.tipo === 'pared') hojaPared(D, cabecera, tabla, oH);
+  else if (disposicion() === 'curva') hojaCurva(D, cabecera, tabla, oH);
   else {
   // ---- hoja 2: vista lateral (orden de montaje) y perfil con las varillas ----
   cabecera('2. Orden de montaje y posición de las varillas');
@@ -214,7 +219,7 @@ function planoPDF() {
   const mw = Math.max(...cs.map(c => c.caja.w)), mh = Math.max(...cs.map(c => c.caja.h));
   const s3 = Math.min((cw - 10) / mw, (ch - 16) / mh);
   for (let h0 = 0; h0 < cs.length; h0 += porHoja) {
-    cabecera(`3. Costillas ${cs[h0].i + 1} a ${cs[Math.min(cs.length, h0 + porHoja) - 1].i + 1} (todas a la misma escala, 1:${fmt(k / s3, 0)} aprox.)`);
+    cabecera(`3. ${P.tipo === 'pared' ? 'Lamas' : 'Costillas'} ${cs[h0].i + 1} a ${cs[Math.min(cs.length, h0 + porHoja) - 1].i + 1} (todas a la misma escala, 1:${fmt(k / s3, 0)} aprox.)`);
     cs.slice(h0, h0 + porHoja).forEach((c, j) => {
       const g = geoFab(c), cx = M + (j % cols) * cw, cy = M + 18 + Math.floor(j / cols) * ch;
       D.trazo([225, 225, 225]).grosor(0.2).rect(cx + 1, cy + 1, cw - 2, ch - 2);
@@ -226,9 +231,9 @@ function planoPDF() {
       D.relleno([0, 0, 0]).trazo();
       const et = puntoEtiqueta(c);
       D.texto(PX(et[0]), PY(et[1]) + 2.2, c.etq, { pt: 14, b: true, al: 'c', col: azul });
-      D.texto(cx + 3, cy + 6, `Costilla ${c.i + 1}`, { pt: 9, b: true });
+      D.texto(cx + 3, cy + 6, `${P.tipo === 'pared' ? 'Lama' : 'Costilla'} ${c.i + 1}`, { pt: 9, b: true });
       D.texto(cx + cw - 3, cy + 6, `${fmt(g.caja.w, maq ? 1 : 0)} × ${fmt(g.caja.h, maq ? 1 : 0)} mm`, { pt: 8.5, al: 'r', col: gris });
-      D.texto(cx + 3, cy + ch - 3.5, `x = ${fmt(c.x * k)} mm · ` + (ret ? `${c.ranuras.length} ranuras` : `${c.agujeros.length} agujeros`), { pt: 7.5, col: gris });
+      D.texto(cx + 3, cy + ch - 3.5, (P.tipo === 'radial' ? `a ${fmt(c.x, 1)}° · ` : `x = ${fmt(c.x * k)} mm · `) + (ret ? `${c.ranuras.length} ranuras` : P.tipo === 'radial' || P.tipo === 'pared' ? `${c.ranuras.length} muescas` : `${c.agujeros.length} agujeros`), { pt: 7.5, col: gris });
     });
   }
 
@@ -277,7 +282,22 @@ function planoPDF() {
   // ---- montaje paso a paso ----
   cabecera('5. Montaje paso a paso');
   const wR = fmt(grosorFab() + holguraRanuraFab(), 2), nZ = (R.largueros || []).length, ultZ = nZ ? R.largueros[nZ - 1].etq : '';
-  const pasos = ret ? [
+  const tabla2 = maq ? `tablero de ${fmt(P.maqueta.grosor, 1)} mm` : `${MATERIALES[P.costillas.material].nombre.toLowerCase()} de ${fmt(grosor(), 1)} mm`;
+  const pasos = P.tipo === 'radial' ? [
+    `Corta las ${R.n} costillas y los ${R.discos.length} discos en ${tabla2}. Las muescas y ranuras son de ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm: prueba antes una en un retal.`,
+    `Corta el tubo central de Ø ${fmt(P.radial.tubo * k, 1)} mm a ${fmt(cm.tubo)} mm.` + (maq ? '' : ' Si es una lámpara, pasa antes el cable por dentro.'),
+    'Mete los discos en el tubo a su altura (hoja 2) y fíjalos con una gota de cola, con las ranuras de los dos discos alineadas.',
+    `Encaja las costillas de una en una, en orden (1 a ${R.n}): cada una entra de lado en las ranuras de los discos y su muesca abraza el disco.`,
+    'Comprueba que todas quedan a su ángulo y a la misma altura; encola si se quiere fijo.',
+    maq ? 'Mira la maqueta desde todos los lados antes de cortar la pieza real.' : 'Acabado y, si es lámpara, usa una bombilla LED (no calienta) y un florón para colgarla.',
+  ] : P.tipo === 'pared' ? [
+    `Corta las ${R.n} lamas en ${tabla2}${R.rastreles.length ? `, con sus muescas de ${fmt((P.pared.alto + P.pared.holgura) * k, 1)} × ${fmt(P.pared.grueso * k, 1)} mm detrás` : ''}.`,
+    R.rastreles.length ? `Corta ${R.rastreles.length} rastreles de ${fmt(P.pared.alto * k, 1)} × ${fmt(P.pared.grueso * k, 1)} mm a ${fmt(cm.rastrel)} mm.` : 'Prepara el tablero trasero (o las escuadras) donde irán las lamas.',
+    R.rastreles.length ? 'Marca en la pared la altura de cada rastrel (hoja 2) con nivel, y atorníllalos con tacos (uno cada 50 cm).' : 'Fija el tablero trasero a la pared con tacos y tornillos.',
+    `Coloca las lamas en orden de la 1 a la ${R.n}, encajadas en los rastreles, a ${fmt(cm.sep, 1)} mm entre centros (usa un taco separador de ${fmt(Math.max(0, cm.hueco), 1)} mm).`,
+    'Fija cada lama con un tornillo o cola en cada rastrel. Empieza por el centro si quieres que el dibujo quede centrado en la pared.',
+    'Acabado: mejor antes de montar (aceite, barniz o pintura), para llegar a todas las caras.',
+  ] : ret ? [
     `Corta las ${R.n} costillas (1 a ${R.n}) y los ${nZ} largueros (A a ${ultZ}) en ${maq ? 'tablero de ' + fmt(P.maqueta.grosor, 1) + ' mm' : MATERIALES[P.costillas.material].nombre.toLowerCase() + ' de ' + fmt(grosor(), 1) + ' mm'}. Las ranuras son de ${wR} mm: ${maq ? 'prueba antes una en un retal' : 'en la CNC, con una fresa menor que el ancho de la ranura, y repasa las esquinas interiores con formón o lima (o déjalas en «hueso de perro»)'}.`,
     'Lija los cantos y comprueba con un retal que una ranura entra en otra sin forzar: tiene que entrar a mano, con un poco de roce.',
     `Pon las costillas de pie, en orden de la 1 a la ${R.n}, con sus ranuras ${P.reticula.xArriba !== false ? 'hacia arriba' : 'hacia abajo'}, más o menos a su distancia.`,
@@ -306,7 +326,7 @@ function planoPDF() {
     D.texto(M + 4, yp + 0.1, String(i + 1), { pt: 9, b: true, al: 'c', col: [255, 255, 255] });
     yp = D.parrafo(M + 11, yp, 170, t, { pt: 10 }) + 3;
   });
-  D.texto(M, H - M - 4, 'Herramientas: ' + (ret ? (maq ? 'cortadora láser o cúter, lija fina.' : 'CNC (fresa menor que la ranura), formón o lima, mazo de goma, lija.') : maq ? 'cortadora láser o cúter, cola blanca.' : `CNC o sierra de calar, broca de Ø ${fmt(2 * radioFab(), 1)}, lija, llaves para las tuercas M${V.diam}.`), { pt: 9, col: gris });
+  D.texto(M, H - M - 4, 'Herramientas: ' + (P.tipo === 'radial' ? (maq ? 'cortadora láser o cúter, cola.' : 'CNC o láser, sierra para el tubo, cola, lija.') : P.tipo === 'pared' ? 'CNC o sierra de calar, taladro, tacos y tornillos, nivel, taco separador.' : ret ? (maq ? 'cortadora láser o cúter, lija fina.' : 'CNC (fresa menor que la ranura), formón o lima, mazo de goma, lija.') : maq ? 'cortadora láser o cúter, cola blanca.' : `CNC o sierra de calar, broca de Ø ${fmt(2 * radioFab(), 1)}, lija, llaves para las tuercas M${V.diam}.`), { pt: 9, col: gris });
 
   // pies de página
   hojas.forEach((p, i) => { D.p = p; D.trazo([200, 200, 200]).grosor(0.2).linea(M, H - 8, W - M, H - 8); D.texto(M, H - 4.5, 'Made-rebanadas', { pt: 7.5, col: gris }); D.texto(W - M, H - 4.5, `Hoja ${i + 1} de ${hojas.length}`, { pt: 7.5, al: 'r', col: gris }); });
@@ -357,4 +377,86 @@ function hojaReticula(D, cabecera, tabla, o) {
   filas.push(['Costillas', P.reticula.xArriba !== false ? 'ranuras desde arriba' : 'ranuras desde abajo']);
   filas.push(['Largueros', P.reticula.xArriba !== false ? 'ranuras desde abajo' : 'ranuras desde arriba']);
   tabla(M + 184, M + 98, W - M - (M + 184), filas, { c1: 38 });
+}
+
+// hoja 2 de la planta curva: vista desde arriba con el eje, las costillas y las varillas
+function hojaCurva(D, cabecera, tabla, o) {
+  const { M, W, k, gris, azul, madera, cm } = o;
+  cabecera('2. Planta curva: orden de montaje, varillas y separadores');
+  const cs = R.costillas.filter(c => c.ok), segs = [];
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  cs.forEach(c => { const m = marcoEn(c.x); const a = puntoMarco(m, c.caja.x0, 0), b = puntoMarco(m, c.caja.x1, 0); segs.push([a, b, c]); [a, b].forEach(p => { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); z0 = Math.min(z0, p[2]); z1 = Math.max(z1, p[2]); }); });
+  const zona = { x: M + 8, y: M + 24, w: W - 2 * M - 16, h: 92 }, s = Math.min(zona.w / (x1 - x0), zona.h / (z1 - z0));
+  const PX = x => zona.x + (x - x0) * s + (zona.w - (x1 - x0) * s) / 2, PZ = z => zona.y + (z - z0) * s;
+  D.texto(zona.x, zona.y - 4, `Planta (vista desde arriba): ${R.n} costillas perpendiculares a la curva y las varillas, que la siguen.`, { pt: 8.5, col: gris });
+  D.trazo(madera).grosor(Math.max(0.25, grosor() * s));
+  segs.forEach(([a, b]) => D.linea(PX(a[0]), PZ(a[2]), PX(b[0]), PZ(b[2])));
+  D.trazo([80, 88, 98]).grosor(0.45);
+  R.varillas.filter(v => v.usada).forEach(v => {
+    const pts = []; for (let i = v.a; i <= v.b; i++) { const p = puntoMarco(marcoEn(R.costillas[i].x), v.u, v.v); pts.push([PX(p[0]), PZ(p[2])]); }
+    D.poli(pts, false); D.texto(pts[pts.length - 1][0] + 2, pts[pts.length - 1][1] + 1, 'V' + (v.k + 1), { pt: 7.5, b: true });
+  });
+  D.trazo();
+  const paso = Math.max(1, Math.ceil(cs.length / 30));
+  segs.forEach(([a, b, c], i) => { if (i % paso === 0 || i === segs.length - 1) D.texto(PX(a[0]), PZ(a[2]) - 1.5, String(c.i + 1), { pt: 6.5, al: 'c', col: azul }); });
+  const filas = [{ titulo: 'Varillas y separadores' }];
+  R.varillas.filter(v => v.usada).forEach(v => {
+    const L = cm.varillas.find(q => q.k === v.k).largo, sp = v.dists.map(d => d * k - grosorFab()).filter(x => x > 0.5);
+    filas.push([`V${v.k + 1}: atrás ${fmt(v.u * k, 1)} · suelo ${fmt(v.v * k, 1)} mm`, `largo ${fmt(L)} mm · radio mín. ${fmt(v.radioMin * k)} mm` + (sp.length ? ` · separadores de ${fmt(Math.min(...sp), 1)} a ${fmt(Math.max(...sp), 1)} mm` : '')]);
+  });
+  const fy = tabla(M, M + 126, W - 2 * M, filas, { c1: 80 });
+  // largos de los separadores, costilla a costilla
+  if (P.varillas.separadores) {
+    const us = R.varillas.filter(v => v.usada);
+    let txt = 'Separadores (entre la costilla n y la n+1, en mm): ';
+    us.forEach(v => { txt += `V${v.k + 1}: ` + v.dists.map((d, i) => `${v.a + i + 1}-${v.a + i + 2} ${fmt(d * k - grosorFab(), 1)}`).join(', ') + '. '; });
+    D.parrafo(M, fy + 6, W - 2 * M, txt, { pt: 7.5, col: gris });
+  }
+}
+// hoja 2 radial: planta con las costillas alrededor del tubo y perfil con los discos
+function hojaRadial(D, cabecera, tabla, o) {
+  const { M, W, k, gris, azul, madera } = o;
+  cabecera('2. Planta, discos de unión y orden de montaje');
+  const cs = R.costillas.filter(c => c.ok), rT = radioTubo(), rmax = Math.max(...cs.map(c => c.caja.x1));
+  const cx = M + 52, cy = M + 72, s = 46 / rmax;
+  D.texto(M, M + 22, 'Planta: costillas en orden.', { pt: 8.5, col: gris });
+  D.trazo([150, 150, 150]).grosor(0.3).circulo(cx, cy, rT * s);
+  R.discos.forEach(d => D.trazo([190, 190, 190]).rayas(1).circulo(cx, cy, d.rD * s).rayas(0));
+  D.trazo(madera).grosor(Math.max(0.3, grosor() * s));
+  cs.forEach(c => { const t = c.x * Math.PI / 180, ca = Math.cos(t), sa = -Math.sin(t); D.linea(cx + ca * c.caja.x0 * s, cy + sa * c.caja.x0 * s, cx + ca * c.caja.x1 * s, cy + sa * c.caja.x1 * s); D.texto(cx + ca * (c.caja.x1 * s + 4), cy + sa * (c.caja.x1 * s + 4) + 1.2, String(c.i + 1), { pt: 7, al: 'c', col: azul }); });
+  D.trazo();
+  // perfil de la costilla central con los discos
+  const c0 = cs[0], zx = M + 125, zy = M + 30, zh = 150, sp = Math.min(70 / (c0.caja.x1), zh / c0.caja.y1);
+  const PX = u => zx + u * sp, PY = v => zy + zh - v * sp;
+  D.texto(zx + 14, zy - 2, 'Costilla 1 y altura de los discos.', { pt: 8.5, col: gris });
+  D.relleno([200, 200, 200]).rect(PX(0), PY(c0.caja.y1 + 10), rT * sp, (c0.caja.y1 + 20) * sp, 'f');
+  D.relleno([240, 228, 208]).trazo(madera).grosor(0.35).poli(simplificaCerrado(c0.poly, 0.1).map(p => [PX(p[0]), PY(p[1])]), true, 'b');
+  D.relleno([0, 0, 0]).trazo([95, 107, 120]).grosor(0.3);
+  R.discos.forEach(d => { D.linea(PX(0), PY(d.v), PX(d.rD) + 6, PY(d.v)); D.texto(PX(d.rD) + 7, PY(d.v) + 1.2, d.etq, { pt: 8, b: true }); });
+  D.trazo();
+  const filas = [{ titulo: 'Tubo y discos' }, ['Tubo central', `Ø ${fmt(P.radial.tubo * k, 1)} mm · largo ${fmt(o.cm.tubo)} mm`], ['Ángulo entre costillas', `${fmt(R.sep, 2)}°`]];
+  R.discos.forEach(d => filas.push([`Disco ${d.etq}`, `a ${fmt(d.v * k)} mm del suelo · Ø ${fmt(2 * d.rD * k)} mm · ${R.n} ranuras`]));
+  filas.push(['Muescas y ranuras', `${fmt(grosorFab() + holguraRanuraFab(), 2)} mm de ancho`]);
+  tabla(M + 200, M + 24, W - M - (M + 200), filas, { c1: 30 });
+}
+// hoja 2 de la pared: alzado con las lamas y los rastreles
+function hojaPared(D, cabecera, tabla, o) {
+  const { M, W, k, gris, azul, madera, cm } = o;
+  cabecera('2. Alzado de la pared, rastreles y orden de colocación');
+  const cs = R.costillas.filter(c => c.ok), Pa = P.pared, H = Math.max(...cs.map(c => c.caja.y1));
+  const zona = { x: M + 10, y: M + 24, w: W - 2 * M - 20, h: 100 }, s = Math.min(zona.w / P.largo, zona.h / H);
+  const PX = x => zona.x + x * s, PY = v => zona.y + zona.h - v * s;
+  D.texto(zona.x, zona.y - 4, `Alzado (de frente): ${R.n} lamas numeradas y ${R.rastreles.length} rastreles detrás.`, { pt: 8.5, col: gris });
+  D.relleno([205, 179, 138]);
+  R.rastreles.forEach(r => D.rect(PX(R.costillas[0].x - grosor() / 2 - 30), PY(r.v + Pa.alto / 2), (R.costillas[R.n - 1].x - R.costillas[0].x + grosor() + 60) * s, Pa.alto * s, 'f'));
+  D.relleno([226, 205, 172]).trazo(madera).grosor(0.15);
+  cs.forEach(c => D.rect(PX(c.x - grosor() / 2), PY(c.caja.y1), Math.max(0.3, grosor() * s), (c.caja.y1 - c.caja.y0) * s, 'b'));
+  D.relleno([0, 0, 0]).trazo();
+  const paso = Math.max(1, Math.ceil(cs.length / 40));
+  cs.forEach((c, i) => { if (i % paso === 0 || i === cs.length - 1) D.texto(PX(c.x), PY(c.caja.y1) - 1.5, String(c.i + 1), { pt: 6.5, al: 'c', col: azul }); });
+  const filas = [{ titulo: 'Rastreles (altura de su centro desde abajo)' }];
+  R.rastreles.forEach(r => filas.push([`Rastrel ${r.j + 1}`, `a ${fmt(r.v * k)} mm · ${fmt(Pa.alto * k, 1)} × ${fmt(Pa.grueso * k, 1)} × ${fmt(cm.rastrel)} mm`]));
+  filas.push(['Separación entre lamas', `${fmt(cm.sep, 1)} mm entre centros (hueco ${fmt(Math.max(0, cm.hueco), 1)} mm)`]);
+  filas.push(['Medidas del panel', `${(G.dims || [0, 0, 0]).map(v => fmt(v * k)).join(' × ')} mm (ancho × fondo × alto)`]);
+  tabla(M, M + 134, W - 2 * M, filas, { c1: 70 });
 }

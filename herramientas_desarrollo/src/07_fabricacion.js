@@ -25,16 +25,18 @@ const diamVarFab = () => enMaqueta() ? P.maqueta.diam : P.varillas.diam;
 const textoEscala = () => enMaqueta() ? 'maqueta 1:' + P.maqueta.escala : 'tamaño real';
 // medidas de una costilla tal y como se fabrica (a escala si es maqueta)
 // todas las piezas que se cortan: costillas y, en la retícula, largueros
-const piezasFab = () => [...R.costillas, ...(R.largueros || [])].filter(c => c.ok);
-const holguraRanuraFab = () => enMaqueta() ? P.maqueta.holgura : P.reticula.holgura;
+const piezasFab = () => [...R.costillas, ...(R.otras || [])].filter(c => c.ok);
+const holguraRanuraFab = () => enMaqueta() ? P.maqueta.holgura : P.tipo === 'radial' ? P.radial.holgura : P.reticula.holgura;
 function geoFab(c) {
   const k = escalaFab();
   // las ranuras se rehacen con el grosor de fabricación (el de la maqueta, si lo es)
-  const base = c.ranuras && c.ranuras.length ? ranurar(c.base, c.ranuras, (grosorFab() + holguraRanuraFab()) / k).poly : c.poly;
+  const wF = (grosorFab() + holguraRanuraFab()) / k;
+  const base = c.generar ? c.generar(wF) : c.ranuras && c.ranuras.length ? ranurar(c.base, c.ranuras, wF).poly : c.poly;
   const poly = base.map(p => [p[0] * k, p[1] * k]);
   return {
     c, poly, caja: cajaDe(poly), r: radioFab(), area: Math.abs(c.area) * k * k,
-    agujeros: c.agujeros.map(j => [P.varillas.lista[j][0] * k, P.varillas.lista[j][1] * k]),
+    // agujeros [x, y, radio]: los de las varillas y los propios de la pieza (el tubo en los discos)
+    agujeros: c.agujeros.map(j => [P.varillas.lista[j][0] * k, P.varillas.lista[j][1] * k, radioFab()]).concat((c.huecos || []).map(h => [h.x * k, h.y * k, h.r * k])),
     etiqueta: puntoEtiqueta(c).map(v => v * k),
   };
 }
@@ -152,7 +154,7 @@ function dibujarTableros(ctx, col, f, Wc, opciones = {}) {
       ctx.beginPath();
       pz.g.poly.forEach((p, i) => { const [x, y] = P2(...aTablero(pz, p)); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
       ctx.closePath(); ctx.fillStyle = 'rgba(168,116,63,.35)'; ctx.fill(); ctx.strokeStyle = '#7a5226'; ctx.stroke();
-      pz.g.agujeros.forEach(q => { const [x, y] = P2(...aTablero(pz, q)); ctx.beginPath(); ctx.arc(x, y, Math.max(1.2, pz.g.r * sc), 0, PI2); ctx.strokeStyle = '#c0392b'; ctx.stroke(); });
+      pz.g.agujeros.forEach(q => { const [x, y] = P2(...aTablero(pz, q)); ctx.beginPath(); ctx.arc(x, y, Math.max(1.2, q[2] * sc), 0, PI2); ctx.strokeStyle = '#c0392b'; ctx.stroke(); });
       if (f.numeros) {
         const [x, y] = P2(...aTablero(pz, pz.g.etiqueta));
         ctx.fillStyle = '#1f4f8a'; ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(pz.c.etq, x, y);
@@ -198,7 +200,7 @@ function dxf() {
     if (f.modo !== 'fila') poli('TABLERO', [[ox, 0], [ox + f.ancho, 0], [ox + f.ancho, f.alto], [ox, f.alto]]);
     t.piezas.forEach(pz => {
       poli('CORTE', simplificaCerrado(pz.g.poly, 0.05).map(p => { const q = aTablero(pz, p); return [ox + q[0], q[1]]; }));
-      pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); g(0, 'CIRCLE'); g(8, 'TALADROS'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(pz.g.r)); });
+      pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); g(0, 'CIRCLE'); g(8, 'TALADROS'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(a[2])); });
       if (f.numeros) {
         const q = aTablero(pz, pz.g.etiqueta), h = altoTexto(pz.g);
         g(0, 'TEXT'); g(8, 'GRABADO'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(h)); g(1, pz.c.etq); g(72, 1); g(11, n(ox + q[0])); g(21, n(q[1] - h / 2)); g(31, 0);
@@ -222,7 +224,7 @@ function svg() {
     t.piezas.forEach(pz => {
       const d = simplificaCerrado(pz.g.poly, 0.05).map((p, i) => { const q = aTablero(pz, p); return (i ? 'L' : 'M') + n(ox + q[0]) + ' ' + n(Y(q[1])); }).join(' ') + ' Z';
       partes.push(`<path d="${d}" fill="none" stroke="#000" stroke-width="0.2"/>`);
-      pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); partes.push(`<circle cx="${n(ox + q[0])}" cy="${n(Y(q[1]))}" r="${n(pz.g.r)}" fill="none" stroke="#d00" stroke-width="0.2"/>`); });
+      pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); partes.push(`<circle cx="${n(ox + q[0])}" cy="${n(Y(q[1]))}" r="${n(a[2])}" fill="none" stroke="#d00" stroke-width="0.2"/>`); });
       if (f.numeros) { const q = aTablero(pz, pz.g.etiqueta); partes.push(`<text x="${n(ox + q[0])}" y="${n(Y(q[1]))}" font-family="Arial" font-size="${n(altoTexto(pz.g))}" text-anchor="middle" dominant-baseline="middle" fill="#00f">${pz.c.etq}</text>`); }
     });
     W += tw + 200;
@@ -233,46 +235,65 @@ function svg() {
 function exportarSVG() { descargar(nombreArchivo(P.nombre) + '_costillas' + sufijoFab() + '.svg', svg(), 'image/svg+xml'); aviso('SVG guardado'); }
 
 // ---------- despiece y lista de compra ----------
-function calcularCompraFab() { // como calcularCompra, pero con las medidas de fabricación (maqueta o real)
-  const V = P.varillas, k = escalaFab(), f = fabActual(), col = colocarEnTableros(f);
-  const usadas = P.tipo === 'reticula' ? [] : R.varillas.filter(v => v.usada);
-  const sepF = R.sep * k, hueco = sepF - grosorFab(), sobra = enMaqueta() ? Math.max(2, V.sobra * k) : V.sobra;
-  let nSep = 0;
-  if (V.separadores && hueco > 0.5 && P.tipo !== 'reticula') usadas.forEach(v => { for (let i = v.a; i < v.b; i++) if (v.cabe[i] && v.cabe[i + 1]) nSep++; });
+function calcularCompraFab() { // material con las medidas de fabricación (maqueta o real)
+  const V = P.varillas, k = escalaFab(), f = fabActual(), col = colocarEnTableros(f), eF = grosorFab();
+  const usadas = P.tipo === 'costillas' ? R.varillas.filter(v => v.usada) : [];
+  const sobra = enMaqueta() ? Math.max(2, V.sobra * k) : V.sobra, seps = [];
+  const varillas = usadas.map(v => {
+    if (V.separadores) v.dists.forEach((d, i) => { const L = d * k - eF; if (L > 0.5 && v.cabe[v.a + i] && v.cabe[v.a + i + 1]) seps.push(L); });
+    return { k: v.k, largo: v.dists.reduce((a, d) => a + d, 0) * k + eF + 2 * sobra };
+  });
+  const sepF = (P.tipo === 'radial' ? 0 : R.sep * k);
   return {
-    area: piezasFab().reduce((s, c) => s + Math.abs(c.area) * k * k, 0), nSep, hueco, sep: sepF,
-    varillas: usadas.map(v => ({ k: v.k, largo: (v.b - v.a) * sepF + grosorFab() + 2 * sobra })),
+    area: piezasFab().reduce((s, c) => s + Math.abs(c.area) * k * k, 0), sep: sepF, hueco: sepF - eF,
+    varillas, nSep: seps.length, seps, sepMin: seps.length ? Math.min(...seps) : 0, sepMax: seps.length ? Math.max(...seps) : 0,
     nTuercas: V.tipo === 'madera' || enMaqueta() ? 0 : usadas.length * 2,
+    tubo: P.tipo === 'radial' && R.tuboV ? (R.tuboV[1] - R.tuboV[0] + 40) * k : 0,
+    rastrel: P.tipo === 'pared' && R.rastreles.length ? (R.costillas[R.n - 1].x - R.costillas[0].x + grosor() + 60) * k : 0,
     tablero: [f.ancho, f.alto], nTableros: col.tableros.length, colocacion: col,
   };
 }
-function filasDespiece() {
-  const mat = enMaqueta() ? `Maqueta ${fmt(P.maqueta.grosor, 1)} mm` : MATERIALES[P.costillas.material].nombre;
-  return piezasFab().map(c => { const g = geoFab(c); return { n: c.etq, nombre: c.nombre, x: (c.z ? c.u : c.x) * escalaFab(), eje: c.z ? 'z' : 'x', ranuras: c.ranuras.length, w: g.caja.w, h: g.caja.h, e: grosorFab(), area: g.area, ag: c.agujeros.length, dA: fmt(2 * g.r, 2), mat }; });
-}
 function listaCompra() {
-  const cm = calcularCompraFab(), V = P.varillas, tv = VARILLA_TIPOS[V.tipo], L = [];
+  const cm = calcularCompraFab(), V = P.varillas, tv = VARILLA_TIPOS[V.tipo], L = [], maq = enMaqueta(), k = escalaFab();
+  const tablero = maq ? `Tablero de maqueta (DM, contrachapado…) de ${fmt(P.maqueta.grosor, 1)} mm` : `${MATERIALES[P.costillas.material].nombre}, ${fmt(grosor(), 1)} mm`;
+  L.push([tablero, `${cm.nTableros} tablero${cm.nTableros === 1 ? '' : 's'} de ${fmt(cm.tablero[0])} × ${fmt(cm.tablero[1])} mm (${maq ? fmt(cm.area / 100, 0) + ' cm²' : fmt(cm.area / 1e6, 2) + ' m²'} de piezas)`]);
   if (P.tipo === 'reticula') {
-    const nX = R.costillas.filter(c => c.ok).length, nZ = (R.largueros || []).filter(z => z.ok).length;
-    L.push([enMaqueta() ? `Tablero de maqueta de ${fmt(P.maqueta.grosor, 1)} mm` : `${MATERIALES[P.costillas.material].nombre}, ${fmt(grosor(), 1)} mm`, `${cm.nTableros} tablero${cm.nTableros === 1 ? '' : 's'} de ${fmt(cm.tablero[0])} × ${fmt(cm.tablero[1])} mm (${enMaqueta() ? fmt(cm.area / 100, 0) + ' cm²' : fmt(cm.area / 1e6, 2) + ' m²'} de piezas)`]);
-    L.push(['Piezas', `${nX} costillas y ${nZ} largueros, con ${R.cruces.length} cruces`]);
+    L.push(['Piezas', `${R.costillas.filter(c => c.ok).length} costillas y ${R.largueros.filter(z => z.ok).length} largueros, con ${R.cruces.length} cruces`]);
     L.push(['Ranuras a media madera', `${fmt(grosorFab() + holguraRanuraFab(), 2)} mm de ancho`]);
     L.push(['Herrajes', 'ninguno (cola en los cruces, si se quiere fijo)']);
     return L;
   }
-  if (enMaqueta()) {
-    L.push([`Tablero de maqueta (DM, contrachapado…) de ${fmt(P.maqueta.grosor, 1)} mm`, `${cm.nTableros} de ${fmt(cm.tablero[0])} × ${fmt(cm.tablero[1])} mm (${fmt(cm.area / 100, 0)} cm² de piezas)`]);
-    cm.varillas.forEach(v => L.push([`Varilla de Ø ${fmt(P.maqueta.diam, 1)} mm (bambú, madera o alambre) — varilla ${v.k + 1}`, fmt(v.largo) + ' mm']));
-    if (cm.nSep) L.push([`Separadores de ${fmt(cm.hueco, 1)} mm (tubito, pajita o arandela de cartón)`, `${cm.nSep} piezas`]);
-    L.push(['Agujeros', `Ø ${fmt(P.maqueta.diam + P.maqueta.holgura, 2)} mm`]);
+  if (P.tipo === 'radial') {
+    L.push([`Tubo central Ø ${fmt(P.radial.tubo * k, 1)} mm (${maq ? 'pajita, varilla o tubo' : 'acero, aluminio, latón o madera'})`, fmt(cm.tubo) + ' mm']);
+    if (R.discos.length) L.push([`Discos de unión (salen del mismo tablero)`, `${R.discos.length} de Ø ${fmt(2 * R.discos[0].rD * k)} mm`]);
+    L.push(['Cola', 'para fijar los discos al tubo y las costillas a los discos']);
+    if (!maq) L.push(['Si es lámpara', 'portalámparas, cable, florón y bombilla LED (que no caliente)']);
     return L;
   }
-  L.push([`${MATERIALES[P.costillas.material].nombre}, ${fmt(grosor(), 1)} mm`, `${cm.nTableros} tablero${cm.nTableros === 1 ? '' : 's'} de ${fmt(cm.tablero[0])} × ${fmt(cm.tablero[1])} mm (${fmt(cm.area / 1e6, 2)} m² de piezas)`]);
-  cm.varillas.forEach(v => L.push([`${tv.nombre} ${V.tipo === 'roscada' ? 'M' : 'Ø '}${V.diam} — varilla ${v.k + 1}`, fmt(v.largo) + ' mm']));
-  if (cm.nSep) L.push([`${tv.sep} Ø ${V.sepD} mm (agujero interior > ${V.diam} mm)`, `${cm.nSep} piezas de ${fmt(cm.hueco, 1)} mm (${fmt(cm.nSep * cm.hueco)} mm en total)`]);
+  if (P.tipo === 'pared') {
+    const Pa = P.pared;
+    if (R.rastreles.length) L.push([`Rastrel (listón) de ${fmt(Pa.alto * k, 1)} × ${fmt(Pa.grueso * k, 1)} mm`, `${R.rastreles.length} de ${fmt(cm.rastrel)} mm`]);
+    else L.push(['Tablero trasero (o escuadras)', `${fmt(cm.rastrel || P.largo * k)} × ${fmt((G.alto || 0) * k)} mm`]);
+    if (!maq) { L.push(['Tacos y tornillos para la pared', `${R.rastreles.length * Math.max(2, Math.ceil(cm.rastrel / 500))} (uno cada 50 cm de rastrel)`]); L.push(['Tornillos o cola para las lamas', `${R.n * Math.max(1, R.rastreles.length)} (uno en cada cruce con un rastrel)`]); }
+    return L;
+  }
+  const curva = disposicion() === 'curva';
+  cm.varillas.forEach(v => L.push([maq ? `Varilla de Ø ${fmt(P.maqueta.diam, 1)} mm${curva ? ' (que se pueda curvar: alambre)' : ' (bambú, madera o alambre)'} — varilla ${v.k + 1}` : `${tv.nombre} ${V.tipo === 'roscada' ? 'M' : 'Ø '}${V.diam}${curva ? ' (curvada)' : ''} — varilla ${v.k + 1}`, fmt(v.largo) + ' mm']));
+  if (cm.nSep) {
+    const txt = Math.abs(cm.sepMax - cm.sepMin) < 0.2 ? `${cm.nSep} piezas de ${fmt(cm.sepMin, 1)} mm (${fmt(cm.seps.reduce((a, b) => a + b, 0))} mm en total)` : `${cm.nSep} piezas de ${fmt(cm.sepMin, 1)} a ${fmt(cm.sepMax, 1)} mm (cada largo en el plano; ${fmt(cm.seps.reduce((a, b) => a + b, 0))} mm en total)`;
+    L.push([maq ? 'Separadores (tubito, pajita o arandela de cartón)' : `${tv.sep} Ø ${V.sepD} mm (agujero interior > ${V.diam} mm)`, txt]);
+  }
   if (cm.nTuercas) L.push([`Tuercas M${V.diam} (mejor ciegas) y arandelas`, `${cm.nTuercas} + ${cm.nTuercas}`]);
-  L.push(['Broca para los agujeros', `Ø ${fmt(V.diam + V.holgura, 1)} mm`]);
+  L.push([maq ? 'Agujeros' : 'Broca para los agujeros', `Ø ${fmt(2 * radioFab(), maq ? 2 : 1)} mm`]);
   return L;
+}
+function filasDespiece() {
+  const mat = enMaqueta() ? `Maqueta ${fmt(P.maqueta.grosor, 1)} mm` : MATERIALES[P.costillas.material].nombre;
+  return piezasFab().map(c => {
+    const g = geoFab(c), rad = P.tipo === 'radial' && !c.disco;
+    return { n: c.etq, nombre: c.nombre, x: (c.disco ? c.v : c.z ? c.u : c.x) * (rad ? 1 : escalaFab()), eje: c.disco ? 'altura' : c.z ? 'z' : rad ? 'ángulo' : 'x',
+      ranuras: c.ranuras.length + (c.disco ? R.n : 0), w: g.caja.w, h: g.caja.h, e: grosorFab(), area: g.area, ag: g.agujeros.length, dA: g.agujeros.length ? fmt(2 * g.agujeros[0][2], 2) : '', mat };
+  });
 }
 function abrirDespiece() {
   if (!R) return;
@@ -280,7 +301,7 @@ function abrirDespiece() {
   modal('📋 Despiece y lista de compra' + (enMaqueta() ? ' · maqueta 1:' + P.maqueta.escala : ''), `
     <h4>Costillas</h4>
     <div style="max-height:46vh;overflow:auto"><table class="tabla"><tr><th class="n">Pieza</th><th class="n">Posición</th><th class="n">Ancho</th><th class="n">Alto</th><th class="n">Grosor</th><th class="n">Superficie</th><th class="n">Agujeros / ranuras</th></tr>
-    ${F.map(f => `<tr><td class="n">${esc(f.nombre)}</td><td class="n">${f.eje} = ${fmt(f.x)} mm</td><td class="n">${fmt(f.w, enMaqueta() ? 1 : 0)}</td><td class="n">${fmt(f.h, enMaqueta() ? 1 : 0)}</td><td class="n">${fmt(f.e, 1)}</td><td class="n">${fmt(f.area / 100)} cm²</td><td class="n">${f.ranuras ? f.ranuras + ' ranuras' : f.ag + ' × Ø' + f.dA}</td></tr>`).join('')}
+    ${F.map(f => `<tr><td class="n">${esc(f.nombre)}</td><td class="n">${f.eje} = ${f.eje === 'ángulo' ? fmt(f.x, 1) + '°' : fmt(f.x) + ' mm'}</td><td class="n">${fmt(f.w, enMaqueta() ? 1 : 0)}</td><td class="n">${fmt(f.h, enMaqueta() ? 1 : 0)}</td><td class="n">${fmt(f.e, 1)}</td><td class="n">${fmt(f.area / 100)} cm²</td><td class="n">${f.ranuras ? f.ranuras + ' ranuras' : f.ag + ' × Ø' + f.dA}</td></tr>`).join('')}
     </table></div>
     <h4>Lista de compra</h4>
     <table class="tabla">${L.map(l => `<tr><td>${esc(l[0])}</td><td class="n">${esc(l[1])}</td></tr>`).join('')}</table>`,

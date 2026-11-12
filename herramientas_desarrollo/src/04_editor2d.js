@@ -126,6 +126,18 @@ function dibujarPerfil(ctx, V) {
   V.camino(ctx, k.pts); ctx.stroke(); ctx.setLineDash([]);
   // varillas
   const r = radioAgujero(), Vv = P.varillas;
+  // radial: tubo central y discos; pared: la pared y los rastreles
+  if (P.tipo === 'radial') {
+    const [xt] = V.aPantalla(radioTubo(), 0);
+    ctx.fillStyle = 'rgba(150,156,164,.25)'; ctx.fillRect(V.aPantalla(0, 0)[0], 0, xt - V.aPantalla(0, 0)[0], V.h);
+    ctx.fillStyle = '#5f6b78'; ctx.font = '11px system-ui'; ctx.fillText('tubo', xt + 4, 46);
+    R.discos.forEach(d => { const [a, y] = V.aPantalla(radioTubo(), d.v), [b] = V.aPantalla(d.rD, 0); ctx.fillStyle = 'rgba(95,107,120,.35)'; ctx.fillRect(a, y - grosor() / 2 * V.sc, b - a, grosor() * V.sc); ctx.fillStyle = '#5f6b78'; ctx.fillText(d.etq, b + 4, y + 4); });
+  }
+  if (P.tipo === 'pared') {
+    const [xp] = V.aPantalla(0, 0);
+    ctx.fillStyle = 'rgba(150,156,164,.28)'; ctx.fillRect(0, 0, xp, V.h); ctx.fillStyle = '#5f6b78'; ctx.font = '11px system-ui'; ctx.fillText('pared', Math.max(4, xp - 40), 46);
+    R.rastreles.forEach(rr => { const [a, y] = V.aPantalla(0, rr.v + P.pared.alto / 2), [b] = V.aPantalla(P.pared.grueso, 0); ctx.fillStyle = 'rgba(205,179,138,.6)'; ctx.fillRect(a, y, b - a, P.pared.alto * V.sc); });
+  }
   // retícula: posición de los largueros
   if (P.tipo === 'reticula') {
     const vistos = new Set();
@@ -137,7 +149,7 @@ function dibujarPerfil(ctx, V) {
       ctx.fillStyle = ctx.strokeStyle; ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center'; ctx.fillText(letra(z.j), x, 58); ctx.textAlign = 'left';
     });
   }
-  if (P.tipo !== 'reticula') Vv.lista.forEach((p, i) => {
+  if (P.tipo === 'costillas') Vv.lista.forEach((p, i) => {
     const info = R.varillas[i], mal = info && (!info.usada || info.fallan.length), [x, y] = V.aPantalla(p[0], p[1]);
     const col = mal ? cssVar('--peligro') : '#5f6b78';
     ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
@@ -176,7 +188,7 @@ function puntoCerca(mx, my) {
   return mejor;
 }
 function varillaCerca(mx, my) {
-  if (P.tipo === 'reticula') return -1;
+  if (P.tipo !== 'costillas') return -1;
   let mejor = -1, md = Infinity; const r = radioAgujero();
   P.varillas.lista.forEach((p, i) => { const [x, y] = VP.aPantalla(p[0], p[1]), d = Math.hypot(x - mx, y - my); if (d < Math.max(9, r * VP.sc + 4) && d < md) { md = d; mejor = i; } });
   return mejor;
@@ -316,14 +328,15 @@ function selCostilla(i, encuadrar) {
   const li = $('#listaCost').children[UI.costilla]; if (li) li.scrollIntoView({ block: 'nearest' });
 }
 // pieza seleccionada: costilla o larguero (retícula)
-const nPiezas = () => R.n + (R.largueros ? R.largueros.length : 0);
-const piezaSel = () => R ? (UI.costilla < R.n ? R.costillas[UI.costilla] : R.largueros[UI.costilla - R.n]) : null;
+const nPiezas = () => R.n + (R.otras ? R.otras.length : 0);
+const piezaSel = () => R ? (UI.costilla < R.n ? R.costillas[UI.costilla] : R.otras[UI.costilla - R.n]) : null;
 function encuadrarCostilla() { const c = piezaSel(); if (c && c.ok) VC.encuadrar(c.caja, 40); else VC.pintar(); }
 function refrescarCostilla() {
   const c = piezaSel(); if (!c) return;
-  $('#tipoPieza').textContent = c.z ? 'Larguero' : 'Costilla';
+  $('#tipoPieza').textContent = c.disco ? 'Disco' : c.z ? 'Larguero' : P.tipo === 'pared' ? 'Lama' : 'Costilla';
   $('#numCost').textContent = c.etq;
-  $('#infoCost').textContent = c.z ? `z = ${fmt(c.u)} mm · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm · ${c.ranuras.length} ranuras`
-    : `de ${R.n} · x = ${fmt(c.x)} mm · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm` + (c.ranuras.length ? ` · ${c.ranuras.length} ranuras` : '');
+  $('#infoCost').textContent = c.disco ? `a ${fmt(c.v)} mm de altura · Ø ${fmt(2 * c.rD)} mm · ${R.n} ranuras`
+    : c.z ? `z = ${fmt(c.u)} mm · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm · ${c.ranuras.length} ranuras`
+    : `de ${R.n} · ${P.tipo === 'radial' ? 'ángulo' : 'x'} = ${textoPos(c.x)} · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm` + (c.ranuras.length ? ` · ${c.ranuras.length} ${P.tipo === 'reticula' ? 'ranuras' : 'muescas'}` : '');
   $$('#listaCost li').forEach((li, i) => li.classList.toggle('sel', i === UI.costilla));
 }

@@ -10,7 +10,7 @@ function piezaCalcador(c) {
   // cada agujero: círculo de dos medias vueltas (bulge 1)
   g.agujeros.forEach(a => {
     const x = a[0] - b.x0, y = a[1] - b.y0;
-    contornos.push({ pts: [{ x: r3(x + g.r), y: r3(y) }, { x: r3(x - g.r), y: r3(y) }], b: [1, 1], cerrado: true, tipo: 'interior', mec: { op: 'corte', prof: null, puentes: { ...PUENTES0 } } });
+    contornos.push({ pts: [{ x: r3(x + a[2]), y: r3(y) }, { x: r3(x - a[2]), y: r3(y) }], b: [1, 1], cerrado: true, tipo: 'interior', mec: { op: 'corte', prof: null, puentes: { ...PUENTES0 } } });
   });
   return { nombre: c.nombre, cantidad: 1, veta: false, calcador: { contornos } };
 }

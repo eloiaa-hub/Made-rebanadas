@@ -46,7 +46,10 @@ function hacerRanura(poly, r, w) {
 // aplica las ranuras de una pieza con un ancho dado (en sus coordenadas); devuelve el polígono y las que fallan
 function ranurar(base, ranuras, w) {
   let poly = base; const fallan = [];
-  for (const r of ranuras) { const nuevo = hacerRanura(poly, r, w); if (nuevo) poly = nuevo; else fallan.push(r); }
+  for (const r of ranuras) {
+    const ww = r.ancho != null ? r.ancho : w, nuevo = r.lat ? hacerRanuraLat(poly, r, ww) : hacerRanura(poly, r, ww);
+    if (nuevo) poly = nuevo; else fallan.push(r);
+  }
   return { poly, fallan };
 }
 
