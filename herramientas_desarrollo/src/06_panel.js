@@ -127,6 +127,39 @@ function iniciarPanel() {
     cambio({ costillas: 'Costillas con varillas', reticula: 'Retícula entrelazada', radial: 'Rebanadas radiales', pared: 'Panel de pared' }[P.tipo]);
     encuadrarSiHaceFalta(); camara('tres4');
   });
+  // relieve: texto o modelo 3D
+  LETRAS_SISTEMA.forEach(l => $('#rlLetra').add(new Option(l, l)));
+  const Rl = () => P.relieve;
+  enlazar('#sOrigen', () => {
+    Rl().fuente = $('#sOrigen').value;
+    if (relieveActivo() && P.pared.rastreles && Rl().fondo < P.pared.grueso + 15) Rl().fondo = P.pared.grueso + 15;
+    UI.costilla = 0; ponerControles(); cambio({ plantilla: 'Forma desde la plantilla', texto: 'Relieve de texto', modelo: 'Relieve desde un modelo 3D' }[Rl().fuente]);
+    encuadrarSiHaceFalta(); camara('tres4');
+  });
+  const num = (sel, k, min = 0) => enlazar(sel, () => { Rl()[k] = Math.max(min, +$(sel).value || 0); cambio(); });
+  num('#rlTam', 'tamLetra', 5); num('#rlFondo', 'fondo', 2); num('#rlRelieve', 'relieve'); num('#rlSuave', 'suavizado'); num('#rlOnda', 'ondaAmp'); num('#rlOndas', 'ondas', 0.5); num('#rlInter', 'interlinea', 0.5);
+  enlazar('#rlBase', () => { Rl().base = clamp(+$('#rlBase').value || 0, 0, 0.9); cambio(); });
+  const medida = (sel, k) => enlazar(sel, () => { Rl()[k] = Math.max(100, +$(sel).value || 500); if (Rl().fuente === 'modelo') reproyectarModelo(); cambio(); encuadrarSiHaceFalta(); camara('tres4'); });
+  medida('#rlAncho', 'ancho'); medida('#rlAlto', 'alto');
+  enlazar('#rlLetra', () => { Rl().letra = $('#rlLetra').value; cambio(); });
+  enlazar('#rlNegrita', () => { Rl().negrita = $('#rlNegrita').checked; cambio(); });
+  enlazar('#rlInvertir', () => { Rl().invertir = $('#rlInvertir').checked; cambio(); });
+  let tTexto = 0;
+  $('#rlTexto').addEventListener('input', () => { clearTimeout(tTexto); tTexto = setTimeout(() => { Rl().texto = $('#rlTexto').value; cambio('Texto'); }, 450); });
+  const vista = () => { Rl().vista = $('#rlVista').value; Rl().giro = +$('#rlGiro').value; if (reproyectarModelo()) cambio('Vista del modelo'); else aviso('Para cambiar la vista, vuelve a cargar el modelo (el proyecto guarda solo su relieve).', 5000); };
+  enlazar('#rlVista', vista); enlazar('#rlGiro', vista);
+  $('#bCargarModelo').onclick = () => {
+    const f = $('#fModelo'); f.value = '';
+    f.onchange = () => {
+      const a = f.files[0]; if (!a) return;
+      aviso('Leyendo ' + esc(a.name) + '…');
+      const rd = new FileReader();
+      rd.onload = () => { try { const n = cargarModelo(rd.result, a.name); ponerControles(); cambio('Modelo: ' + a.name); encuadrarSiHaceFalta(); camara('tres4'); aviso(`${esc(a.name)}: ${n.toLocaleString('es-ES')} triángulos`); } catch (e) { aviso('⚠ ' + esc(e.message), 5000); } };
+      rd.readAsArrayBuffer(a);
+    };
+    f.click();
+  };
+  enlazar('#paOrient', () => { Rl().orient = $('#paOrient').value; cambio(Rl().orient === 'h' ? 'Lamas horizontales' : 'Lamas verticales'); encuadrarSiHaceFalta(); camara('tres4'); });
   // planta curva
   enlazar('#plForma', () => { P.planta.forma = $('#plForma').value; mostrarSecciones(); cambio('Planta ' + $('#plForma').selectedOptions[0].text.toLowerCase()); camara('tres4'); });
   enlazar('#plRadio', () => { P.planta.radio = Math.max(150, +$('#plRadio').value || 2500); cambio(); });
@@ -217,6 +250,14 @@ function mostrarSecciones() {
   $('#filaSep').classList.toggle('oculto', rad || P.costillas.modo !== 'separacion');
   $('#filaNum').classList.toggle('oculto', rad || P.costillas.modo !== 'numero');
   $('#kPosTit').textContent = rad ? 'Posición (°)' : 'Posición (mm)';
+  // relieve (paneles de pared)
+  const rel = relieveActivo(), Rl = P.relieve;
+  $('#filaOrigen').classList.toggle('oculto', t !== 'pared');
+  $('#filaPlantilla').classList.toggle('oculto', rel); $('#params').classList.toggle('oculto', rel); $('#descPlantilla').classList.toggle('oculto', rel);
+  $('#secRelieve').classList.toggle('oculto', !rel);
+  $('#relTexto').classList.toggle('oculto', Rl.fuente !== 'texto'); $('#relModelo').classList.toggle('oculto', Rl.fuente !== 'modelo');
+  $('#secClaves').classList.toggle('oculto', rel);
+  $('#sClave').classList.toggle('oculto', rel); $('#bEsquina').classList.toggle('oculto', rel); $('#infoClave').classList.toggle('oculto', rel);
 }
 function ponerControles() {
   llenarPlantillas();
@@ -237,6 +278,11 @@ function ponerControles() {
   const Ra = P.radial; $('#raNum').value = P.costillas.numero; $('#raTubo').value = Ra.tubo; $('#raHolTubo').value = Ra.holguraTubo; $('#raDiscos').value = Ra.discos; $('#raRDisco').value = Ra.rDisco; $('#raHolgura').value = Ra.holgura;
   const Pa = P.pared; $('#paNum').value = Pa.rastreles; $('#paAlto').value = Pa.alto; $('#paGrueso').value = Pa.grueso; $('#paMargen').value = Pa.margen; $('#paHolgura').value = Pa.holgura; $('#paVer').checked = Pa.verPared;
   $('#cClaves3d').checked = P.vista.claves !== false;
+  const Rl = P.relieve; $('#sOrigen').value = P.tipo === 'pared' ? Rl.fuente : 'plantilla'; $('#paOrient').value = Rl.orient || 'v';
+  $('#rlTexto').value = Rl.texto; $('#rlLetra').value = Rl.letra; $('#rlNegrita').checked = Rl.negrita; $('#rlTam').value = Rl.tamLetra; $('#rlInter').value = Rl.interlinea;
+  $('#rlVista').value = Rl.vista; $('#rlGiro').value = String(Rl.giro || 0); $('#rlBase').value = Rl.base;
+  $('#rlAncho').value = Rl.ancho; $('#rlAlto').value = Rl.alto; $('#rlFondo').value = Rl.fondo; $('#rlRelieve').value = Rl.relieve; $('#rlSuave').value = Rl.suavizado; $('#rlInvertir').checked = Rl.invertir; $('#rlOnda').value = Rl.ondaAmp; $('#rlOndas').value = Rl.ondas;
+  $('#rlModeloInfo').textContent = Rl.modelo ? `Modelo: ${Rl.modelo.nombre}` + (Rl.modelo.triangulos ? ` (${Rl.modelo.triangulos.toLocaleString('es-ES')} triángulos)` : '') + (UI.malla ? '' : '. El proyecto guarda su relieve; para cambiar la vista, vuelve a cargarlo.') : 'Sin modelo. Carga un STL u OBJ (rostro, figura, logo en 3D…).';
   mostrarSecciones();
   const M = P.maqueta; $('#mActiva').checked = M.activa; $('#mEscala').value = String(M.escala); $('#mGrosor').value = M.grosor; $('#mDiam').value = M.diam; $('#mHolgura').value = M.holgura;
   $('#rExplosion').value = P.vista.explosion; $('#cFantasma').checked = P.vista.fantasma; $('#cVarillas3d').checked = P.vista.varillas; $('#cResalta').checked = P.vista.resalta;

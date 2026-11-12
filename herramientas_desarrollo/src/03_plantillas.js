@@ -263,6 +263,40 @@ PLANTILLAS.pared_relieve = {
     return generarPared(p, (t, y) => p.fondo + p.relieve * Math.min(1, g(t, y, p.cx, p.cy) + p.dos * g(t, y, 1 - p.cx * 0.6, 1 - p.cy)));
   },
 };
+PLANTILLAS.pared_estante = {
+  nombre: 'Estantería de pared ondulada', grupo: 'pared',
+  desc: 'Lamas contra la pared que salen formando baldas; el fondo de las baldas ondula a lo ancho.',
+  params: [
+    { id: 'largo', nombre: 'Ancho de la estantería', min: 400, max: 6000, paso: 10, valor: 2000 },
+    { id: 'alto', nombre: 'Alto', min: 300, max: 2500, paso: 10, valor: 1000 },
+    { id: 'baldas', nombre: 'Número de baldas', min: 1, max: 8, paso: 1, valor: 3 },
+    { id: 'fondoMax', nombre: 'Fondo mayor de las baldas', min: 60, max: 600, paso: 5, valor: 220 },
+    { id: 'fondoMin', nombre: 'Fondo menor de las baldas', min: 30, max: 600, paso: 5, valor: 110 },
+    { id: 'ondas', nombre: 'Ondas a lo ancho', min: 0.5, max: 5, paso: 0.5, valor: 1.5 },
+    { id: 'desfase', nombre: 'Desfase entre baldas (0 a 1)', min: 0, max: 1, paso: 0.05, valor: 0.3 },
+    { id: 'gruesoBalda', nombre: 'Grueso de la balda', min: 15, max: 120, paso: 1, valor: 40 },
+    { id: 'fondo', nombre: 'Fondo de la lama entre baldas', min: 20, max: 200, paso: 1, valor: 45 },
+    { id: 'mensula', nombre: 'Altura de la ménsula bajo la balda', min: 0, max: 300, paso: 5, valor: 90 },
+  ],
+  generar(p) {
+    const n = Math.round(p.baldas), H = p.alto, F = p.fondo;
+    const esquinas = [true, true];
+    for (let j = 0; j < n; j++) esquinas.push(true, false, true, true, true);
+    esquinas.push(true, true);
+    const K = clamp(Math.round(p.ondas * 6) + 1, 7, 31);
+    const claves = clavesUniformes(K, p.largo, t => {
+      const pts = [[0, 0], [F, 0]];
+      for (let j = 0; j < n; j++) {
+        const h = H * (j + 1) / (n + 0.6), g = p.gruesoBalda, m = Math.max(g * 0.5, p.mensula);
+        const D = Math.max(F + 10, p.fondoMin + (p.fondoMax - p.fondoMin) * (0.5 + 0.5 * Math.sin(PI2 * (p.ondas * t + j * p.desfase))));
+        pts.push([F, Math.max(1, h - g - m)], [F + (D - F) * 0.6, h - g - m * 0.25], [D, h - g], [D, h], [F, h]);
+      }
+      pts.push([F, H], [0, H]);
+      return redondeaPts(pts);
+    });
+    return { largo: p.largo, esquinas, claves };
+  },
+};
 const grupoDe = id => PLANTILLAS[id].grupo || 'lineal';
 const grupoTipo = t => t === 'radial' ? 'radial' : t === 'pared' ? 'pared' : 'lineal';
 

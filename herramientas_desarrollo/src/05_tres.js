@@ -104,7 +104,7 @@ function marcoExpl(x) {
 // coloca una malla extruida (forma en u, v; grosor centrado) con el marco m
 function ponerEnMarco(obj, m, dy = 0) {
   const ae = ejeGrosor(m), M4 = new T.Matrix4();
-  M4.makeBasis(new T.Vector3(...m.Au), new T.Vector3(0, 1, 0), new T.Vector3(...ae)).setPosition(m.O[0], m.O[1] + dy, m.O[2]);
+  M4.makeBasis(new T.Vector3(...m.Au), new T.Vector3(...ejeV(m)), new T.Vector3(...ae)).setPosition(m.O[0], m.O[1] + dy, m.O[2]);
   obj.matrixAutoUpdate = false; obj.matrix.copy(M4); obj.matrixWorldNeedsUpdate = true;
 }
 const V3 = a => new T.Vector3(a[0], a[1], a[2]);
@@ -165,9 +165,16 @@ function construir3D() {
     const mR = new T.MeshStandardMaterial({ color: '#cdb38a', roughness: .8 }); mR.userData.propio = true;
     const x0 = R.costillas[0].x - e / 2 - 30, x1 = R.costillas[R.n - 1].x + e / 2 + 30, Pa = P.pared;
     R.rastreles.forEach(r => {
-      const b = new T.Mesh(new T.BoxGeometry(x1 - x0, Pa.alto, Pa.grueso), mR);
-      b.position.set((x0 + x1) / 2 - P.largo / 2, r.v, Pa.grueso / 2); b.castShadow = true; b.userData.extra = 'rastrel'; G.modelo.add(b);
+      // de la primera a la última lama, 30 mm más por cada lado, a la altura del rastrel
+      const m0 = marcoEn(R.costillas[0].x), m1 = marcoEn(R.costillas[R.n - 1].x), ae = ejeGrosor(m0), av = ejeV(m0);
+      const a = puntoMarco(m0, Pa.grueso / 2, r.v), b = puntoMarco(m1, Pa.grueso / 2, r.v);
+      const d = new T.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]), L = d.length() + e + 60;
+      const caja = new T.Mesh(new T.BoxGeometry(L, Pa.alto, Pa.grueso), mR);
+      const ex = new T.Vector3(...ae), ey = new T.Vector3(...av), ez = ex.clone().cross(ey);
+      caja.matrixAutoUpdate = false; caja.matrix.makeBasis(ex, ey, ez).setPosition((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
+      caja.castShadow = true; caja.userData.extra = 'rastrel'; G.modelo.add(caja);
     });
+
     if (Pa.verPared) {
       const mP = new T.MeshStandardMaterial({ color: '#e9e5de', roughness: .95 }); mP.userData.propio = true;
       const w = new T.Mesh(new T.PlaneGeometry(Math.max(P.largo * 1.6, 2000), Math.max(G.alto * 1.5, 1500)), mP);
@@ -230,7 +237,7 @@ function construirVarillas3D() {
 function construirClaves3D() {
   (G.claves3d || []).forEach(l => { G.modelo.remove(l); l.geometry.dispose(); l.material.dispose(); });
   G.claves3d = [];
-  if (!P.vista.claves) return;
+  if (!P.vista.claves || relieveActivo()) return;
   const C = clavesOrdenadas(), acento = cssVar('--acento') || '#1f6fd1';
   C.forEach((k, i) => {
     if (P.tipo === 'radial' && k.x >= 359.999 && C.length > 1) return;     // la de 360° es la misma que la de 0°
@@ -262,7 +269,7 @@ function construirFantasma() {
   if (!P.vista.fantasma) return;
   const N = P.tipo === 'radial' ? 72 : 64, anillos = [], X = P.tipo === 'radial' ? 360 : P.largo;
   for (let i = 0; i <= N; i++) {
-    const x = X * i / N; let c = curvaCerrada(perfilEn(x), P.esquinas);
+    const x = X * i / N; let c = relieveActivo() ? poligonoRelieve(x, true) : curvaCerrada(perfilEn(x), P.esquinas);
     c = c.map(p => [P.tipo === 'radial' ? Math.max(p[0], radioTubo()) : p[0], clamp(p[1], P.costillas.base ? 0 : -1e9, P.costillas.tope ? P.costillas.topeAlt : 1e9)]);
     anillos.push({ m: marcoExpl(x), c });
   }

@@ -8,7 +8,7 @@
 'use strict';
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
-const VERSION = '1.4';
+const VERSION = '1.5';
 const T = window.THREE;
 
 /* ===================== UTILIDADES ===================== */
@@ -83,5 +83,8 @@ function proyectoBase() {
     planta: { forma: 'recta', radio: 2500, sentido: 1, amplitud: 150, ondas: 1 },
     radial: { tubo: 20, holguraTubo: 0.5, discos: 2, rDisco: 0, holgura: 0.3 },
     pared: { rastreles: 3, alto: 45, grueso: 20, margen: 120, holgura: 0.5, verPared: true },
+    relieve: { fuente: 'plantilla', orient: 'v', ancho: 1200, alto: 500, fondo: 20, relieve: 60, suavizado: 10, invertir: false,
+      texto: 'Made', letra: 'Arial Black', tamLetra: 320, negrita: true, interlinea: 1.05, ondaAmp: 0, ondas: 2,
+      vista: 'frente', giro: 0, base: 0.15, modelo: null },
   };
 }

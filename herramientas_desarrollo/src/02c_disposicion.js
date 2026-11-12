@@ -31,11 +31,17 @@ function marcoEn(x) {
   const d = disposicion(), uc = ucActual;
   if (d === 'radial') { const t = x * Math.PI / 180; return { O: [0, 0, 0], Au: [Math.cos(t), 0, -Math.sin(t)] }; }
   if (d === 'curva') { const s = ejePlanta(x), sf = Math.sin(s.f), cf = Math.cos(s.f); return { O: [s.X - sf * uc, 0, s.Z + cf * uc], Au: [sf, 0, -cf] }; }
-  if (d === 'pared') return { O: [x - P.largo / 2, 0, 0], Au: [0, 0, 1] };
+  if (d === 'pared') {
+    // lamas horizontales: la posición x es la altura y el perfil (v) va a lo ancho
+    if (P.relieve && P.relieve.orient === 'h') return { O: [-anchoPerfil() / 2, x, 0], Au: [0, 0, 1], Av: [1, 0, 0] };
+    return { O: [x - P.largo / 2, 0, 0], Au: [0, 0, 1] };
+  }
   return { O: [x - P.largo / 2, 0, uc], Au: [0, 0, -1] };
 }
-const puntoMarco = (m, u, v) => [m.O[0] + m.Au[0] * u, v, m.O[2] + m.Au[2] * u];
-const ejeGrosor = m => [-m.Au[2], 0, m.Au[0]];           // perpendicular a la costilla (Au × Y)
+// el eje del perfil (v) es la vertical salvo en las lamas horizontales (Av)
+const ejeV = m => m.Av || [0, 1, 0];
+const puntoMarco = (m, u, v) => { const av = ejeV(m); return [m.O[0] + m.Au[0] * u + av[0] * v, m.O[1] + m.Au[1] * u + av[1] * v, m.O[2] + m.Au[2] * u + av[2] * v]; };
+const ejeGrosor = m => { const a = m.Au, b = ejeV(m); return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; };  // Au × Av
 
 // ranura que entra de lado (por el borde de u pequeño): se traspone el polígono y se usa hacerRanura
 function hacerRanuraLat(poly, r, w) {

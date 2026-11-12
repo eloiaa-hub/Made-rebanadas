@@ -1,5 +1,14 @@
 # Novedades de Made-rebanadas
 
+## v1.5
+
+- **Origen de la forma** en los paneles de pared: plantilla, **texto en relieve** o **modelo 3D (STL / OBJ)**.
+- **Texto en relieve** para rótulos y nombres: letra, tamaño, negrita, varias líneas, suavizado de los bordes y onda de fondo.
+- **Figuras desde un modelo 3D** (caras, labios, formas de arte mural): vista, giro y base; el proyecto guarda el mapa de alturas.
+- **Lamas horizontales** (con rastreles verticales) además de las verticales.
+- Plantilla **Estantería de pared ondulada**: lamas con baldas y ménsulas, de fondo ondulado.
+- Tres ejemplos nuevos: estantería ondulada, rótulo de texto y arte mural «ondas».
+
 ## v1.4
 
 - **Hueso de perro** automático en las esquinas interiores de ranuras (retícula) y muescas (discos y rastreles), con el Ø de la fresa; la maqueta tiene su propia fresa (0 en láser). Aviso si la fresa no cabe en la ranura.

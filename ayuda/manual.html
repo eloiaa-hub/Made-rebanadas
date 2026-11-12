@@ -49,7 +49,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 
 <header class="port">
   <h1>Made-rebanadas</h1>
-  <p>Manual de uso · versión 1.4 · Muebles orgánicos hechos con costillas de tablero, sin internet · Por Eloi A.A.</p>
+  <p>Manual de uso · versión 1.5 · Muebles orgánicos hechos con costillas de tablero, sin internet · Por Eloi A.A.</p>
 </header>
 
 <figure><img src="img/portada.jpg" alt="Banco ondulado hecho con costillas de contrachapado"></figure>
@@ -63,21 +63,22 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <a href="#perfiles">6. Paso 2 · Retocar los perfiles</a><br>
   <a href="#costillas">7. Paso 3 · Las costillas</a><br>
   <a href="#varillas">8. Paso 4 · Las varillas</a><br>
-  <a href="#reticula">9. Otro tipo: retícula entrelazada</a><br>
+  <a href="#reticula">9. Otro tipo de mueble: retícula entrelazada</a><br>
   <a href="#curva">10. Planta curva (arco y S)</a><br>
   <a href="#radial">11. Rebanadas radiales: lámparas y columnas</a><br>
   <a href="#pared">12. Paneles de pared</a><br>
-  <a href="#comprobar">13. Comprobaciones</a><br>
-  <a href="#vista3d">14. La vista 3D</a><br>
-  <a href="#fabricar">15. Paso 5 · Fabricar: tableros, DXF y Calcador</a><br>
-  <a href="#despiece">16. Despiece y lista de compra</a><br>
-  <a href="#maqueta">17. Maqueta a escala</a><br>
-  <a href="#plano">18. Plano de montaje en PDF</a><br>
-  <a href="#anidador">19. Anidador de tableros</a><br>
-  <a href="#archivos">20. Guardar, abrir y ejemplos</a><br>
-  <a href="#teclas">21. Atajos de teclado</a><br>
-  <a href="#taller">22. Consejos de taller</a><br>
-  <a href="#limites">23. Limitaciones de esta versión</a>
+  <a href="#relieve">13. Figuras, rótulos y estanterías de pared</a><br>
+  <a href="#comprobar">14. Comprobaciones</a><br>
+  <a href="#vista3d">15. La vista 3D</a><br>
+  <a href="#fabricar">16. Paso 5 · Fabricar: tableros, DXF y Calcador</a><br>
+  <a href="#despiece">17. Despiece y lista de compra</a><br>
+  <a href="#maqueta">18. Maqueta a escala</a><br>
+  <a href="#plano">19. Plano de montaje en PDF</a><br>
+  <a href="#anidador">20. Anidador de tableros</a><br>
+  <a href="#archivos">21. Guardar, abrir y ejemplos</a><br>
+  <a href="#teclas">22. Atajos de teclado</a><br>
+  <a href="#taller">23. Consejos de taller</a><br>
+  <a href="#limites">24. Limitaciones de esta versión</a>
 </div>
 
 <h2 id="que">1. Qué es</h2>
@@ -130,6 +131,8 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <tr><td>Forma libre</td><td>Largo, fondo y altura de un bloque redondeado para dibujar tus propios perfiles.</td></tr>
   <tr><td>Lámpara de lóbulos / Columna <i>(radial)</i></td><td>Altura, radio mayor, radio abajo y arriba, altura de la panza, lóbulos, su profundidad y giro en espiral.</td></tr>
   <tr><td>Panel ondulado / con relieve <i>(pared)</i></td><td>Ancho y alto del panel, fondo mínimo, relieve y ondas (o posición y anchura de los relieves).</td></tr>
+  <tr><td>Estantería de pared ondulada <i>(pared)</i></td><td>Ancho, alto, número de baldas, fondo máximo y mínimo, ondas y desfase, grueso de la balda, fondo de la lama y alto de la ménsula.</td></tr>
+  <tr><td>Texto o modelo 3D <i>(pared)</i></td><td>Con «Origen de la forma»: texto en relieve o una figura STL/OBJ (apartado 13).</td></tr>
 </table>
 <div class="caja">Si ya has retocado los perfiles a mano y cambias una medida de la plantilla, la forma <b>se vuelve a generar</b> y se pierden los retoques (el programa te avisa antes). Solo el <b>largo</b> se puede cambiar sin perderlos: los perfiles clave se estiran a la nueva medida.</div>
 
@@ -277,13 +280,47 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
       <li><b>Rastreles</b>: listones horizontales atornillados a la pared. Cada lama lleva detrás una muesca por rastrel y encaja en ellos.</li>
       <li><b>Alto</b> y <b>grueso</b> del rastrel, <b>margen</b> arriba y abajo y <b>holgura</b> de la muesca.</li>
       <li>Con 0 rastreles, las lamas van sobre un tablero trasero (sale en la lista de compra).</li>
-      <li>Plantillas: <b>Panel de pared ondulado</b> (ondas a lo ancho, a lo alto y en diagonal) y <b>Panel de pared con relieve</b>.</li>
+      <li>Plantillas: <b>Panel de pared ondulado</b> (ondas a lo ancho, a lo alto y en diagonal) <b>Panel de pared con relieve</b> y <b>Estantería de pared ondulada</b>. Para texto y figuras, mira el apartado 13.</li>
     </ul>
   </div>
 </div>
 <figure><img src="img/plano_pared.jpg" alt="Plano de la pared" style="max-width:640px"><figcaption>Hoja 2 del plano: alzado con las lamas numeradas y la altura de cada rastrel.</figcaption></figure>
 
-<h2 id="comprobar">13. Comprobaciones</h2>
+<h2 id="relieve">13. Figuras, rótulos y estanterías de pared</h2>
+<p>Los paneles de pared tienen dos maneras más de sacar la forma, en <b>Forma → Origen de la forma</b>:</p>
+<ul>
+  <li><b>Plantilla</b>: la de siempre, con perfiles clave que se editan a mano.</li>
+  <li><b>Texto en relieve</b>: escribe un nombre o un logo de texto (puede tener varias líneas). El programa lo dibuja con la letra que elijas, lo redondea con el <b>suavizado</b> y lo convierte en el canto de las lamas. Sirve para rótulos de tienda, nombres en la habitación o números de casa.</li>
+  <li><b>Modelo 3D (STL / OBJ)</b>: carga una cara, un busto, unos labios o cualquier figura. El programa la mira desde la <b>vista</b> que elijas (frente, lado, arriba…) con el <b>giro</b> que quieras y saca un mapa de alturas: lo más cercano sale más de la pared. Así se hacen las caras y figuras de «arte mural paramétrico».</li>
+</ul>
+<div class="dos">
+  <img src="img/relieve_panel.png" alt="Apartado Relieve" class="estrecha">
+  <div>
+    <ul>
+      <li><b>Ancho</b> y <b>alto</b> del panel (mm).</li>
+      <li><b>Fondo</b>: lo que sale la lama donde no hay relieve. <b>Relieve</b>: lo que sale de más en lo más alto de la figura.</li>
+      <li><b>Suavizado</b>: redondea los bordes de las letras o de la figura (en mm). Con 0 salen escalones rectos.</li>
+      <li><b>Invertir</b>: la figura se hunde en lugar de salir.</li>
+      <li><b>Onda de fondo</b> (solo texto): un oleaje suave detrás de las letras.</li>
+      <li><b>Base</b> (solo modelo): quita la parte más baja del modelo, para que el fondo quede plano.</li>
+      <li><b>Lamas</b>: <b>verticales</b> o <b>horizontales</b>. Las horizontales dan el aspecto de las piezas de arte de líneas; los rastreles pasan a ser verticales.</li>
+    </ul>
+  </div>
+</div>
+<div class="dos">
+  <figure><img src="img/rotulo.jpg" alt="Rótulo de texto"><figcaption>Ejemplo «Rótulo de texto en relieve»: «Hola» en nogal, con onda de fondo.</figcaption></figure>
+  <figure><img src="img/arte_ondas.jpg" alt="Arte mural"><figcaption>Ejemplo «Arte mural ondas»: lamas horizontales.</figcaption></figure>
+</div>
+<div class="caja">El proyecto guarda el mapa de alturas del modelo, no el modelo entero: se abre igual en otro ordenador. Pero si quieres cambiar la <b>vista</b> o el <b>giro</b> después de abrirlo, vuelve a cargar el STL. Para caras, busca modelos de «bas-relief» o un escaneo con el móvil; un modelo de 50 000 triángulos tarda un segundo.</div>
+<h3>Estantería de pared ondulada</h3>
+<p>La plantilla <b>Estantería de pared ondulada</b> (en Panel de pared) hace las lamas con baldas que salen de ellas: cada lama lleva un trozo de cada balda con una ménsula inclinada debajo. El fondo de las baldas ondula a lo largo, como las estanterías de lamas que se venden hechas. Parámetros: número de baldas, fondo máximo y mínimo, ondas y desfase entre baldas, grueso de la balda, fondo de la lama y alto de la ménsula.</p>
+<div class="dos">
+  <figure><img src="img/estanteria.jpg" alt="Estantería ondulada"><figcaption>Ejemplo «Estantería de pared ondulada»: 56 lamas de abedul de 12 mm.</figcaption></figure>
+  <figure><img src="img/estanteria_lama.png" alt="Lama de la estantería"><figcaption>Una lama: tres baldas con ménsula y tres muescas para los rastreles.</figcaption></figure>
+</div>
+<div class="caja">Las baldas se forman con muchas lamas finas juntas: no cargues mucho peso (libros ligeros, plantas, objetos). Para más carga, usa tablero de 18 mm, separa menos las lamas y atornilla bien los rastreles a la pared, con taco.</div>
+
+<h2 id="comprobar">14. Comprobaciones</h2>
 <figure><img src="img/comprobaciones.png" class="estrecha" alt="Comprobaciones"></figure>
 <p>El programa revisa el mueble cada vez que cambias algo y lo indica en el panel <b>Comprobaciones</b>. Haz clic en un aviso para ir a la costilla afectada.</p>
 <table>
@@ -298,7 +335,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 </table>
 <p>En la lista <b>Costillas</b> del panel derecho, las que tienen algún problema llevan un <b style="color:#c0392b">!</b>.</p>
 
-<h2 id="vista3d">14. La vista 3D</h2>
+<h2 id="vista3d">15. La vista 3D</h2>
 <div class="dos">
   <figure><img src="img/explosion.jpg" alt="Vista explosionada"><figcaption>💥 Explosión: separa las costillas para ver el montaje.</figcaption></figure>
   <figure><img src="img/volumen.jpg" alt="Volumen ideal"><figcaption>Volumen: la forma ideal, transparente, para comparar con las costillas.</figcaption></figure>
@@ -309,7 +346,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <li><b>📷 Imagen</b> guarda la vista 3D en PNG a alta resolución.</li>
 </ul>
 
-<h2 id="fabricar">15. Paso 5 · Fabricar: tableros, DXF y Calcador</h2>
+<h2 id="fabricar">16. Paso 5 · Fabricar: tableros, DXF y Calcador</h2>
 <figure><img src="img/fabricar.png" alt="Ventana Fabricar"></figure>
 <p><b>🪚 Fabricar</b> coloca todas las costillas en tableros y muestra cuántos hacen falta y el aprovechamiento. Puedes elegir:</p>
 <ul>
@@ -356,11 +393,11 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 <p><b>⬇ CSV de cortes</b> guarda una línea por costilla (nombre, largo y ancho de su rectángulo, cantidad y veta) con el mismo formato de despiece que lee el <b>Anidador</b> y que abre cualquier hoja de cálculo. <b>🧩 Anidador</b> abre el Anidador con las costillas por su forma real (sección 19).</p>
 <div class="caja taller">Taladra y vacía <b>los agujeros antes que el contorno</b>: si cortas primero la pieza, se puede mover al hacer los agujeros. Deja puentes (pestañas) si la pieza es pequeña.</div>
 
-<h2 id="despiece">16. Despiece y lista de compra</h2>
+<h2 id="despiece">17. Despiece y lista de compra</h2>
 <figure><img src="img/despiece.png" alt="Despiece"></figure>
 <p><b>📋 Despiece</b> muestra todas las costillas (posición, ancho, alto, superficie y agujeros) y la <b>lista de compra</b>: tableros, varillas con su largo, separadores con su número y largo, tuercas y arandelas y la broca de los agujeros. <b>⬇ Despiece (CSV)</b> la guarda para abrirla en una hoja de cálculo y <b>⬇ CSV de cortes</b> guarda la lista de cortes para el Anidador. Si está activa la maqueta, todo sale con las medidas de la maqueta.</p>
 
-<h2 id="maqueta">17. Maqueta a escala</h2>
+<h2 id="maqueta">18. Maqueta a escala</h2>
 <div class="dos">
   <img src="img/maqueta.png" alt="Apartado Maqueta a escala">
   <div>
@@ -375,7 +412,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 <p>Con la maqueta activa, <b>Fabricar</b> (con la etiqueta <b>1:5</b> en el botón), el DXF, el SVG, el despiece, el CSV de cortes, el plano y el Anidador salen <b>a escala</b>, con tableros de láser (600 × 400, 900 × 600, A3…). Los archivos llevan <code>_maqueta_1-5</code> en el nombre. El 3D y el panel <b>Resumen</b> siguen a tamaño real.</p>
 <div class="caja">Comprobaciones de la maqueta: avisa si las costillas se pisan (grosor de la maqueta mayor que la separación a escala), si queda menos de 1,5 mm de material alrededor de un agujero, y si el grosor no es proporcional al del tablero real (la maqueta se verá más llena o más calada que el mueble).</div>
 
-<h2 id="plano">18. Plano de montaje en PDF</h2>
+<h2 id="plano">19. Plano de montaje en PDF</h2>
 <p><b>📄 Plano</b> descarga un PDF apaisado (A4) para llevar al taller. Lleva:</p>
 <ol>
   <li><b>Conjunto</b>: el mueble en 3D, sus datos y la lista de compra.</li>
@@ -390,7 +427,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 </div>
 <p>Si está activa la maqueta, el plano sale con las medidas y los pasos de la maqueta.</p>
 
-<h2 id="anidador">19. Anidador de tableros</h2>
+<h2 id="anidador">20. Anidador de tableros</h2>
 <figure><img src="img/anidador.jpg" alt="Anidador dentro de Made-rebanadas"><figcaption>El Anidador dentro de Made-rebanadas, con las costillas de una maqueta 1:5 colocadas por su forma real.</figcaption></figure>
 <p><b>🧩 Anidador</b> (en la barra o en la ventana Fabricar) abre el <b>Anidador de tableros</b> de la Suite CNC dentro del programa. Le llegan solas todas las costillas, cada una con su contorno exterior y los agujeros de las varillas, y las medidas, el grosor y el margen del tablero de Fabricar. Coloca las piezas <b>por su forma real</b>: encaja unas en los huecos de otras y aprovecha mucho mejor el tablero que la colocación de Fabricar.</p>
 <ul>
@@ -401,7 +438,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 </ul>
 <div class="caja">El Anidador es un programa aparte de la Suite CNC: está en <code>assets/anidador/anidador.html</code> y también se puede abrir solo. Tiene su propia ayuda (❓).</div>
 
-<h2 id="archivos">20. Guardar, abrir y ejemplos</h2>
+<h2 id="archivos">21. Guardar, abrir y ejemplos</h2>
 <ul>
   <li><b>💾 Guardar</b> (<kbd>Ctrl</kbd>+<kbd>S</kbd>) descarga el proyecto en un archivo <code>.json</code> con todo: perfiles, costillas, varillas y material. <b>📂 Abrir</b> lo carga de nuevo.</li>
   <li><b>↶ ↷</b> (<kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd>) deshacen y rehacen.</li>
@@ -414,7 +451,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <img src="img/ej_estante.jpg" alt="Estantería">
 </div>
 
-<h2 id="teclas">21. Atajos de teclado</h2>
+<h2 id="teclas">22. Atajos de teclado</h2>
 <table>
   <tr><th>Tecla</th><th>Acción</th></tr>
   <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Deshacer / rehacer</td></tr>
@@ -428,7 +465,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <tr><td><kbd>Esc</kbd></td><td>Cancelar la colocación de una varilla y quitar la selección</td></tr>
 </table>
 
-<h2 id="taller">22. Consejos de taller</h2>
+<h2 id="taller">23. Consejos de taller</h2>
 <ul>
   <li>Corta antes una <b>maqueta</b> (sección 17): es barata, se hace en minutos con la láser y descubre los fallos de forma y de montaje.</li>
   <li>Comprueba el <b>grosor real</b> del tablero con el calibre: un contrachapado «de 18» puede medir 17,5. Pon ese valor (Grosor → Otro…).</li>
@@ -439,13 +476,15 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <li>Lija los cantos de las costillas antes de montar: después no se llega bien a los huecos.</li>
 </ul>
 
-<h2 id="limites">23. Limitaciones de esta versión</h2>
+<h2 id="limites">24. Limitaciones de esta versión</h2>
 <ul>
   <li>La retícula solo se hace en planta recta. En la retícula, las costillas son perpendiculares al largo y los largueros paralelos a él (no hay ángulos libres).</li>
   <li>En la planta curva, las varillas se dibujan curvadas: hay que curvarlas en el taller al radio que indica el plano.</li>
   <li>Los arcos del DXF aproximan las curvas dibujadas (que no son arcos de verdad) con la tolerancia que pongas; los arcos de la pieza no coinciden con los puntos de control del perfil.</li>
   <li>La colocación de <b>Fabricar</b> usa el rectángulo que envuelve cada costilla; para encajarlas por su forma, usa el <b>Anidador</b>.</li>
   <li>Las varillas son rectas y paralelas al largo del mueble.</li>
+  <li>Las figuras de un modelo 3D se hacen como relieve de pared (lo que se ve desde una vista). Las figuras de pie hechas con costillas, cortando el modelo de verdad, no están todavía.</li>
+  <li>Las letras del texto en relieve son las que tiene instaladas el ordenador.</li>
 </ul>
 
 <footer>Made-rebanadas · Por Eloi A.A. · Programa con licencia EUPL-1.2 · Este manual: CC BY-SA 4.0 · Usa Three.js (MIT).</footer>

@@ -443,20 +443,30 @@ function hojaRadial(D, cabecera, tabla, o) {
 function hojaPared(D, cabecera, tabla, o) {
   const { M, W, k, gris, azul, madera, cm } = o;
   cabecera('2. Alzado de la pared, rastreles y orden de colocación');
-  const cs = R.costillas.filter(c => c.ok), Pa = P.pared, H = Math.max(...cs.map(c => c.caja.y1));
-  const zona = { x: M + 10, y: M + 24, w: W - 2 * M - 20, h: 100 }, s = Math.min(zona.w / P.largo, zona.h / H);
-  const PX = x => zona.x + x * s, PY = v => zona.y + zona.h - v * s;
-  D.texto(zona.x, zona.y - 4, `Alzado (de frente): ${R.n} lamas numeradas y ${R.rastreles.length} rastreles detrás.`, { pt: 8.5, col: gris });
+  const cs = R.costillas.filter(c => c.ok), Pa = P.pared, e = grosor(), hor = P.relieve && P.relieve.orient === 'h';
+  // rectángulo de cada lama visto de frente (X, Y del mundo)
+  const rect = c => { const m = marcoEn(c.x), a = puntoMarco(m, 0, c.caja.y0), b = puntoMarco(m, 0, c.caja.y1), g = ejeGrosor(m);
+    const xs = [a[0], b[0], a[0] + g[0] * e / 2, a[0] - g[0] * e / 2], ys = [a[1], b[1], a[1] + g[1] * e / 2, a[1] - g[1] * e / 2];
+    return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; };
+  const rs = cs.map(rect), X0 = Math.min(...rs.map(r => r[0])), X1 = Math.max(...rs.map(r => r[2])), Y1 = Math.max(...rs.map(r => r[3]));
+  const zona = { x: M + 10, y: M + 24, w: W - 2 * M - 20, h: 100 }, s = Math.min(zona.w / (X1 - X0 + 80), zona.h / (Y1 + 20));
+  const PX = x => zona.x + (x - X0 + 40) * s, PY = v => zona.y + zona.h - v * s;
+  D.texto(zona.x, zona.y - 4, `Alzado (de frente): ${R.n} lamas ${hor ? 'horizontales' : 'verticales'} numeradas y ${R.rastreles.length} rastreles detrás.`, { pt: 8.5, col: gris });
   D.relleno([205, 179, 138]);
-  R.rastreles.forEach(r => D.rect(PX(R.costillas[0].x - grosor() / 2 - 30), PY(r.v + Pa.alto / 2), (R.costillas[R.n - 1].x - R.costillas[0].x + grosor() + 60) * s, Pa.alto * s, 'f'));
+  R.rastreles.forEach(r => {
+    const m0 = marcoEn(cs[0].x), m1 = marcoEn(cs[cs.length - 1].x), a = puntoMarco(m0, 0, r.v), b = puntoMarco(m1, 0, r.v);
+    if (hor) D.rect(PX(a[0] - Pa.alto / 2), PY(Math.max(a[1], b[1]) + e / 2 + 30), Pa.alto * s, (Math.abs(b[1] - a[1]) + e + 60) * s, 'f');
+    else D.rect(PX(Math.min(a[0], b[0]) - e / 2 - 30), PY(r.v + Pa.alto / 2), (Math.abs(b[0] - a[0]) + e + 60) * s, Pa.alto * s, 'f');
+  });
   D.relleno([226, 205, 172]).trazo(madera).grosor(0.15);
-  cs.forEach(c => D.rect(PX(c.x - grosor() / 2), PY(c.caja.y1), Math.max(0.3, grosor() * s), (c.caja.y1 - c.caja.y0) * s, 'b'));
+  rs.forEach(r => D.rect(PX(r[0]), PY(r[3]), Math.max(0.3, (r[2] - r[0]) * s), Math.max(0.3, (r[3] - r[1]) * s), 'b'));
   D.relleno([0, 0, 0]).trazo();
-  const paso = Math.max(1, Math.ceil(cs.length / 40));
-  cs.forEach((c, i) => { if (i % paso === 0 || i === cs.length - 1) D.texto(PX(c.x), PY(c.caja.y1) - 1.5, String(c.i + 1), { pt: 6.5, al: 'c', col: azul }); });
-  const filas = [{ titulo: 'Rastreles (altura de su centro desde abajo)' }];
+  const paso = Math.max(1, Math.ceil(cs.length / (hor ? 25 : 40)));
+  cs.forEach((c, i) => { if (i % paso === 0 || i === cs.length - 1) { const r = rs[i]; if (hor) D.texto(PX(r[0]) - 2, PY((r[1] + r[3]) / 2) + 1.2, String(c.i + 1), { pt: 6.5, al: 'r', col: azul }); else D.texto(PX((r[0] + r[2]) / 2), PY(r[3]) - 1.5, String(c.i + 1), { pt: 6.5, al: 'c', col: azul }); } });
+  const filas = [{ titulo: hor ? 'Rastreles (posición de su centro desde la izquierda)' : 'Rastreles (altura de su centro desde abajo)' }];
   R.rastreles.forEach(r => filas.push([`Rastrel ${r.j + 1}`, `a ${fmt(r.v * k)} mm · ${fmt(Pa.alto * k, 1)} × ${fmt(Pa.grueso * k, 1)} × ${fmt(cm.rastrel)} mm`]));
   filas.push(['Separación entre lamas', `${fmt(cm.sep, 1)} mm entre centros (hueco ${fmt(Math.max(0, cm.hueco), 1)} mm)`]);
   filas.push(['Medidas del panel', `${(G.dims || [0, 0, 0]).map(v => fmt(v * k)).join(' × ')} mm (ancho × fondo × alto)`]);
+  if (relieveActivo()) filas.push(['Relieve', P.relieve.fuente === 'texto' ? `texto «${P.relieve.texto.replace(/\n/g, ' / ')}»` : `modelo ${P.relieve.modelo ? P.relieve.modelo.nombre : ''}`]);
   tabla(M, M + 134, W - 2 * M, filas, { c1: 70 });
 }

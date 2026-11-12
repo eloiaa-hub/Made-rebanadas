@@ -69,7 +69,7 @@ function reticula(res) {
   const us = n === 1 ? [(u0 + u1) / 2] : Array.from({ length: n }, (_, j) => u0 + m + j * (u1 - u0 - 2 * m) / (n - 1));
   // perfiles en columnas a lo largo de x (compartidos por todos los largueros)
   const NX = clamp(Math.round(L / 5), 80, 420), xs = Array.from({ length: NX + 1 }, (_, i) => L * i / NX);
-  const cols = xs.map(x => contornoDe(perfilEn(x)));
+  const cols = xs.map(x => contornoEnX(x));
   res.largueros = []; res.cruces = []; res.partidos = [];
   us.forEach((u, j) => {
     // seguir los tramos verticales columna a columna; cada tramo seguido es una pieza

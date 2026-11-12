@@ -41,7 +41,9 @@
       <div class="sec-cuerpo">
         <label class="fila" title="Costillas separadas unidas con varillas, o retícula de costillas y largueros que se cruzan con ranuras a media madera">Tipo de mueble
           <select id="sTipo"><option value="costillas">Costillas con varillas</option><option value="reticula">Retícula (ranuras a media madera)</option><option value="radial">Radial (lámparas, columnas)</option><option value="pared">Panel de pared (lamas)</option></select></label>
-        <label class="fila">Plantilla <select id="sPlantilla"></select></label>
+        <label class="fila oculto" id="filaOrigen" title="De dónde sale la forma de las lamas">Origen de la forma
+          <select id="sOrigen"><option value="plantilla">Plantilla</option><option value="texto">Texto en relieve</option><option value="modelo">Modelo 3D (STL / OBJ)</option></select></label>
+        <label class="fila" id="filaPlantilla">Plantilla <select id="sPlantilla"></select></label>
         <p class="nota" id="descPlantilla"></p>
         <div id="params"></div>
         <p class="nota aviso-edit oculto" id="avisoEditado">Has retocado los perfiles a mano: si cambias un parámetro, la forma se vuelve a generar.</p>
@@ -97,10 +99,39 @@
       </div>
     </section>
 
+    <section id="secRelieve">
+      <h3>Relieve</h3>
+      <div class="sec-cuerpo">
+        <div id="relTexto">
+          <label class="fila" style="align-items:flex-start">Texto <textarea id="rlTexto" rows="2" style="width:58%;resize:vertical;font:inherit;border:1px solid var(--borde);border-radius:5px;background:var(--panel);padding:4px 6px"></textarea></label>
+          <label class="fila">Letra <select id="rlLetra"></select></label>
+          <label class="fila chk"><input type="checkbox" id="rlNegrita"> Negrita</label>
+          <label class="fila">Alto de la letra (mm) <input type="number" id="rlTam" min="10" step="5"></label>
+          <label class="fila">Interlineado <input type="number" id="rlInter" min="0.6" max="3" step="0.05"></label>
+        </div>
+        <div id="relModelo">
+          <p class="nota" id="rlModeloInfo">Sin modelo. Carga un STL u OBJ (rostro, figura, logo en 3D…).</p>
+          <button id="bCargarModelo" class="ancho" title="Cargar un modelo 3D (.stl o .obj)">📂 Cargar modelo 3D…</button>
+          <label class="fila">Vista <select id="rlVista"><option value="frente">De frente</option><option value="atras">De atrás</option><option value="izquierda">Desde la izquierda</option><option value="derecha">Desde la derecha</option><option value="arriba">Desde arriba</option><option value="abajo">Desde abajo</option></select></label>
+          <label class="fila">Giro <select id="rlGiro"><option value="0">0°</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></label>
+          <label class="fila" title="Lo que sale la parte más lejana del modelo sobre el fondo (0 a 1)">Despegue del fondo <input type="number" id="rlBase" min="0" max="0.9" step="0.05"></label>
+        </div>
+        <label class="fila">Ancho del panel (mm) <input type="number" id="rlAncho" min="100" step="10"></label>
+        <label class="fila">Alto del panel (mm) <input type="number" id="rlAlto" min="100" step="10"></label>
+        <label class="fila" title="Lo que sale la lama donde no hay relieve">Fondo mínimo (mm) <input type="number" id="rlFondo" min="5" step="1"></label>
+        <label class="fila" title="Lo que sale de más lo más alto del relieve">Relieve (mm) <input type="number" id="rlRelieve" min="0" step="1"></label>
+        <label class="fila" title="Redondea los bordes del relieve">Suavizado (mm) <input type="number" id="rlSuave" min="0" step="1"></label>
+        <label class="fila chk"><input type="checkbox" id="rlInvertir"> Invertir (el relieve se hunde)</label>
+        <label class="fila" title="Ondas de fondo a lo ancho, sumadas al relieve">Onda de fondo (mm) <input type="number" id="rlOnda" min="0" step="1"></label>
+        <label class="fila">Ondas de fondo <input type="number" id="rlOndas" min="0.5" max="10" step="0.5"></label>
+      </div>
+    </section>
+
     <section id="secPared">
       <h3>Pared: rastreles</h3>
       <div class="sec-cuerpo">
         <p class="nota">Las lamas llevan detrás unas muescas por las que pasan unos rastreles horizontales atornillados a la pared.</p>
+        <label class="fila" title="Lamas verticales (de pie) u horizontales (tumbadas)">Lamas <select id="paOrient"><option value="v">Verticales</option><option value="h">Horizontales</option></select></label>
         <label class="fila">Número de rastreles <input type="number" id="paNum" min="0" max="10" step="1" value="3"></label>
         <label class="fila">Alto del rastrel (mm) <input type="number" id="paAlto" min="10" step="1" value="45"></label>
         <label class="fila">Grueso del rastrel (mm) <input type="number" id="paGrueso" min="5" step="1" value="20"></label>
@@ -220,7 +251,7 @@
 
   <!-- ============ PANEL DERECHO ============ -->
   <aside class="panel der">
-    <section>
+    <section id="secClaves">
       <h3>Perfiles clave <span id="nClaves" class="cuenta">0</span></h3>
       <div class="sec-cuerpo">
         <p class="nota">La forma se define con unos pocos perfiles a lo largo del mueble; cada costilla es la mezcla suave de los que tiene a los lados.</p>
@@ -273,6 +304,7 @@
 </div>
 
 <input type="file" id="fArchivo" class="oculto" accept=".json,application/json">
+<input type="file" id="fModelo" class="oculto" accept=".stl,.obj">
 <div id="aviso" class="aviso"></div>
 
 <script src="assets/js/three-bundle.js"></script>

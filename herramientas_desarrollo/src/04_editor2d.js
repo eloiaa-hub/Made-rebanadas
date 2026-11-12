@@ -98,6 +98,7 @@ function colorCostilla(alfa) { return `rgba(168,116,63,${alfa})`; }
 function dibujarPerfil(ctx, V) {
   V.rejilla(ctx);
   if (!P || !R) return;
+  if (relieveActivo()) { dibujarPerfilRelieve(ctx, V); return; }
   const C = clavesOrdenadas(), k = claveActual(), acento = cssVar('--acento');
   // todas las costillas, muy suaves (la «envolvente»)
   ctx.lineWidth = 1; ctx.strokeStyle = colorCostilla(.16);
@@ -183,6 +184,7 @@ function dibujarPerfil(ctx, V) {
 const ED = { arr: null };
 function snap(v) { const g = +$('#kRejilla').value; return g ? Math.round(v / g) * g : Math.round(v * 10) / 10; }
 function puntoCerca(mx, my) {
+  if (relieveActivo()) return -1;
   const k = claveActual(); let mejor = -1, md = 10;
   k.pts.forEach((p, i) => { const [x, y] = VP.aPantalla(p[0], p[1]), d = Math.hypot(x - mx, y - my); if (d < md) { md = d; mejor = i; } });
   return mejor;
@@ -275,6 +277,7 @@ function iniciarEditor() {
   c.addEventListener('dblclick', ev => {
     const r = c.getBoundingClientRect(), mx = ev.clientX - r.left, my = ev.clientY - r.top;
     const ip = puntoCerca(mx, my); if (ip >= 0) { alternarEsquina(ip); return; }
+    if (relieveActivo()) return;
     const t = tramoCerca(mx, my); if (t) { insertarPunto(t.j, t.s); cambio('Punto añadido'); }
   });
   $('#bEsquina').onclick = () => alternarEsquina(UI.punto);
@@ -284,11 +287,24 @@ function iniciarEditor() {
   $('#bCostSig').onclick = () => selCostilla(UI.costilla + 1);
   $('#piePerfil').innerHTML = ayudaPerfil();
 }
+// con relieve (texto o modelo) no hay perfiles clave: se ven las lamas y la seleccionada
+function dibujarPerfilRelieve(ctx, V) {
+  ctx.fillStyle = 'rgba(150,156,164,.28)'; const [xp] = V.aPantalla(0, 0); ctx.fillRect(0, 0, xp, V.h);
+  ctx.lineWidth = 1; ctx.strokeStyle = colorCostilla(.18);
+  R.costillas.forEach(c => { if (c.ok) { V.camino(ctx, c.poly); ctx.stroke(); } });
+  const cs = piezaSel();
+  if (cs && cs.ok && !cs.z) { ctx.fillStyle = conAlfa(cssVar('--acento'), .13); ctx.strokeStyle = cssVar('--acento'); ctx.lineWidth = 2; V.camino(ctx, cs.poly); ctx.fill(); ctx.stroke(); }
+  R.rastreles.forEach(rr => { const [a, y] = V.aPantalla(0, rr.v + P.pared.alto / 2), [b] = V.aPantalla(P.pared.grueso, 0); ctx.fillStyle = 'rgba(205,179,138,.6)'; ctx.fillRect(a, y, b - a, P.pared.alto * V.sc); });
+  ctx.fillStyle = cssVar('--acento'); ctx.font = '600 12.5px system-ui'; ctx.textAlign = 'center';
+  ctx.fillText(`Forma desde ${P.relieve.fuente === 'texto' ? 'el texto' : 'el modelo 3D'}: se cambia en el panel izquierdo (lama ${cs ? cs.etq : ''})`, V.w / 2, 66);
+  ctx.textAlign = 'left';
+}
 function ayudaPerfil() {
   return '<span><kbd>Doble clic</kbd> línea: punto nuevo · punto: esquina</span><span><kbd>Clic dcho.</kbd> borrar</span><span><kbd>Mayús</kbd> sin rejilla</span>';
 }
 function encuadrarPerfil() {
   if (!R) return;
+  if (relieveActivo()) { const cs = R.costillas.filter(c => c.ok); if (cs.length) VP.encuadrar({ x0: 0, y0: 0, w: Math.max(...cs.map(c => c.caja.x1)), h: Math.max(...cs.map(c => c.caja.y1)) }, 50); return; }
   let x0 = Infinity, y0 = 0, x1 = -Infinity, y1 = -Infinity;
   P.claves.forEach(c => c.pts.forEach(p => { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }));
   VP.encuadrar({ x0, y0, w: x1 - x0, h: y1 - y0 }, 50);

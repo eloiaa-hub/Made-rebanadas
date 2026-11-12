@@ -41,7 +41,7 @@ function proyectoDePlantilla(id, extra) {
     if (extra.varillas) Object.assign(p.varillas, extra.varillas);
     if (extra.reticula) Object.assign(p.reticula, extra.reticula);
     if (extra.tipo) p.tipo = extra.tipo;
-    ['planta', 'radial', 'pared'].forEach(k => { if (extra[k]) Object.assign(p[k], extra[k]); });
+    ['planta', 'radial', 'pared', 'relieve'].forEach(k => { if (extra[k]) Object.assign(p[k], extra[k]); });
     if (extra.nombre) p.nombre = extra.nombre;
   }
   return p;
@@ -69,7 +69,7 @@ function validarProyecto(o) {
   p.maqueta = Object.assign(proyectoBase().maqueta, o.maqueta || {});
   p.cnc = Object.assign(proyectoBase().cnc, o.cnc || {});
   p.reticula = Object.assign(proyectoBase().reticula, o.reticula || {});
-  ['planta', 'radial', 'pared'].forEach(k => p[k] = Object.assign(proyectoBase()[k], o[k] || {}));
+  ['planta', 'radial', 'pared', 'relieve'].forEach(k => p[k] = Object.assign(proyectoBase()[k], o[k] || {}));
   if (!['reticula', 'radial', 'pared'].includes(p.tipo)) p.tipo = 'costillas';
   if (!PLANTILLAS[p.plantilla]) p.plantilla = 'libre';
   p.params = Object.assign(paramsDefecto(p.plantilla), o.params || {});

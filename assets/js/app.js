@@ -8,7 +8,7 @@
 'use strict';
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
-const VERSION = '1.4';
+const VERSION = '1.5';
 const T = window.THREE;
 
 /* ===================== UTILIDADES ===================== */
@@ -83,6 +83,9 @@ function proyectoBase() {
     planta: { forma: 'recta', radio: 2500, sentido: 1, amplitud: 150, ondas: 1 },
     radial: { tubo: 20, holguraTubo: 0.5, discos: 2, rDisco: 0, holgura: 0.3 },
     pared: { rastreles: 3, alto: 45, grueso: 20, margen: 120, holgura: 0.5, verPared: true },
+    relieve: { fuente: 'plantilla', orient: 'v', ancho: 1200, alto: 500, fondo: 20, relieve: 60, suavizado: 10, invertir: false,
+      texto: 'Made', letra: 'Arial Black', tamLetra: 320, negrita: true, interlinea: 1.05, ondaAmp: 0, ondas: 2,
+      vista: 'frente', giro: 0, base: 0.15, modelo: null },
   };
 }
 
@@ -247,13 +250,14 @@ function reparto() {
 function radioAgujero() { return (P.varillas.diam + P.varillas.holgura) / 2; }
 
 function calcular() {
+  if (relieveActivo()) P.largo = P.relieve.orient === 'h' ? P.relieve.alto : P.relieve.ancho;
   const e = grosor(), rep = reparto(), V = P.varillas;
   const res = { n: rep.n, sep: rep.s, hueco: rep.hueco, costillas: [], varillas: [], avisos: [] };
   for (let i = 0; i < rep.n; i++) {
-    const x = rep.xs[i], ctrl = perfilEn(x), poly = contornoDe(ctrl);
+    const x = rep.xs[i], poly = contornoEnX(x);
     const ok = poly.length >= 3 && Math.abs(areaFirmada(poly)) > 25;
     const caja = ok ? cajaDe(poly) : { x0: 0, y0: 0, x1: 0, y1: 0, w: 0, h: 0 };
-    res.costillas.push({ i, x, poly: ok ? poly : [], base: ok ? poly : [], ok, caja, area: ok ? areaFirmada(poly) : 0, agujeros: [], nVar: 0, ranuras: [], etq: String(i + 1), nombre: 'Costilla ' + (i + 1) });
+    res.costillas.push({ i, x, poly: ok ? poly : [], base: ok ? poly : [], ok, caja, area: ok ? areaFirmada(poly) : 0, agujeros: [], nVar: 0, ranuras: [], etq: String(i + 1), nombre: (P.tipo === 'pared' ? 'Lama ' : 'Costilla ') + (i + 1) });
   }
   res.largueros = []; res.cruces = []; res.discos = []; res.rastreles = []; res.ranurasMal = [];
   // centro del fondo de las costillas (en radial y pared, el eje o la pared: 0)
@@ -478,7 +482,7 @@ function reticula(res) {
   const us = n === 1 ? [(u0 + u1) / 2] : Array.from({ length: n }, (_, j) => u0 + m + j * (u1 - u0 - 2 * m) / (n - 1));
   // perfiles en columnas a lo largo de x (compartidos por todos los largueros)
   const NX = clamp(Math.round(L / 5), 80, 420), xs = Array.from({ length: NX + 1 }, (_, i) => L * i / NX);
-  const cols = xs.map(x => contornoDe(perfilEn(x)));
+  const cols = xs.map(x => contornoEnX(x));
   res.largueros = []; res.cruces = []; res.partidos = [];
   us.forEach((u, j) => {
     // seguir los tramos verticales columna a columna; cada tramo seguido es una pieza
@@ -596,11 +600,17 @@ function marcoEn(x) {
   const d = disposicion(), uc = ucActual;
   if (d === 'radial') { const t = x * Math.PI / 180; return { O: [0, 0, 0], Au: [Math.cos(t), 0, -Math.sin(t)] }; }
   if (d === 'curva') { const s = ejePlanta(x), sf = Math.sin(s.f), cf = Math.cos(s.f); return { O: [s.X - sf * uc, 0, s.Z + cf * uc], Au: [sf, 0, -cf] }; }
-  if (d === 'pared') return { O: [x - P.largo / 2, 0, 0], Au: [0, 0, 1] };
+  if (d === 'pared') {
+    // lamas horizontales: la posición x es la altura y el perfil (v) va a lo ancho
+    if (P.relieve && P.relieve.orient === 'h') return { O: [-anchoPerfil() / 2, x, 0], Au: [0, 0, 1], Av: [1, 0, 0] };
+    return { O: [x - P.largo / 2, 0, 0], Au: [0, 0, 1] };
+  }
   return { O: [x - P.largo / 2, 0, uc], Au: [0, 0, -1] };
 }
-const puntoMarco = (m, u, v) => [m.O[0] + m.Au[0] * u, v, m.O[2] + m.Au[2] * u];
-const ejeGrosor = m => [-m.Au[2], 0, m.Au[0]];           // perpendicular a la costilla (Au × Y)
+// el eje del perfil (v) es la vertical salvo en las lamas horizontales (Av)
+const ejeV = m => m.Av || [0, 1, 0];
+const puntoMarco = (m, u, v) => { const av = ejeV(m); return [m.O[0] + m.Au[0] * u + av[0] * v, m.O[1] + m.Au[1] * u + av[1] * v, m.O[2] + m.Au[2] * u + av[2] * v]; };
+const ejeGrosor = m => { const a = m.Au, b = ejeV(m); return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; };  // Au × Av
 
 // ranura que entra de lado (por el borde de u pequeño): se traspone el polígono y se usa hacerRanura
 function hacerRanuraLat(poly, r, w) {
@@ -758,6 +768,168 @@ function avisosPared(res) {
   if (res.ranurasMal.length) add('error', `No se pudo hacer la muesca del rastrel en ${cstLa(res.ranurasMal.map(p => p.i))}.`, res.ranurasMal[0].i);
   avisosMaqueta(res, add);
   if (!A.some(a => a.tipo === 'error' || a.tipo === 'atencion')) add('ok', `Todo correcto: ${res.n} lamas` + (res.rastreles.length ? ` sobre ${res.rastreles.length} rastreles de ${fmt(Pa.alto)} × ${fmt(Pa.grueso)} mm.` : '.'));
+}
+
+/* ===================== RELIEVE DESDE TEXTO O MODELO 3D (paneles de pared) =====================
+   La forma de las lamas no sale de los perfiles clave sino de un «mapa de profundidad» del panel:
+   - texto: se dibuja con una fuente del sistema, se suaviza y sus letras salen (o se hunden)
+   - modelo: un STL u OBJ proyectado desde un lado; lo más cercano sale más
+   El mapa cubre el panel (ancho × alto, en mm) y vale de 0 (fondo) a 1 (lo que más sale). */
+const relieveActivo = () => P.tipo === 'pared' && P.relieve && (P.relieve.fuente === 'texto' || P.relieve.fuente === 'modelo');
+// medidas del panel: ancho (horizontal) y alto (vertical)
+function medidasPanel() {
+  if (relieveActivo()) return [P.relieve.ancho, P.relieve.alto];
+  return [P.largo, (P.params && P.params.alto) || 1000];
+}
+// a lo ancho del perfil (lo que mide cada lama a lo largo): en lamas horizontales, el ancho del panel
+const anchoPerfil = () => medidasPanel()[0];
+
+const CACHE_MAPA = { clave: '', mapa: null };
+function mapaRelieve() {
+  const Rl = P.relieve, clave = JSON.stringify([Rl.fuente, Rl.ancho, Rl.alto, Rl.texto, Rl.letra, Rl.tamLetra, Rl.negrita, Rl.interlinea, Rl.suavizado, Rl.invertir, Rl.ondaAmp, Rl.ondas, Rl.modelo && Rl.modelo.id]);
+  if (CACHE_MAPA.clave === clave) return CACHE_MAPA.mapa;
+  let m = Rl.fuente === 'texto' ? mapaTexto(Rl) : mapaModelo(Rl);
+  if (m && Rl.suavizado > 0) m = suavizarMapa(m, Rl.suavizado / m.mm);
+  if (m && Rl.invertir) for (let i = 0; i < m.d.length; i++) m.d[i] = 1 - m.d[i];
+  CACHE_MAPA.clave = clave; CACHE_MAPA.mapa = m;
+  return m;
+}
+// profundidad (mm) en el punto (X horizontal, Y vertical) del panel
+function profundidadEn(X, Y) {
+  const Rl = P.relieve, m = mapaRelieve();
+  let h = 0;
+  if (m) {
+    const fx = clamp(X / m.mm, 0, m.w - 1), fy = clamp((Rl.alto - Y) / (m.mmY || m.mm), 0, m.h - 1);
+    const x0 = Math.floor(fx), y0 = Math.floor(fy), x1 = Math.min(m.w - 1, x0 + 1), y1 = Math.min(m.h - 1, y0 + 1), tx = fx - x0, ty = fy - y0;
+    const g = (x, y) => m.d[y * m.w + x];
+    h = (g(x0, y0) * (1 - tx) + g(x1, y0) * tx) * (1 - ty) + (g(x0, y1) * (1 - tx) + g(x1, y1) * tx) * ty;
+  }
+  const onda = Rl.ondaAmp ? Rl.ondaAmp * (0.5 + 0.5 * Math.sin(PI2 * (Rl.ondas || 1) * X / Rl.ancho)) : 0;
+  return Math.max(2, Rl.fondo + Rl.relieve * h + onda);
+}
+// contorno de la lama en la posición x (horizontal en lamas verticales, altura en las horizontales)
+function poligonoRelieve(x, denso) {
+  const [W, H] = medidasPanel(), hor = P.relieve.orient === 'h', largoV = hor ? W : H;
+  const paso = Math.max(1.5, largoV / 260), out = [[0, 0]];
+  for (let v = 0; v <= largoV + 1e-6; v += paso) out.push([hor ? profundidadEn(v, x) : profundidadEn(x, v), Math.min(v, largoV)]);
+  if (out[out.length - 1][1] < largoV) out.push([hor ? profundidadEn(largoV, x) : profundidadEn(x, largoV), largoV]);
+  out.push([0, largoV]);
+  return denso ? out : simplificaCerrado(out, 0.02);
+}
+// contorno de la costilla en la posición x, venga de los perfiles clave o del relieve
+function contornoEnX(x) { return relieveActivo() ? poligonoRelieve(x) : contornoDe(perfilEn(x)); }
+
+/* ---------- texto ---------- */
+const LETRAS_SISTEMA = ['Arial Black', 'Arial', 'Impact', 'Verdana', 'Tahoma', 'Trebuchet MS', 'Georgia', 'Times New Roman', 'Courier New', 'Comic Sans MS', 'serif', 'sans-serif', 'monospace'];
+function mapaTexto(Rl) {
+  const mm = Math.max(1, Math.max(Rl.ancho, Rl.alto) / 700), w = Math.max(8, Math.round(Rl.ancho / mm)), h = Math.max(8, Math.round(Rl.alto / mm));
+  if (typeof document === 'undefined') return null;
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const ctx = cv.getContext('2d'); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
+  const lineas = String(Rl.texto || '').split('\n'), pt = Rl.tamLetra / mm;
+  ctx.font = `${Rl.negrita ? 'bold ' : ''}${pt}px "${Rl.letra}", sans-serif`;
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const alto = pt * (Rl.interlinea || 1.1);
+  lineas.forEach((l, i) => ctx.fillText(l, w / 2, h / 2 + (i - (lineas.length - 1) / 2) * alto));
+  const px = ctx.getImageData(0, 0, w, h).data, d = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) d[i] = px[i * 4] / 255;
+  return { w, h, mm, d };
+}
+// desenfoque por cajas (tres pasadas ≈ gaussiano): letras y bordes redondeados
+function suavizarMapa(m, rad) {
+  const r = Math.max(1, Math.round(rad / 2)), w = m.w, h = m.h; let a = Float32Array.from(m.d), b = new Float32Array(w * h);
+  for (let pas = 0; pas < 3; pas++) {
+    for (let y = 0; y < h; y++) { let s = 0; for (let x = -r; x <= r; x++) s += a[y * w + clamp(x, 0, w - 1)]; for (let x = 0; x < w; x++) { b[y * w + x] = s / (2 * r + 1); s += a[y * w + clamp(x + r + 1, 0, w - 1)] - a[y * w + clamp(x - r, 0, w - 1)]; } }
+    for (let x = 0; x < w; x++) { let s = 0; for (let y = -r; y <= r; y++) s += b[clamp(y, 0, h - 1) * w + x]; for (let y = 0; y < h; y++) { a[y * w + x] = s / (2 * r + 1); s += b[clamp(y + r + 1, 0, h - 1) * w + x] - b[clamp(y - r, 0, h - 1) * w + x]; } }
+  }
+  return { ...m, d: a };
+}
+
+/* ---------- modelo 3D ---------- */
+// lee un STL (binario o de texto) o un OBJ y devuelve los triángulos [[x,y,z]×3]
+function leerMalla(buf, nombre) {
+  const u8 = new Uint8Array(buf), tri = [];
+  const txt = () => new TextDecoder().decode(u8);
+  if (/\.obj$/i.test(nombre)) {
+    const vs = [];
+    txt().split(/\r?\n/).forEach(l => {
+      const t = l.trim().split(/\s+/);
+      if (t[0] === 'v') vs.push([+t[1], +t[2], +t[3]]);
+      else if (t[0] === 'f') { const ix = t.slice(1).map(s => { const k = parseInt(s, 10); return k < 0 ? vs.length + k : k - 1; }); for (let i = 1; i + 1 < ix.length; i++) tri.push([vs[ix[0]], vs[ix[i]], vs[ix[i + 1]]]); }
+    });
+  } else {
+    const dv = new DataView(buf), n = u8.length >= 84 ? dv.getUint32(80, true) : 0;
+    if (u8.length >= 84 && 84 + n * 50 === u8.length) {
+      for (let i = 0; i < n; i++) { const o = 84 + i * 50 + 12, p = k => [dv.getFloat32(o + k * 12, true), dv.getFloat32(o + k * 12 + 4, true), dv.getFloat32(o + k * 12 + 8, true)]; tri.push([p(0), p(1), p(2)]); }
+    } else {
+      const v = []; txt().replace(/vertex\s+(\S+)\s+(\S+)\s+(\S+)/g, (_, a, b, c) => { v.push([+a, +b, +c]); return ''; });
+      for (let i = 0; i + 2 < v.length; i += 3) tri.push([v[i], v[i + 1], v[i + 2]]);
+    }
+  }
+  return tri.filter(t => t.every(p => p && p.every(isFinite)));
+}
+// proyecta los triángulos desde una vista: devuelve [x imagen, y imagen, profundidad (más = más cerca)]
+const VISTAS = {
+  frente: p => [p[0], p[1], p[2]], atras: p => [-p[0], p[1], -p[2]],
+  izquierda: p => [-p[2], p[1], -p[0]], derecha: p => [p[2], p[1], p[0]],
+  arriba: p => [p[0], -p[2], p[1]], abajo: p => [p[0], p[2], -p[1]],
+};
+// de malla a mapa de profundidad, ajustado al panel (rasterizado con z-buffer)
+function mapaDesdeMalla(tri, vista, giro, ancho, alto, mmPx) {
+  const pr = VISTAS[vista] || VISTAS.frente, g = ((giro || 0) % 360 + 360) % 360;
+  const rot = p => g === 90 ? [-p[1], p[0], p[2]] : g === 180 ? [-p[0], -p[1], p[2]] : g === 270 ? [p[1], -p[0], p[2]] : p;
+  const T3 = tri.map(t => t.map(p => rot(pr(p))));
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  T3.forEach(t => t.forEach(p => { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }));
+  const w = Math.max(8, Math.round(ancho / mmPx)), h = Math.max(8, Math.round(alto / mmPx));
+  const s = 0.94 * Math.min(w / (x1 - x0 || 1), h / (y1 - y0 || 1)), ox = (w - (x1 - x0) * s) / 2, oy = (h - (y1 - y0) * s) / 2;
+  const z = new Float32Array(w * h).fill(-Infinity);
+  T3.forEach(t => {
+    const q = t.map(p => [ox + (p[0] - x0) * s, h - (oy + (p[1] - y0) * s), p[2]]);
+    const minX = Math.max(0, Math.floor(Math.min(q[0][0], q[1][0], q[2][0]))), maxX = Math.min(w - 1, Math.ceil(Math.max(q[0][0], q[1][0], q[2][0])));
+    const minY = Math.max(0, Math.floor(Math.min(q[0][1], q[1][1], q[2][1]))), maxY = Math.min(h - 1, Math.ceil(Math.max(q[0][1], q[1][1], q[2][1])));
+    const den = (q[1][1] - q[2][1]) * (q[0][0] - q[2][0]) + (q[2][0] - q[1][0]) * (q[0][1] - q[2][1]);
+    if (Math.abs(den) < 1e-12) return;
+    for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) {
+      const px = x + 0.5, py = y + 0.5;
+      const a = ((q[1][1] - q[2][1]) * (px - q[2][0]) + (q[2][0] - q[1][0]) * (py - q[2][1])) / den;
+      const b = ((q[2][1] - q[0][1]) * (px - q[2][0]) + (q[0][0] - q[2][0]) * (py - q[2][1])) / den, c = 1 - a - b;
+      if (a < -1e-6 || b < -1e-6 || c < -1e-6) continue;
+      const zz = a * q[0][2] + b * q[1][2] + c * q[2][2], k = y * w + x;
+      if (zz > z[k]) z[k] = zz;
+    }
+  });
+  let zmin = Infinity, zmax = -Infinity;
+  for (let i = 0; i < z.length; i++) if (z[i] > -Infinity) { zmin = Math.min(zmin, z[i]); zmax = Math.max(zmax, z[i]); }
+  const d = new Uint8Array(w * h);
+  for (let i = 0; i < z.length; i++) d[i] = z[i] > -Infinity ? 1 + Math.round(254 * (z[i] - zmin) / ((zmax - zmin) || 1)) : 0;
+  return { w, h, mm: mmPx, d8: d };
+}
+function mapaModelo(Rl) {
+  const M = Rl.modelo; if (!M || !M.d64) return null;
+  const bin = atob(M.d64), d = new Float32Array(bin.length);
+  // 0 = fondo; 1…255 = profundidad del modelo; el fondo del modelo queda en «base»
+  for (let i = 0; i < bin.length; i++) { const v = bin.charCodeAt(i); d[i] = v ? (Rl.base || 0) + (1 - (Rl.base || 0)) * (v - 1) / 254 : 0; }
+  // el mapa guardado puede tener otro tamaño que el panel: se estira al panel
+  return { w: M.w, h: M.h, mm: Rl.ancho / M.w, d, mmY: Rl.alto / M.h };
+}
+function cargarModelo(buf, nombre) {
+  const tri = leerMalla(buf, nombre);
+  if (!tri.length) throw new Error('No se han encontrado triángulos en «' + nombre + '»');
+  const Rl = P.relieve, mmPx = Math.max(1, Math.max(Rl.ancho, Rl.alto) / 500);
+  const m = mapaDesdeMalla(tri, Rl.vista, Rl.giro, Rl.ancho, Rl.alto, mmPx);
+  let s = ''; for (let i = 0; i < m.d8.length; i++) s += String.fromCharCode(m.d8[i]);
+  Rl.modelo = { nombre, w: m.w, h: m.h, d64: btoa(s), id: Date.now().toString(36), triangulos: tri.length };
+  UI.malla = { tri, nombre };     // para volver a proyectar si cambia la vista (no se guarda)
+  return tri.length;
+}
+function reproyectarModelo() {
+  if (!UI.malla) return false;
+  const Rl = P.relieve, mmPx = Math.max(1, Math.max(Rl.ancho, Rl.alto) / 500);
+  const m = mapaDesdeMalla(UI.malla.tri, Rl.vista, Rl.giro, Rl.ancho, Rl.alto, mmPx);
+  let s = ''; for (let i = 0; i < m.d8.length; i++) s += String.fromCharCode(m.d8[i]);
+  Rl.modelo = { ...Rl.modelo, w: m.w, h: m.h, d64: btoa(s), id: Date.now().toString(36) };
+  return true;
 }
 
 /* ===================== PLANTILLAS PARAMÉTRICAS =====================
@@ -1024,6 +1196,40 @@ PLANTILLAS.pared_relieve = {
     return generarPared(p, (t, y) => p.fondo + p.relieve * Math.min(1, g(t, y, p.cx, p.cy) + p.dos * g(t, y, 1 - p.cx * 0.6, 1 - p.cy)));
   },
 };
+PLANTILLAS.pared_estante = {
+  nombre: 'Estantería de pared ondulada', grupo: 'pared',
+  desc: 'Lamas contra la pared que salen formando baldas; el fondo de las baldas ondula a lo ancho.',
+  params: [
+    { id: 'largo', nombre: 'Ancho de la estantería', min: 400, max: 6000, paso: 10, valor: 2000 },
+    { id: 'alto', nombre: 'Alto', min: 300, max: 2500, paso: 10, valor: 1000 },
+    { id: 'baldas', nombre: 'Número de baldas', min: 1, max: 8, paso: 1, valor: 3 },
+    { id: 'fondoMax', nombre: 'Fondo mayor de las baldas', min: 60, max: 600, paso: 5, valor: 220 },
+    { id: 'fondoMin', nombre: 'Fondo menor de las baldas', min: 30, max: 600, paso: 5, valor: 110 },
+    { id: 'ondas', nombre: 'Ondas a lo ancho', min: 0.5, max: 5, paso: 0.5, valor: 1.5 },
+    { id: 'desfase', nombre: 'Desfase entre baldas (0 a 1)', min: 0, max: 1, paso: 0.05, valor: 0.3 },
+    { id: 'gruesoBalda', nombre: 'Grueso de la balda', min: 15, max: 120, paso: 1, valor: 40 },
+    { id: 'fondo', nombre: 'Fondo de la lama entre baldas', min: 20, max: 200, paso: 1, valor: 45 },
+    { id: 'mensula', nombre: 'Altura de la ménsula bajo la balda', min: 0, max: 300, paso: 5, valor: 90 },
+  ],
+  generar(p) {
+    const n = Math.round(p.baldas), H = p.alto, F = p.fondo;
+    const esquinas = [true, true];
+    for (let j = 0; j < n; j++) esquinas.push(true, false, true, true, true);
+    esquinas.push(true, true);
+    const K = clamp(Math.round(p.ondas * 6) + 1, 7, 31);
+    const claves = clavesUniformes(K, p.largo, t => {
+      const pts = [[0, 0], [F, 0]];
+      for (let j = 0; j < n; j++) {
+        const h = H * (j + 1) / (n + 0.6), g = p.gruesoBalda, m = Math.max(g * 0.5, p.mensula);
+        const D = Math.max(F + 10, p.fondoMin + (p.fondoMax - p.fondoMin) * (0.5 + 0.5 * Math.sin(PI2 * (p.ondas * t + j * p.desfase))));
+        pts.push([F, Math.max(1, h - g - m)], [F + (D - F) * 0.6, h - g - m * 0.25], [D, h - g], [D, h], [F, h]);
+      }
+      pts.push([F, H], [0, H]);
+      return redondeaPts(pts);
+    });
+    return { largo: p.largo, esquinas, claves };
+  },
+};
 const grupoDe = id => PLANTILLAS[id].grupo || 'lineal';
 const grupoTipo = t => t === 'radial' ? 'radial' : t === 'pared' ? 'pared' : 'lineal';
 
@@ -1141,6 +1347,7 @@ function colorCostilla(alfa) { return `rgba(168,116,63,${alfa})`; }
 function dibujarPerfil(ctx, V) {
   V.rejilla(ctx);
   if (!P || !R) return;
+  if (relieveActivo()) { dibujarPerfilRelieve(ctx, V); return; }
   const C = clavesOrdenadas(), k = claveActual(), acento = cssVar('--acento');
   // todas las costillas, muy suaves (la «envolvente»)
   ctx.lineWidth = 1; ctx.strokeStyle = colorCostilla(.16);
@@ -1226,6 +1433,7 @@ function dibujarPerfil(ctx, V) {
 const ED = { arr: null };
 function snap(v) { const g = +$('#kRejilla').value; return g ? Math.round(v / g) * g : Math.round(v * 10) / 10; }
 function puntoCerca(mx, my) {
+  if (relieveActivo()) return -1;
   const k = claveActual(); let mejor = -1, md = 10;
   k.pts.forEach((p, i) => { const [x, y] = VP.aPantalla(p[0], p[1]), d = Math.hypot(x - mx, y - my); if (d < md) { md = d; mejor = i; } });
   return mejor;
@@ -1318,6 +1526,7 @@ function iniciarEditor() {
   c.addEventListener('dblclick', ev => {
     const r = c.getBoundingClientRect(), mx = ev.clientX - r.left, my = ev.clientY - r.top;
     const ip = puntoCerca(mx, my); if (ip >= 0) { alternarEsquina(ip); return; }
+    if (relieveActivo()) return;
     const t = tramoCerca(mx, my); if (t) { insertarPunto(t.j, t.s); cambio('Punto añadido'); }
   });
   $('#bEsquina').onclick = () => alternarEsquina(UI.punto);
@@ -1327,11 +1536,24 @@ function iniciarEditor() {
   $('#bCostSig').onclick = () => selCostilla(UI.costilla + 1);
   $('#piePerfil').innerHTML = ayudaPerfil();
 }
+// con relieve (texto o modelo) no hay perfiles clave: se ven las lamas y la seleccionada
+function dibujarPerfilRelieve(ctx, V) {
+  ctx.fillStyle = 'rgba(150,156,164,.28)'; const [xp] = V.aPantalla(0, 0); ctx.fillRect(0, 0, xp, V.h);
+  ctx.lineWidth = 1; ctx.strokeStyle = colorCostilla(.18);
+  R.costillas.forEach(c => { if (c.ok) { V.camino(ctx, c.poly); ctx.stroke(); } });
+  const cs = piezaSel();
+  if (cs && cs.ok && !cs.z) { ctx.fillStyle = conAlfa(cssVar('--acento'), .13); ctx.strokeStyle = cssVar('--acento'); ctx.lineWidth = 2; V.camino(ctx, cs.poly); ctx.fill(); ctx.stroke(); }
+  R.rastreles.forEach(rr => { const [a, y] = V.aPantalla(0, rr.v + P.pared.alto / 2), [b] = V.aPantalla(P.pared.grueso, 0); ctx.fillStyle = 'rgba(205,179,138,.6)'; ctx.fillRect(a, y, b - a, P.pared.alto * V.sc); });
+  ctx.fillStyle = cssVar('--acento'); ctx.font = '600 12.5px system-ui'; ctx.textAlign = 'center';
+  ctx.fillText(`Forma desde ${P.relieve.fuente === 'texto' ? 'el texto' : 'el modelo 3D'}: se cambia en el panel izquierdo (lama ${cs ? cs.etq : ''})`, V.w / 2, 66);
+  ctx.textAlign = 'left';
+}
 function ayudaPerfil() {
   return '<span><kbd>Doble clic</kbd> línea: punto nuevo · punto: esquina</span><span><kbd>Clic dcho.</kbd> borrar</span><span><kbd>Mayús</kbd> sin rejilla</span>';
 }
 function encuadrarPerfil() {
   if (!R) return;
+  if (relieveActivo()) { const cs = R.costillas.filter(c => c.ok); if (cs.length) VP.encuadrar({ x0: 0, y0: 0, w: Math.max(...cs.map(c => c.caja.x1)), h: Math.max(...cs.map(c => c.caja.y1)) }, 50); return; }
   let x0 = Infinity, y0 = 0, x1 = -Infinity, y1 = -Infinity;
   P.claves.forEach(c => c.pts.forEach(p => { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }));
   VP.encuadrar({ x0, y0, w: x1 - x0, h: y1 - y0 }, 50);
@@ -1489,7 +1711,7 @@ function marcoExpl(x) {
 // coloca una malla extruida (forma en u, v; grosor centrado) con el marco m
 function ponerEnMarco(obj, m, dy = 0) {
   const ae = ejeGrosor(m), M4 = new T.Matrix4();
-  M4.makeBasis(new T.Vector3(...m.Au), new T.Vector3(0, 1, 0), new T.Vector3(...ae)).setPosition(m.O[0], m.O[1] + dy, m.O[2]);
+  M4.makeBasis(new T.Vector3(...m.Au), new T.Vector3(...ejeV(m)), new T.Vector3(...ae)).setPosition(m.O[0], m.O[1] + dy, m.O[2]);
   obj.matrixAutoUpdate = false; obj.matrix.copy(M4); obj.matrixWorldNeedsUpdate = true;
 }
 const V3 = a => new T.Vector3(a[0], a[1], a[2]);
@@ -1550,9 +1772,16 @@ function construir3D() {
     const mR = new T.MeshStandardMaterial({ color: '#cdb38a', roughness: .8 }); mR.userData.propio = true;
     const x0 = R.costillas[0].x - e / 2 - 30, x1 = R.costillas[R.n - 1].x + e / 2 + 30, Pa = P.pared;
     R.rastreles.forEach(r => {
-      const b = new T.Mesh(new T.BoxGeometry(x1 - x0, Pa.alto, Pa.grueso), mR);
-      b.position.set((x0 + x1) / 2 - P.largo / 2, r.v, Pa.grueso / 2); b.castShadow = true; b.userData.extra = 'rastrel'; G.modelo.add(b);
+      // de la primera a la última lama, 30 mm más por cada lado, a la altura del rastrel
+      const m0 = marcoEn(R.costillas[0].x), m1 = marcoEn(R.costillas[R.n - 1].x), ae = ejeGrosor(m0), av = ejeV(m0);
+      const a = puntoMarco(m0, Pa.grueso / 2, r.v), b = puntoMarco(m1, Pa.grueso / 2, r.v);
+      const d = new T.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]), L = d.length() + e + 60;
+      const caja = new T.Mesh(new T.BoxGeometry(L, Pa.alto, Pa.grueso), mR);
+      const ex = new T.Vector3(...ae), ey = new T.Vector3(...av), ez = ex.clone().cross(ey);
+      caja.matrixAutoUpdate = false; caja.matrix.makeBasis(ex, ey, ez).setPosition((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
+      caja.castShadow = true; caja.userData.extra = 'rastrel'; G.modelo.add(caja);
     });
+
     if (Pa.verPared) {
       const mP = new T.MeshStandardMaterial({ color: '#e9e5de', roughness: .95 }); mP.userData.propio = true;
       const w = new T.Mesh(new T.PlaneGeometry(Math.max(P.largo * 1.6, 2000), Math.max(G.alto * 1.5, 1500)), mP);
@@ -1615,7 +1844,7 @@ function construirVarillas3D() {
 function construirClaves3D() {
   (G.claves3d || []).forEach(l => { G.modelo.remove(l); l.geometry.dispose(); l.material.dispose(); });
   G.claves3d = [];
-  if (!P.vista.claves) return;
+  if (!P.vista.claves || relieveActivo()) return;
   const C = clavesOrdenadas(), acento = cssVar('--acento') || '#1f6fd1';
   C.forEach((k, i) => {
     if (P.tipo === 'radial' && k.x >= 359.999 && C.length > 1) return;     // la de 360° es la misma que la de 0°
@@ -1647,7 +1876,7 @@ function construirFantasma() {
   if (!P.vista.fantasma) return;
   const N = P.tipo === 'radial' ? 72 : 64, anillos = [], X = P.tipo === 'radial' ? 360 : P.largo;
   for (let i = 0; i <= N; i++) {
-    const x = X * i / N; let c = curvaCerrada(perfilEn(x), P.esquinas);
+    const x = X * i / N; let c = relieveActivo() ? poligonoRelieve(x, true) : curvaCerrada(perfilEn(x), P.esquinas);
     c = c.map(p => [P.tipo === 'radial' ? Math.max(p[0], radioTubo()) : p[0], clamp(p[1], P.costillas.base ? 0 : -1e9, P.costillas.tope ? P.costillas.topeAlt : 1e9)]);
     anillos.push({ m: marcoExpl(x), c });
   }
@@ -1817,6 +2046,39 @@ function iniciarPanel() {
     cambio({ costillas: 'Costillas con varillas', reticula: 'Retícula entrelazada', radial: 'Rebanadas radiales', pared: 'Panel de pared' }[P.tipo]);
     encuadrarSiHaceFalta(); camara('tres4');
   });
+  // relieve: texto o modelo 3D
+  LETRAS_SISTEMA.forEach(l => $('#rlLetra').add(new Option(l, l)));
+  const Rl = () => P.relieve;
+  enlazar('#sOrigen', () => {
+    Rl().fuente = $('#sOrigen').value;
+    if (relieveActivo() && P.pared.rastreles && Rl().fondo < P.pared.grueso + 15) Rl().fondo = P.pared.grueso + 15;
+    UI.costilla = 0; ponerControles(); cambio({ plantilla: 'Forma desde la plantilla', texto: 'Relieve de texto', modelo: 'Relieve desde un modelo 3D' }[Rl().fuente]);
+    encuadrarSiHaceFalta(); camara('tres4');
+  });
+  const num = (sel, k, min = 0) => enlazar(sel, () => { Rl()[k] = Math.max(min, +$(sel).value || 0); cambio(); });
+  num('#rlTam', 'tamLetra', 5); num('#rlFondo', 'fondo', 2); num('#rlRelieve', 'relieve'); num('#rlSuave', 'suavizado'); num('#rlOnda', 'ondaAmp'); num('#rlOndas', 'ondas', 0.5); num('#rlInter', 'interlinea', 0.5);
+  enlazar('#rlBase', () => { Rl().base = clamp(+$('#rlBase').value || 0, 0, 0.9); cambio(); });
+  const medida = (sel, k) => enlazar(sel, () => { Rl()[k] = Math.max(100, +$(sel).value || 500); if (Rl().fuente === 'modelo') reproyectarModelo(); cambio(); encuadrarSiHaceFalta(); camara('tres4'); });
+  medida('#rlAncho', 'ancho'); medida('#rlAlto', 'alto');
+  enlazar('#rlLetra', () => { Rl().letra = $('#rlLetra').value; cambio(); });
+  enlazar('#rlNegrita', () => { Rl().negrita = $('#rlNegrita').checked; cambio(); });
+  enlazar('#rlInvertir', () => { Rl().invertir = $('#rlInvertir').checked; cambio(); });
+  let tTexto = 0;
+  $('#rlTexto').addEventListener('input', () => { clearTimeout(tTexto); tTexto = setTimeout(() => { Rl().texto = $('#rlTexto').value; cambio('Texto'); }, 450); });
+  const vista = () => { Rl().vista = $('#rlVista').value; Rl().giro = +$('#rlGiro').value; if (reproyectarModelo()) cambio('Vista del modelo'); else aviso('Para cambiar la vista, vuelve a cargar el modelo (el proyecto guarda solo su relieve).', 5000); };
+  enlazar('#rlVista', vista); enlazar('#rlGiro', vista);
+  $('#bCargarModelo').onclick = () => {
+    const f = $('#fModelo'); f.value = '';
+    f.onchange = () => {
+      const a = f.files[0]; if (!a) return;
+      aviso('Leyendo ' + esc(a.name) + '…');
+      const rd = new FileReader();
+      rd.onload = () => { try { const n = cargarModelo(rd.result, a.name); ponerControles(); cambio('Modelo: ' + a.name); encuadrarSiHaceFalta(); camara('tres4'); aviso(`${esc(a.name)}: ${n.toLocaleString('es-ES')} triángulos`); } catch (e) { aviso('⚠ ' + esc(e.message), 5000); } };
+      rd.readAsArrayBuffer(a);
+    };
+    f.click();
+  };
+  enlazar('#paOrient', () => { Rl().orient = $('#paOrient').value; cambio(Rl().orient === 'h' ? 'Lamas horizontales' : 'Lamas verticales'); encuadrarSiHaceFalta(); camara('tres4'); });
   // planta curva
   enlazar('#plForma', () => { P.planta.forma = $('#plForma').value; mostrarSecciones(); cambio('Planta ' + $('#plForma').selectedOptions[0].text.toLowerCase()); camara('tres4'); });
   enlazar('#plRadio', () => { P.planta.radio = Math.max(150, +$('#plRadio').value || 2500); cambio(); });
@@ -1907,6 +2169,14 @@ function mostrarSecciones() {
   $('#filaSep').classList.toggle('oculto', rad || P.costillas.modo !== 'separacion');
   $('#filaNum').classList.toggle('oculto', rad || P.costillas.modo !== 'numero');
   $('#kPosTit').textContent = rad ? 'Posición (°)' : 'Posición (mm)';
+  // relieve (paneles de pared)
+  const rel = relieveActivo(), Rl = P.relieve;
+  $('#filaOrigen').classList.toggle('oculto', t !== 'pared');
+  $('#filaPlantilla').classList.toggle('oculto', rel); $('#params').classList.toggle('oculto', rel); $('#descPlantilla').classList.toggle('oculto', rel);
+  $('#secRelieve').classList.toggle('oculto', !rel);
+  $('#relTexto').classList.toggle('oculto', Rl.fuente !== 'texto'); $('#relModelo').classList.toggle('oculto', Rl.fuente !== 'modelo');
+  $('#secClaves').classList.toggle('oculto', rel);
+  $('#sClave').classList.toggle('oculto', rel); $('#bEsquina').classList.toggle('oculto', rel); $('#infoClave').classList.toggle('oculto', rel);
 }
 function ponerControles() {
   llenarPlantillas();
@@ -1927,6 +2197,11 @@ function ponerControles() {
   const Ra = P.radial; $('#raNum').value = P.costillas.numero; $('#raTubo').value = Ra.tubo; $('#raHolTubo').value = Ra.holguraTubo; $('#raDiscos').value = Ra.discos; $('#raRDisco').value = Ra.rDisco; $('#raHolgura').value = Ra.holgura;
   const Pa = P.pared; $('#paNum').value = Pa.rastreles; $('#paAlto').value = Pa.alto; $('#paGrueso').value = Pa.grueso; $('#paMargen').value = Pa.margen; $('#paHolgura').value = Pa.holgura; $('#paVer').checked = Pa.verPared;
   $('#cClaves3d').checked = P.vista.claves !== false;
+  const Rl = P.relieve; $('#sOrigen').value = P.tipo === 'pared' ? Rl.fuente : 'plantilla'; $('#paOrient').value = Rl.orient || 'v';
+  $('#rlTexto').value = Rl.texto; $('#rlLetra').value = Rl.letra; $('#rlNegrita').checked = Rl.negrita; $('#rlTam').value = Rl.tamLetra; $('#rlInter').value = Rl.interlinea;
+  $('#rlVista').value = Rl.vista; $('#rlGiro').value = String(Rl.giro || 0); $('#rlBase').value = Rl.base;
+  $('#rlAncho').value = Rl.ancho; $('#rlAlto').value = Rl.alto; $('#rlFondo').value = Rl.fondo; $('#rlRelieve').value = Rl.relieve; $('#rlSuave').value = Rl.suavizado; $('#rlInvertir').checked = Rl.invertir; $('#rlOnda').value = Rl.ondaAmp; $('#rlOndas').value = Rl.ondas;
+  $('#rlModeloInfo').textContent = Rl.modelo ? `Modelo: ${Rl.modelo.nombre}` + (Rl.modelo.triangulos ? ` (${Rl.modelo.triangulos.toLocaleString('es-ES')} triángulos)` : '') + (UI.malla ? '' : '. El proyecto guarda su relieve; para cambiar la vista, vuelve a cargarlo.') : 'Sin modelo. Carga un STL u OBJ (rostro, figura, logo en 3D…).';
   mostrarSecciones();
   const M = P.maqueta; $('#mActiva').checked = M.activa; $('#mEscala').value = String(M.escala); $('#mGrosor').value = M.grosor; $('#mDiam').value = M.diam; $('#mHolgura').value = M.holgura;
   $('#rExplosion').value = P.vista.explosion; $('#cFantasma').checked = P.vista.fantasma; $('#cVarillas3d').checked = P.vista.varillas; $('#cResalta').checked = P.vista.resalta;
@@ -2818,21 +3093,31 @@ function hojaRadial(D, cabecera, tabla, o) {
 function hojaPared(D, cabecera, tabla, o) {
   const { M, W, k, gris, azul, madera, cm } = o;
   cabecera('2. Alzado de la pared, rastreles y orden de colocación');
-  const cs = R.costillas.filter(c => c.ok), Pa = P.pared, H = Math.max(...cs.map(c => c.caja.y1));
-  const zona = { x: M + 10, y: M + 24, w: W - 2 * M - 20, h: 100 }, s = Math.min(zona.w / P.largo, zona.h / H);
-  const PX = x => zona.x + x * s, PY = v => zona.y + zona.h - v * s;
-  D.texto(zona.x, zona.y - 4, `Alzado (de frente): ${R.n} lamas numeradas y ${R.rastreles.length} rastreles detrás.`, { pt: 8.5, col: gris });
+  const cs = R.costillas.filter(c => c.ok), Pa = P.pared, e = grosor(), hor = P.relieve && P.relieve.orient === 'h';
+  // rectángulo de cada lama visto de frente (X, Y del mundo)
+  const rect = c => { const m = marcoEn(c.x), a = puntoMarco(m, 0, c.caja.y0), b = puntoMarco(m, 0, c.caja.y1), g = ejeGrosor(m);
+    const xs = [a[0], b[0], a[0] + g[0] * e / 2, a[0] - g[0] * e / 2], ys = [a[1], b[1], a[1] + g[1] * e / 2, a[1] - g[1] * e / 2];
+    return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; };
+  const rs = cs.map(rect), X0 = Math.min(...rs.map(r => r[0])), X1 = Math.max(...rs.map(r => r[2])), Y1 = Math.max(...rs.map(r => r[3]));
+  const zona = { x: M + 10, y: M + 24, w: W - 2 * M - 20, h: 100 }, s = Math.min(zona.w / (X1 - X0 + 80), zona.h / (Y1 + 20));
+  const PX = x => zona.x + (x - X0 + 40) * s, PY = v => zona.y + zona.h - v * s;
+  D.texto(zona.x, zona.y - 4, `Alzado (de frente): ${R.n} lamas ${hor ? 'horizontales' : 'verticales'} numeradas y ${R.rastreles.length} rastreles detrás.`, { pt: 8.5, col: gris });
   D.relleno([205, 179, 138]);
-  R.rastreles.forEach(r => D.rect(PX(R.costillas[0].x - grosor() / 2 - 30), PY(r.v + Pa.alto / 2), (R.costillas[R.n - 1].x - R.costillas[0].x + grosor() + 60) * s, Pa.alto * s, 'f'));
+  R.rastreles.forEach(r => {
+    const m0 = marcoEn(cs[0].x), m1 = marcoEn(cs[cs.length - 1].x), a = puntoMarco(m0, 0, r.v), b = puntoMarco(m1, 0, r.v);
+    if (hor) D.rect(PX(a[0] - Pa.alto / 2), PY(Math.max(a[1], b[1]) + e / 2 + 30), Pa.alto * s, (Math.abs(b[1] - a[1]) + e + 60) * s, 'f');
+    else D.rect(PX(Math.min(a[0], b[0]) - e / 2 - 30), PY(r.v + Pa.alto / 2), (Math.abs(b[0] - a[0]) + e + 60) * s, Pa.alto * s, 'f');
+  });
   D.relleno([226, 205, 172]).trazo(madera).grosor(0.15);
-  cs.forEach(c => D.rect(PX(c.x - grosor() / 2), PY(c.caja.y1), Math.max(0.3, grosor() * s), (c.caja.y1 - c.caja.y0) * s, 'b'));
+  rs.forEach(r => D.rect(PX(r[0]), PY(r[3]), Math.max(0.3, (r[2] - r[0]) * s), Math.max(0.3, (r[3] - r[1]) * s), 'b'));
   D.relleno([0, 0, 0]).trazo();
-  const paso = Math.max(1, Math.ceil(cs.length / 40));
-  cs.forEach((c, i) => { if (i % paso === 0 || i === cs.length - 1) D.texto(PX(c.x), PY(c.caja.y1) - 1.5, String(c.i + 1), { pt: 6.5, al: 'c', col: azul }); });
-  const filas = [{ titulo: 'Rastreles (altura de su centro desde abajo)' }];
+  const paso = Math.max(1, Math.ceil(cs.length / (hor ? 25 : 40)));
+  cs.forEach((c, i) => { if (i % paso === 0 || i === cs.length - 1) { const r = rs[i]; if (hor) D.texto(PX(r[0]) - 2, PY((r[1] + r[3]) / 2) + 1.2, String(c.i + 1), { pt: 6.5, al: 'r', col: azul }); else D.texto(PX((r[0] + r[2]) / 2), PY(r[3]) - 1.5, String(c.i + 1), { pt: 6.5, al: 'c', col: azul }); } });
+  const filas = [{ titulo: hor ? 'Rastreles (posición de su centro desde la izquierda)' : 'Rastreles (altura de su centro desde abajo)' }];
   R.rastreles.forEach(r => filas.push([`Rastrel ${r.j + 1}`, `a ${fmt(r.v * k)} mm · ${fmt(Pa.alto * k, 1)} × ${fmt(Pa.grueso * k, 1)} × ${fmt(cm.rastrel)} mm`]));
   filas.push(['Separación entre lamas', `${fmt(cm.sep, 1)} mm entre centros (hueco ${fmt(Math.max(0, cm.hueco), 1)} mm)`]);
   filas.push(['Medidas del panel', `${(G.dims || [0, 0, 0]).map(v => fmt(v * k)).join(' × ')} mm (ancho × fondo × alto)`]);
+  if (relieveActivo()) filas.push(['Relieve', P.relieve.fuente === 'texto' ? `texto «${P.relieve.texto.replace(/\n/g, ' / ')}»` : `modelo ${P.relieve.modelo ? P.relieve.modelo.nombre : ''}`]);
   tabla(M, M + 134, W - 2 * M, filas, { c1: 70 });
 }
 
@@ -3087,7 +3372,7 @@ function proyectoDePlantilla(id, extra) {
     if (extra.varillas) Object.assign(p.varillas, extra.varillas);
     if (extra.reticula) Object.assign(p.reticula, extra.reticula);
     if (extra.tipo) p.tipo = extra.tipo;
-    ['planta', 'radial', 'pared'].forEach(k => { if (extra[k]) Object.assign(p[k], extra[k]); });
+    ['planta', 'radial', 'pared', 'relieve'].forEach(k => { if (extra[k]) Object.assign(p[k], extra[k]); });
     if (extra.nombre) p.nombre = extra.nombre;
   }
   return p;
@@ -3115,7 +3400,7 @@ function validarProyecto(o) {
   p.maqueta = Object.assign(proyectoBase().maqueta, o.maqueta || {});
   p.cnc = Object.assign(proyectoBase().cnc, o.cnc || {});
   p.reticula = Object.assign(proyectoBase().reticula, o.reticula || {});
-  ['planta', 'radial', 'pared'].forEach(k => p[k] = Object.assign(proyectoBase()[k], o[k] || {}));
+  ['planta', 'radial', 'pared', 'relieve'].forEach(k => p[k] = Object.assign(proyectoBase()[k], o[k] || {}));
   if (!['reticula', 'radial', 'pared'].includes(p.tipo)) p.tipo = 'costillas';
   if (!PLANTILLAS[p.plantilla]) p.plantilla = 'libre';
   p.params = Object.assign(paramsDefecto(p.plantilla), o.params || {});

@@ -1,6 +1,6 @@
 # Made-rebanadas — Por Eloi A.A.
 
-**Versión 1.4** · novedades en [NOVEDADES.md](NOVEDADES.md)
+**Versión 1.5** · novedades en [NOVEDADES.md](NOVEDADES.md)
 
 **Portada en línea:** <https://eloiaa-hub.github.io/Made-rebanadas/>
 
@@ -20,6 +20,7 @@ Funciona en el navegador (Chrome, Edge o Firefox), sin instalar nada y **sin con
 - **Forma paramétrica**: plantillas de banco ondulado, tumbona, pouf / taburete, mesa baja «ola», estantería «duna» y forma libre, con sus medidas en deslizadores.
 - **Perfiles clave**: la forma se define con unos pocos perfiles a lo largo del mueble; cada costilla es la mezcla suave de los perfiles que tiene a los lados. Se editan a mano (puntos de curva o de esquina).
 - **Cuatro tipos**: costillas unidas con varillas (en planta recta, en **arco** o **en S**), **retícula entrelazada** a media madera, **radiales** (lámparas y columnas alrededor de un tubo, con discos de unión) y **paneles de pared** (lamas sobre rastreles).
+- **Arte mural, rótulos y estanterías**: relieve de pared a partir de un **texto** (nombres, logos) o de una **figura STL/OBJ** (caras, labios, formas), en lamas verticales u horizontales, y estantería de pared ondulada de lamas.
 - **Perfiles clave en el 3D**: se seleccionan pinchándolos.
 - **Costillas**: grosor del tablero, reparto por separación o por número, base aplanada y corte plano arriba.
 - **Varillas**: roscada, redondo de madera o tubo, con separadores; colocación automática y comprobación de la madera que queda al borde en cada costilla.

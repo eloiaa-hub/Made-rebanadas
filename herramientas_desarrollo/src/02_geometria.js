@@ -160,13 +160,14 @@ function reparto() {
 function radioAgujero() { return (P.varillas.diam + P.varillas.holgura) / 2; }
 
 function calcular() {
+  if (relieveActivo()) P.largo = P.relieve.orient === 'h' ? P.relieve.alto : P.relieve.ancho;
   const e = grosor(), rep = reparto(), V = P.varillas;
   const res = { n: rep.n, sep: rep.s, hueco: rep.hueco, costillas: [], varillas: [], avisos: [] };
   for (let i = 0; i < rep.n; i++) {
-    const x = rep.xs[i], ctrl = perfilEn(x), poly = contornoDe(ctrl);
+    const x = rep.xs[i], poly = contornoEnX(x);
     const ok = poly.length >= 3 && Math.abs(areaFirmada(poly)) > 25;
     const caja = ok ? cajaDe(poly) : { x0: 0, y0: 0, x1: 0, y1: 0, w: 0, h: 0 };
-    res.costillas.push({ i, x, poly: ok ? poly : [], base: ok ? poly : [], ok, caja, area: ok ? areaFirmada(poly) : 0, agujeros: [], nVar: 0, ranuras: [], etq: String(i + 1), nombre: 'Costilla ' + (i + 1) });
+    res.costillas.push({ i, x, poly: ok ? poly : [], base: ok ? poly : [], ok, caja, area: ok ? areaFirmada(poly) : 0, agujeros: [], nVar: 0, ranuras: [], etq: String(i + 1), nombre: (P.tipo === 'pared' ? 'Lama ' : 'Costilla ') + (i + 1) });
   }
   res.largueros = []; res.cruces = []; res.discos = []; res.rastreles = []; res.ranurasMal = [];
   // centro del fondo de las costillas (en radial y pared, el eje o la pared: 0)
