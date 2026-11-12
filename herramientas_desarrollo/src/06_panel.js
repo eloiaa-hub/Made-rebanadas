@@ -138,7 +138,7 @@ function iniciarPanel() {
   enlazar('#sOrigen', () => {
     Rl().fuente = $('#sOrigen').value;
     if (relieveActivo() && P.pared.rastreles && Rl().fondo < P.pared.grueso + 15) Rl().fondo = P.pared.grueso + 15;
-    UI.costilla = 0; ponerControles(); cambio({ plantilla: 'Forma desde la plantilla', texto: 'Relieve de texto', modelo: 'Relieve desde un modelo 3D' }[Rl().fuente]);
+    UI.costilla = 0; ponerControles(); cambio({ plantilla: 'Forma desde la plantilla', texto: 'Relieve de texto', modelo: 'Relieve desde un modelo 3D', imagen: 'Relieve desde una imagen' }[Rl().fuente]);
     encuadrarSiHaceFalta(); camara('tres4');
   });
   const num = (sel, k, min = 0) => enlazar(sel, () => { Rl()[k] = Math.max(min, +$(sel).value || 0); cambio(); });
@@ -165,6 +165,18 @@ function iniciarPanel() {
     f.click();
   };
   $('#bModeloEjemplo').onclick = dialogoModelos;
+  $('#bImagenEjemplo').onclick = dialogoImagenes;
+  enlazar('#rlGama', () => { Rl().gama = clamp(+$('#rlGama').value || 1, 0.2, 5); cambio(); });
+  $('#bAjustarImagen').onclick = () => { if (!Rl().imagen) { aviso('Carga antes una imagen.'); return; } ajustarAltoImagen(); ponerControles(); cambio('Alto según la imagen'); encuadrarSiHaceFalta(); camara('tres4'); };
+  $('#bCargarImagen').onclick = () => {
+    const f = $('#fImagen'); f.value = '';
+    f.onchange = () => {
+      const a = f.files[0]; if (!a) return;
+      cargarImagenArchivo(a, true).then(r => { ponerControles(); cambio('Imagen: ' + a.name); encuadrarSiHaceFalta(); camara('tres4'); aviso(`${esc(a.name)}: ${r.w} × ${r.h} px`); })
+        .catch(e => aviso('⚠ ' + esc(e.message), 5000));
+    };
+    f.click();
+  };
   enlazar('#paOrient', () => { Rl().orient = $('#paOrient').value; cambio(Rl().orient === 'h' ? 'Lamas horizontales' : 'Lamas verticales'); encuadrarSiHaceFalta(); camara('tres4'); });
   // planta curva
   enlazar('#plForma', () => { P.planta.forma = $('#plForma').value; mostrarSecciones(); cambio('Planta ' + $('#plForma').selectedOptions[0].text.toLowerCase()); camara('tres4'); });
@@ -261,7 +273,7 @@ function mostrarSecciones() {
   $('#filaOrigen').classList.toggle('oculto', t !== 'pared');
   $('#filaPlantilla').classList.toggle('oculto', rel); $('#params').classList.toggle('oculto', rel); $('#descPlantilla').classList.toggle('oculto', rel);
   $('#secRelieve').classList.toggle('oculto', !rel);
-  $('#relTexto').classList.toggle('oculto', Rl.fuente !== 'texto'); $('#relModelo').classList.toggle('oculto', Rl.fuente !== 'modelo');
+  $('#relTexto').classList.toggle('oculto', Rl.fuente !== 'texto'); $('#relModelo').classList.toggle('oculto', Rl.fuente !== 'modelo'); $('#relImagen').classList.toggle('oculto', Rl.fuente !== 'imagen');
   $('#secClaves').classList.toggle('oculto', rel);
   $('#sClave').classList.toggle('oculto', rel); $('#bEsquina').classList.toggle('oculto', rel); $('#infoClave').classList.toggle('oculto', rel);
 }
@@ -289,6 +301,8 @@ function ponerControles() {
   $('#rlVista').value = Rl.vista; $('#rlGiro').value = String(Rl.giro || 0); $('#rlBase').value = Rl.base;
   $('#rlAncho').value = Rl.ancho; $('#rlAlto').value = Rl.alto; $('#rlFondo').value = Rl.fondo; $('#rlRelieve').value = Rl.relieve; $('#rlSuave').value = Rl.suavizado; $('#rlInvertir').checked = Rl.invertir; $('#rlOnda').value = Rl.ondaAmp; $('#rlOndas').value = Rl.ondas;
   $('#rlModeloInfo').textContent = Rl.modelo ? `Modelo: ${Rl.modelo.nombre}` + (Rl.modelo.triangulos ? ` (${Rl.modelo.triangulos.toLocaleString('es-ES')} triángulos)` : '') + (mallaVigente() ? '' : '. El proyecto guarda su relieve; para cambiar la vista, vuelve a cargarlo.') : 'Sin modelo. Carga un STL u OBJ (rostro, figura, logo en 3D…).';
+  $('#rlGama').value = Rl.gama || 1;
+  $('#rlImagenInfo').textContent = Rl.imagen ? `Imagen: ${Rl.imagen.nombre} (${Rl.imagen.w} × ${Rl.imagen.h} px). Lo blanco sale más.` : 'Sin imagen. Carga una foto o un dibujo: lo blanco sale más y lo negro queda en el fondo.';
   mostrarSecciones();
   const M = P.maqueta; $('#mActiva').checked = M.activa; $('#mEscala').value = String(M.escala); $('#mGrosor').value = M.grosor; $('#mDiam').value = M.diam; $('#mHolgura').value = M.holgura;
   $('#rExplosion').value = P.vista.explosion; $('#cFantasma').checked = P.vista.fantasma; $('#cVarillas3d').checked = P.vista.varillas; $('#cResalta').checked = P.vista.resalta;

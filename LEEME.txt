@@ -12,6 +12,7 @@ Copia siempre la carpeta completa:
   assets/texturas  maderas y almas de tablero (texturas.js)
   assets/ejemplos  muebles de ejemplo (ejemplos.js)
   assets/modelos   modelos 3D de ejemplo para el relieve (.stl)
+  assets/imagenes  imágenes en grises de ejemplo para el relieve (.png)
   assets/anidador  Anidador de tableros (se abre con el botón 🧩 Anidador)
   ayuda/           manual
   herramientas_desarrollo/  solo para cambiar el programa (ver su LEEME.md)

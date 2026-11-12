@@ -42,7 +42,7 @@
         <label class="fila" title="Costillas separadas unidas con varillas, o retícula de costillas y largueros que se cruzan con ranuras a media madera">Tipo de mueble
           <select id="sTipo"><option value="costillas">Costillas con varillas</option><option value="reticula">Retícula (ranuras a media madera)</option><option value="radial">Radial (lámparas, columnas)</option><option value="pared">Panel de pared (lamas)</option></select></label>
         <label class="fila oculto" id="filaOrigen" title="De dónde sale la forma de las lamas">Origen de la forma
-          <select id="sOrigen"><option value="plantilla">Plantilla</option><option value="texto">Texto en relieve</option><option value="modelo">Modelo 3D (STL / OBJ)</option></select></label>
+          <select id="sOrigen"><option value="plantilla">Plantilla</option><option value="texto">Texto en relieve</option><option value="modelo">Modelo 3D (STL / OBJ)</option><option value="imagen">Imagen en grises</option></select></label>
         <label class="fila" id="filaPlantilla">Plantilla <select id="sPlantilla"></select></label>
         <p class="nota" id="descPlantilla"></p>
         <div id="params"></div>
@@ -116,6 +116,13 @@
           <label class="fila">Vista <select id="rlVista"><option value="frente">De frente</option><option value="atras">De atrás</option><option value="izquierda">Desde la izquierda</option><option value="derecha">Desde la derecha</option><option value="arriba">Desde arriba</option><option value="abajo">Desde abajo</option></select></label>
           <label class="fila">Giro <select id="rlGiro"><option value="0">0°</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></label>
           <label class="fila" title="Lo que sale la parte más lejana del modelo sobre el fondo (0 a 1)">Despegue del fondo <input type="number" id="rlBase" min="0" max="0.9" step="0.05"></label>
+        </div>
+        <div id="relImagen">
+          <p class="nota" id="rlImagenInfo">Sin imagen. Carga una foto o un dibujo: lo blanco sale más y lo negro queda en el fondo.</p>
+          <button id="bCargarImagen" class="ancho" title="Cargar una imagen (png, jpg…) como mapa de alturas">🖼 Cargar imagen…</button>
+          <button id="bImagenEjemplo" class="ancho" title="Cara, espiral, hoja, montañas…">🖼 Imágenes de ejemplo…</button>
+          <button id="bAjustarImagen" class="ancho" title="Pone el alto del panel con las proporciones de la imagen">↕ Alto según la imagen</button>
+          <label class="fila" title="Menos de 1: los grises medios salen más. Más de 1: solo sale lo muy claro">Gama <input type="number" id="rlGama" min="0.2" max="5" step="0.1"></label>
         </div>
         <label class="fila">Ancho del panel (mm) <input type="number" id="rlAncho" min="100" step="10"></label>
         <label class="fila">Alto del panel (mm) <input type="number" id="rlAlto" min="100" step="10"></label>
@@ -243,7 +250,6 @@
           <b id="numCost">1</b>
           <button id="bCostSig" class="mini" title="Costilla siguiente (→)">▶</button>
           <small id="infoCost"></small>
-          <span class="cams"><button id="bCalcador" title="Abrir esta pieza en el Calcador de la Suite CNC para programar su G-code">➜ Calcador</button></span>
         </div>
         <canvas id="cCost"></canvas>
       </div>
@@ -306,12 +312,14 @@
 
 <input type="file" id="fArchivo" class="oculto" accept=".json,application/json">
 <input type="file" id="fModelo" class="oculto" accept=".stl,.obj">
+<input type="file" id="fImagen" class="oculto" accept="image/*">
 <div id="aviso" class="aviso"></div>
 
 <script src="assets/js/three-bundle.js"></script>
 <script src="assets/texturas/texturas.js"></script>
 <script src="assets/ejemplos/ejemplos.js"></script>
 <script src="assets/modelos/modelos.js"></script>
+<script src="assets/imagenes/imagenes.js"></script>
 <script src="assets/js/app.js"></script>
 </body>
 </html>

@@ -110,3 +110,59 @@ with open(os.path.join(DEST, 'modelos.js'), 'w') as f:
     f.write('/* Modelos 3D de ejemplo de Made-rebanadas (generados con herramientas_desarrollo/modelos.py).\n   Los mismos modelos están en esta carpeta como .stl. */\nwindow.MADE_MODELOS = ' + json.dumps(M, ensure_ascii=False) + ';\n')
 for m in M: print(m['id'], m['triangulos'], os.path.getsize(os.path.join(DEST, m['archivo'])))
 print('modelos.js', os.path.getsize(os.path.join(DEST, 'modelos.js')))
+
+# ---------------- imágenes en escala de grises de ejemplo (assets/imagenes) ----------------
+from PIL import Image, ImageFilter
+import io
+DIMG = os.path.join(AQUI, '..', 'assets', 'imagenes'); os.makedirs(DIMG, exist_ok=True)
+
+def img_cara(n=260):
+    xs = np.linspace(-75, 75, n); ys = np.linspace(95, -150, int(n * 245 / 150)); zs = np.arange(-80, 95, 1.2)
+    out = np.zeros((ys.size, xs.size))
+    for j, y in enumerate(ys):
+        X, Z = np.meshgrid(xs, zs, indexing='ij'); D = cara((X, np.full_like(X, y), Z)) < 0
+        an = D.any(1); idx = D.shape[1] - 1 - np.argmax(D[:, ::-1], axis=1)
+        out[j] = np.where(an, zs[idx], np.nan)
+    lo, hi = np.nanmin(out), np.nanmax(out)
+    return np.nan_to_num((out - lo) / (hi - lo) * 0.85 + 0.15, nan=0)
+
+def img_espiral(n=300):
+    y, x = np.mgrid[-1:1:n * 1j, -1:1:n * 1j]; r = np.hypot(x, y); a = np.arctan2(y, x)
+    f = 0.5 + 0.5 * np.cos(2 * np.pi * (r * 7 - a / (2 * np.pi)))
+    return f * np.clip(1.15 - r, 0, 1) ** 0.6
+
+def img_hoja(n=300):
+    y, x = np.mgrid[1:-1:n * 1j, -1:1:n * 1j]
+    t = (y + 0.9) / 1.8; ancho = 0.55 * np.sin(np.pi * np.clip(t, 0, 1)) ** 0.9 * (1 - 0.25 * t)
+    dentro = np.clip(1 - np.abs(x) / np.maximum(ancho, 1e-3), 0, 1) * ((t > 0) & (t < 1))
+    lam = np.sqrt(dentro)                                              # lámina abombada
+    nervio = np.exp(-(x / 0.025) ** 2) * ((t > -0.08) & (t < 0.97))
+    sec = np.exp(-((np.abs(x) * 0.9 - (y - (-0.7 + np.round((y + 0.7 + np.abs(x) * 0.9) / 0.28) * 0.28) + np.abs(x) * 0.9) * 0) ** 2))
+    k = (y + 0.75 - np.abs(x) * 0.9) / 0.26; venas = np.exp(-((k - np.round(k)) / 0.09) ** 2) * dentro * (np.abs(x) > 0.03)
+    tallo = np.exp(-(x / 0.03) ** 2) * ((y < -0.86) & (y > -1)) * 0.6
+    return np.clip(0.75 * lam + 0.25 * nervio * (dentro > 0) + 0.12 * venas + tallo + 0.2 * nervio * ((t > -0.08) & (t < 0)), 0, 1)
+
+def img_montanas(n=300):
+    rng = np.random.default_rng(7); y, x = np.mgrid[0:1:n * 1j, 0:1:n * 1j]; f = np.zeros_like(x)
+    for o in range(3):
+        k = 2 ** o * 1.6
+        for _ in range(3):
+            a, b, c = rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(0, 6.3)
+            f += np.cos(k * 2 * np.pi * (a * x + b * y) + c) / 2 ** o
+    f = 1 - np.abs(f) / np.abs(f).max(); f = f ** 1.6
+    return (f - f.min()) / (f.max() - f.min())
+
+IM = []
+for id_, nom, desc, fn, ancho, alto in [
+        ('cara_mapa', 'Mapa de la cara', 'El modelo «Cara» visto de frente, pasado a grises: así ve el programa un STL.', img_cara, 600, 980),
+        ('espiral', 'Espiral', 'Una espiral con relieve de cresta, para lamas horizontales o verticales.', img_espiral, 900, 900),
+        ('hoja', 'Hoja', 'Una hoja abombada con su nervio central y las venas marcadas.', img_hoja, 700, 700),
+        ('montanas', 'Montañas', 'Un paisaje de crestas hecho con ruido: como un mapa topográfico.', img_montanas, 1200, 1200)]:
+    a = (np.clip(fn(), 0, 1) * 255).astype(np.uint8); im = Image.fromarray(a, 'L')
+    im.save(os.path.join(DIMG, id_ + '.png'), optimize=True)
+    b = io.BytesIO(); im.save(b, 'PNG', optimize=True)
+    IM.append({'id': id_, 'nombre': nom, 'desc': desc, 'archivo': id_ + '.png', 'ancho': ancho, 'alto': alto, 'w': im.width, 'h': im.height,
+               'd64': base64.b64encode(a.tobytes()).decode(), 'png': 'data:image/png;base64,' + base64.b64encode(b.getvalue()).decode()})
+with open(os.path.join(DIMG, 'imagenes.js'), 'w') as f:
+    f.write('/* Imágenes en escala de grises de ejemplo de Made-rebanadas (generadas con herramientas_desarrollo/modelos.py).\n   Las mismas imágenes están en esta carpeta como .png. Blanco = sale más; negro = fondo. */\nwindow.MADE_IMAGENES = ' + json.dumps(IM, ensure_ascii=False) + ';\n')
+print('imagenes.js', os.path.getsize(os.path.join(DIMG, 'imagenes.js')))

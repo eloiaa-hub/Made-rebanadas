@@ -49,4 +49,10 @@ window.MADE_EJEMPLOS = [
   { nombre: 'Anomalía', plantilla: 'pared_ondas', tipo: 'pared', modeloEjemplo: 'burbuja', desc: 'Una burbuja que empuja las lamas horizontales (modelo de ejemplo «Anomalía»).',
     params: {}, costillas: { grosor: 12, separacion: 26, material: 'nogal' }, pared: { rastreles: 3, margen: 90, grueso: 15 },
     relieve: { fuente: 'modelo', orient: 'h', ancho: 900, alto: 900, fondo: 30, relieve: 120, suavizado: 4, base: 0 } },
+  { nombre: 'Espiral (desde una imagen)', plantilla: 'pared_ondas', tipo: 'pared', imagenEjemplo: 'espiral', desc: 'Una imagen en grises de una espiral, pasada a lamas horizontales: lo blanco sale más.',
+    params: {}, costillas: { grosor: 12, separacion: 22, material: 'roble' }, pared: { rastreles: 3, margen: 90, grueso: 15 },
+    relieve: { fuente: 'imagen', orient: 'h', ancho: 900, alto: 900, fondo: 30, relieve: 70, suavizado: 6, gama: 1 } },
+  { nombre: 'Hoja (desde una imagen)', plantilla: 'pared_ondas', tipo: 'pared', imagenEjemplo: 'hoja', desc: 'La imagen de ejemplo «Hoja» en lamas verticales de nogal.',
+    params: {}, costillas: { grosor: 12, separacion: 20, material: 'nogal' }, pared: { rastreles: 2, margen: 90, grueso: 15 },
+    relieve: { fuente: 'imagen', orient: 'v', ancho: 700, alto: 700, fondo: 30, relieve: 90, suavizado: 4, gama: 1 } },
 ];

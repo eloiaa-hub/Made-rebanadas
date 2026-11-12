@@ -127,6 +127,25 @@ function dialogoModelos() {
     } catch (e) { aviso('⚠ ' + esc(e.message), 5000); }
   });
 }
+function dialogoImagenes() {
+  const I = imagenesEjemplo();
+  const items = I.map(m => `<button data-img="${m.id}" style="display:flex;gap:10px;align-items:center;text-align:left"><img src="${m.png}" alt="" style="width:64px;height:64px;object-fit:contain;background:#000;border-radius:4px;flex:none"><span><b>${esc(m.nombre)}</b><small>${esc(m.desc)} · <a href="assets/imagenes/${m.archivo}" download data-png>${m.archivo}</a></small></span></button>`).join('');
+  modal('🖼 Imágenes de ejemplo', `<p class="nota">Imágenes en escala de grises para probar el relieve: <b>lo blanco sale más y lo negro queda en el fondo</b>. Al elegir una se carga con unas medidas de panel adecuadas. Las mismas imágenes están como PNG en <b>assets/imagenes</b>: ábrelas o retócalas en un programa de dibujo y vuelve a cargarlas.</p><div class="ejemplos">${items || '<p>No se encuentra assets/imagenes/imagenes.js</p>'}</div>`);
+  $$('[data-png]').forEach(a => a.onclick = e => e.stopPropagation());
+  $$('[data-img]').forEach(b => b.onclick = () => {
+    cerrarModal();
+    try {
+      const nuevo = P.tipo !== 'pared';
+      if (nuevo && UI.sucio && !confirm('El relieve se hace en un panel de pared nuevo. Hay cambios sin guardar. ¿Seguir?')) return;
+      const ant = P; if (nuevo) P = proyectoDePlantilla('pared_ondas');
+      let E; try { E = cargarImagenEjemplo(b.dataset.img, true); } catch (e) { P = ant; throw e; }
+      if (P.pared.rastreles && P.relieve.fondo < P.pared.grueso + 15) P.relieve.fondo = P.pared.grueso + 15;
+      if (nuevo) { P.nombre = 'Relieve ' + E.nombre; const p = P; P = ant; cargarProyecto(p, true); }
+      else { ponerControles(); cambio('Imagen: ' + E.nombre); encuadrarSiHaceFalta(); camara('tres4'); }
+      aviso(esc(E.nombre));
+    } catch (e) { aviso('⚠ ' + esc(e.message), 5000); }
+  });
+}
 function dialogoEjemplos() {
   const E = window.MADE_EJEMPLOS || [];
   const items = E.map((e, i) => `<button data-ej="${i}"><b>${esc(e.nombre)}</b><small>${esc(e.desc)}</small></button>`).join('');
@@ -135,7 +154,7 @@ function dialogoEjemplos() {
     if (UI.sucio && !confirm('Hay cambios sin guardar. ¿Abrir el ejemplo?')) return;
     const e = E[+b.dataset.ej]; cerrarModal();
     const p = proyectoDePlantilla(e.plantilla, e);
-    if (e.modeloEjemplo) { const ant = P; P = p; try { cargarModeloEjemplo(e.modeloEjemplo); } catch (er) { aviso('⚠ ' + esc(er.message), 5000); } P = ant; }
+    if (e.modeloEjemplo || e.imagenEjemplo) { const ant = P; P = p; try { if (e.modeloEjemplo) cargarModeloEjemplo(e.modeloEjemplo); else cargarImagenEjemplo(e.imagenEjemplo); } catch (er) { aviso('⚠ ' + esc(er.message), 5000); } P = ant; }
     cargarProyecto(p, true);
     aviso('Ejemplo: ' + esc(e.nombre));
   });

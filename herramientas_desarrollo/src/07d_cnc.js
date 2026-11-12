@@ -1,9 +1,8 @@
 
-/* ===================== CNC: HUESO DE PERRO, ARCOS Y CALCADOR =====================
+/* ===================== CNC: HUESO DE PERRO Y ARCOS =====================
    - Hueso de perro: en las esquinas interiores de ranuras y muescas, un círculo del radio de la fresa
      para que la pieza que entra llegue al fondo (la fresa redonda no deja esquinas vivas).
-   - Arcos: el contorno de muchos tramos rectos se convierte en rectas y arcos (bulge), con una tolerancia.
-   - Calcador: cada pieza se puede abrir en el Calcador de la Suite CNC o guardar como su proyecto (.json). */
+   - Arcos: el contorno de muchos tramos rectos se convierte en rectas y arcos (bulge), con una tolerancia. */
 
 const fresaFab = () => enMaqueta() ? (+P.maqueta.fresa || 0) : (+P.cnc.fresa || 0);
 const conHueso = () => P.cnc.hueso && fresaFab() > 0;
@@ -115,52 +114,4 @@ function puntosBulge(p, q, bu, cada = 4) {
 function contornoCNC(poly) {
   if (P.cnc.arcos) return ajustarArcos(poly, Math.max(0.005, +P.cnc.tolArco || 0.05));
   const s = simplificaCerrado(poly, 0.05); return { pts: s, b: new Array(s.length).fill(0) };
-}
-
-/* ---------- Calcador de la Suite CNC ---------- */
-const CALCADOR_DEF = 'https://eloiaa-hub.github.io/Suite-CNC/calcador.html';
-const urlCalcador = () => lsGet('made-rebanadas.calcador', CALCADOR_DEF);
-function proyectoCalcador(c) {
-  const pz = piezaCalcador(c), e = grosorFab(), f = fresaFab();
-  return {
-    version: 7, nombre: `${P.nombre} - ${c.nombre}`,
-    calcador: {
-      version: 4, escala: 10, origen: { x: 0, y: 0 }, contornos: pz.calcador.contornos.map((k, i) => ({ ...k, uid: 'mr' + i + '_' + Math.random().toString(36).slice(2, 6) })),
-      cotasAjuste: {}, cotasManuales: [], cfgCotas: { ver: true, cero: true, entrada: true, sentido: true }, aux: [],
-      cfgHoja: { titulo: `${P.nombre} - ${c.nombre}`, material: `${enMaqueta() ? 'Maqueta' : MATERIALES[P.costillas.material].nombre} ${fmt(e, 1)} mm`, herramienta: f ? `Fresa Ø${fmt(f, 1)}` : '' },
-      cfgMec: { prof: +(e + 0.5).toFixed(2) },
-    },
-  };
-}
-function guardarJSONCalcador(c) {
-  const d = proyectoCalcador(c);
-  descargar(nombreArchivo(P.nombre + '_' + c.nombre) + sufijoFab() + '.json', JSON.stringify(d, null, 1), 'application/json');
-}
-function guardarTodasCalcador() {
-  const ps = piezasFab(); if (!ps.length) return;
-  aviso(`Guardando ${ps.length} archivos .json del Calcador…`, 4000);
-  ps.forEach((c, i) => setTimeout(() => guardarJSONCalcador(c), i * 350));
-}
-let paraCalcador = null, ventanaCalcador = null;
-function abrirEnCalcador(c) {
-  if (!c || !c.ok) { aviso('Selecciona antes una pieza.'); return; }
-  const json = JSON.stringify(proyectoCalcador(c));
-  try { localStorage.setItem('suiteCNC:paraCalcador', JSON.stringify({ t: Date.now(), json })); } catch (e) { /* irá por mensaje */ }
-  paraCalcador = json;
-  ventanaCalcador = window.open(urlCalcador() + '#desdeGenerador', '_blank');
-  if (!ventanaCalcador) aviso('El navegador ha bloqueado la pestaña nueva: permite las ventanas emergentes, o usa «⬇ .json del Calcador» y ábrelo allí.', 6000);
-  else aviso(`Abriendo ${esc(c.nombre)} en el Calcador…`);
-}
-window.addEventListener('message', e => {
-  const d = e.data; if (!d || typeof d !== 'object' || d.tipo !== 'calcador-listo' || !paraCalcador || !e.source) return;
-  e.source.postMessage({ tipo: 'proyecto-generador', json: paraCalcador }, '*'); paraCalcador = null;
-});
-function dialogoCalcador() {
-  const c = piezaSel();
-  modal('➜ Calcador de la Suite CNC', `
-    <p class="nota">Abre la pieza seleccionada (<b>${c ? esc(c.nombre) : '—'}</b>) en el Calcador, con su contorno${P.cnc.arcos ? ' en rectas y arcos' : ''}, los agujeros y las ranuras, para programar su G-code. El cero pieza es la esquina de abajo a la izquierda de la pieza.</p>
-    <label class="fila">Dirección del Calcador <input type="text" id="calUrl" value="${esc(urlCalcador())}" style="width:62%"></label>
-    <p class="nota">Puede ser la Suite en internet o tu copia local (por ejemplo <code>file:///C:/Suite-CNC/calcador.html</code>). Si el Calcador no recibe la pieza, guárdala como <b>.json</b> y ábrela allí con 📂 Abrir.</p>`,
-    [['↺ Por defecto', () => { $('#calUrl').value = CALCADOR_DEF; }], ['⬇ .json de todas', () => guardarTodasCalcador()], ['⬇ .json de esta pieza', () => c && guardarJSONCalcador(c)],
-     ['➜ Abrir en el Calcador', () => { lsSet('made-rebanadas.calcador', $('#calUrl').value.trim() || CALCADOR_DEF); cerrarModal(); abrirEnCalcador(c); }, true]]);
 }

@@ -70,7 +70,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <a href="#relieve">13. Figuras, rótulos y estanterías de pared</a><br>
   <a href="#comprobar">14. Comprobaciones</a><br>
   <a href="#vista3d">15. La vista 3D</a><br>
-  <a href="#fabricar">16. Paso 5 · Fabricar: tableros, DXF y Calcador</a><br>
+  <a href="#fabricar">16. Paso 5 · Fabricar: tableros, DXF y SVG</a><br>
   <a href="#despiece">17. Despiece y lista de compra</a><br>
   <a href="#maqueta">18. Maqueta a escala</a><br>
   <a href="#plano">19. Plano de montaje en PDF</a><br>
@@ -288,10 +288,11 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 <figure><img src="img/plano_pared.jpg" alt="Plano de la pared" style="max-width:640px"><figcaption>Hoja 2 del plano: alzado con las lamas numeradas y la altura de cada rastrel.</figcaption></figure>
 
 <h2 id="relieve">13. Figuras, rótulos y estanterías de pared</h2>
-<p>Los paneles de pared tienen dos maneras más de sacar la forma, en <b>Forma → Origen de la forma</b>:</p>
+<p>Los paneles de pared tienen tres maneras más de sacar la forma, en <b>Forma → Origen de la forma</b>:</p>
 <ul>
   <li><b>Plantilla</b>: la de siempre, con perfiles clave que se editan a mano.</li>
   <li><b>Texto en relieve</b>: escribe un nombre o un logo de texto (puede tener varias líneas). El programa lo dibuja con la letra que elijas, lo redondea con el <b>suavizado</b> y lo convierte en el canto de las lamas. Sirve para rótulos de tienda, nombres en la habitación o números de casa.</li>
+  <li><b>Imagen en grises</b>: carga una foto, un dibujo o un mapa de alturas (png, jpg…). <b>Lo blanco sale más y lo negro queda en el fondo</b>; los grises, a medias. Es la forma más fácil de hacer una figura: se dibuja en cualquier programa de dibujo, con pincel difuminado.</li>
   <li><b>Modelo 3D (STL / OBJ)</b>: carga una cara, un busto, unos labios o cualquier figura. El programa la mira desde la <b>vista</b> que elijas (frente, lado, arriba…) con el <b>giro</b> que quieras y saca un mapa de alturas: lo más cercano sale más de la pared. Así se hacen las caras y figuras de «arte mural paramétrico».</li>
 </ul>
 <div class="dos">
@@ -335,6 +336,26 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 </div>
 <div class="caja">Cuanto más juntas estén las lamas, más se reconoce la figura: para una cara, 12 mm cada 16 a 20 mm. Con lamas muy separadas solo se ve la forma general.</div>
 
+<h3>Relieve desde una imagen en grises</h3>
+<p>Con <b>Origen de la forma: Imagen en grises</b> el panel sale de una imagen, como un mapa de alturas. Al cargarla, el alto del panel se ajusta a sus proporciones (se puede cambiar; el botón <b>↕ Alto según la imagen</b> lo vuelve a ajustar). La imagen se guarda dentro del proyecto, reducida a 600 píxeles como mucho.</p>
+<ul>
+  <li><b>Gama</b>: con 1 el gris medio sale a media altura. Con menos de 1 (0,5) los grises salen más y el relieve se ve más lleno; con más de 1 (2) solo sale lo muy claro.</li>
+  <li><b>Invertir</b>: lo negro sale y lo blanco se hunde (útil con dibujos en negro sobre blanco).</li>
+  <li><b>Suavizado</b>: quita los saltos bruscos de las fotos y los bordes pixelados.</li>
+</ul>
+<div class="dos">
+  <img src="img/imagenes_dlg.png" alt="Imágenes de ejemplo">
+  <div>
+    <p><b>🖼 Imágenes de ejemplo…</b> trae cuatro: <b>Mapa de la cara</b> (el modelo «Cara» pasado a grises, para ver que un STL y una imagen son lo mismo), <b>Espiral</b>, <b>Hoja</b> y <b>Montañas</b>. Están como PNG en <b>assets/imagenes</b>: se pueden retocar en un programa de dibujo y volver a cargar.</p>
+    <p>En <b>🪑 Ejemplos</b> están <b>Espiral (desde una imagen)</b> y <b>Hoja (desde una imagen)</b>.</p>
+  </div>
+</div>
+<div class="dos">
+  <figure><img src="img/img_espiral.jpg" alt="Espiral"><figcaption>«Espiral» en lamas horizontales de roble.</figcaption></figure>
+  <figure><img src="img/img_hoja.jpg" alt="Hoja"><figcaption>«Hoja» en lamas verticales de nogal.</figcaption></figure>
+</div>
+<div class="caja">Una foto normal no suele dar buen relieve: lo claro no siempre es lo que está más cerca. Funcionan mejor los dibujos hechos a propósito (blanco donde quieres que salga), los mapas de profundidad (<i>depth map</i>) y los mapas de alturas de terreno.</div>
+
 <h3>Estantería de pared ondulada</h3>
 <p>La plantilla <b>Estantería de pared ondulada</b> (en Panel de pared) hace las lamas con baldas que salen de ellas: cada lama lleva un trozo de cada balda con una ménsula inclinada debajo. El fondo de las baldas ondula a lo largo, como las estanterías de lamas que se venden hechas. Parámetros: número de baldas, fondo máximo y mínimo, ondas y desfase entre baldas, grueso de la balda, fondo de la lama y alto de la ménsula.</p>
 <div class="dos">
@@ -369,7 +390,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <li><b>📷 Imagen</b> guarda la vista 3D en PNG a alta resolución.</li>
 </ul>
 
-<h2 id="fabricar">16. Paso 5 · Fabricar: tableros, DXF y Calcador</h2>
+<h2 id="fabricar">16. Paso 5 · Fabricar: tableros, DXF y SVG</h2>
 <figure><img src="img/fabricar.png" alt="Ventana Fabricar"></figure>
 <p><b>🪚 Fabricar</b> coloca todas las costillas en tableros y muestra cuántos hacen falta y el aprovechamiento. Puedes elegir:</p>
 <ul>
@@ -402,17 +423,6 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   </div>
 </div>
 <figure><img src="img/hueso.png" alt="Hueso de perro en las ranuras" style="max-width:560px"><figcaption>Fondo de las ranuras de un larguero, con el hueso de perro en cada esquina.</figcaption></figure>
-<h3>Llevar una pieza al Calcador</h3>
-<div class="dos">
-  <img src="img/calcador.png" alt="Ventana del Calcador">
-  <div>
-    <p>El botón <b>➜ Calcador</b> (en la vista de la costilla y en Fabricar) abre la pieza seleccionada en el <b>Calcador de la Suite CNC</b>: contorno en rectas y arcos, agujeros, ranuras con su hueso de perro, profundidad = grosor + 0,5 mm y el cero pieza en la esquina de abajo a la izquierda. Allí se programa su G-code (G01, G02, G03) como cualquier ejercicio.</p>
-    <ul>
-      <li><b>Dirección del Calcador</b>: la Suite en internet (por defecto) o tu copia local. Se recuerda en el navegador.</li>
-      <li><b>⬇ .json de esta pieza</b> o <b>de todas</b>: proyectos del Calcador para abrir allí con 📂 Abrir, aunque no haya internet.</li>
-    </ul>
-  </div>
-</div>
 <p><b>⬇ CSV de cortes</b> guarda una línea por costilla (nombre, largo y ancho de su rectángulo, cantidad y veta) con el mismo formato de despiece que lee el <b>Anidador</b> y que abre cualquier hoja de cálculo. <b>🧩 Anidador</b> abre el Anidador con las costillas por su forma real (sección 19).</p>
 <div class="caja taller">Taladra y vacía <b>los agujeros antes que el contorno</b>: si cortas primero la pieza, se puede mover al hacer los agujeros. Deja puentes (pestañas) si la pieza es pequeña.</div>
 

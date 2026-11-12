@@ -16,7 +16,7 @@ No hacen falta para usar el programa: solo para cambiarlo.
 | `01_base.js` | Utilidades, materiales, estado del proyecto |
 | `02_geometria.js` | Curvas de los perfiles, mezcla entre perfiles clave, recortes, costillas, varillas, comprobaciones, colocación automática de varillas |
 | `02b_reticula.js` | Retícula entrelazada: largueros sacados del volumen, cruces y ranuras a media madera, comprobaciones |
-| `modelos.py` | Genera los STL de ejemplo y `assets/modelos/modelos.js` (numpy y scikit-image) |
+| `modelos.py` | Genera los STL y las imágenes en grises de ejemplo (`assets/modelos/modelos.js`, `assets/imagenes/imagenes.js`) (numpy y scikit-image) |
 | `02d_relieve.js` | Relieve de pared: mapa de alturas desde un texto (canvas) o un modelo STL/OBJ (z-buffer), perfil de cada lama, lamas horizontales |
 | `02c_disposicion.js` | Dónde va cada costilla (recta, curva, radial, pared), varillas curvas, tubo y discos, rastreles, comprobaciones de radial y pared |
 | `03_plantillas.js` | Plantillas paramétricas (banco, tumbona, pouf, mesa, estantería, libre) |
@@ -26,7 +26,7 @@ No hacen falta para usar el programa: solo para cambiarlo.
 | `07_fabricacion.js` | Maqueta a escala, colocación en tableros, DXF, SVG, despiece y CSV |
 | `07b_plano.js` | Escritor de PDF propio y plano de montaje |
 | `07c_anidador.js` | Ventana del Anidador y paso de las costillas (formato .json del Calcador) |
-| `07d_cnc.js` | Hueso de perro, ajuste de rectas y arcos (bulge) y paso de piezas al Calcador (`calcador.html#desdeGenerador`, mensajes `calcador-listo` / `proyecto-generador`) |
+| `07d_cnc.js` | Hueso de perro y ajuste de rectas y arcos (bulge) para el DXF, el SVG y el Anidador |
 | `08_archivo.js` | Ventanas, deshacer, guardar, abrir, ejemplos |
 | `09_inicio.js` | Arranque, botones y teclado |
 
@@ -45,7 +45,7 @@ No hacen falta para usar el programa: solo para cambiarlo.
 - `planta`: forma (`recta`, `arco`, `s`), radio, sentido, amplitud y ondas.
 - `radial`: Ø del tubo, holgura, número y radio de los discos (0 = automático), holgura de las ranuras.
 - `pared`: número, alto, grueso, margen y holgura de los rastreles.
-- `relieve`: `fuente` (`plantilla`, `texto` o `modelo`), `orient` (`v` u `h`), `ancho`, `alto`, `fondo`, `relieve`, `suavizado`, `invertir`; para texto `texto`, `letra`, `tamLetra`, `negrita`, `interlinea`, `ondaAmp`, `ondas`; para modelo `vista`, `giro`, `base` y `modelo` = `{nombre, w, h, d64}` (mapa de alturas en bytes, base64; el STL no se guarda).
+- `relieve`: `fuente` (`plantilla`, `texto`, `modelo` o `imagen`; la imagen va en `imagen` = `{nombre, w, h, d64}` en grises, con su `gama`), `orient` (`v` u `h`), `ancho`, `alto`, `fondo`, `relieve`, `suavizado`, `invertir`; para texto `texto`, `letra`, `tamLetra`, `negrita`, `interlinea`, `ondaAmp`, `ondas`; para modelo `vista`, `giro`, `base` y `modelo` = `{nombre, w, h, d64}` (mapa de alturas en bytes, base64; el STL no se guarda).
 - `reticula`: número de largueros, margen, vuelo, holgura de la ranura y si las ranuras de las costillas van desde arriba.
 - `cnc`: Ø de la fresa, hueso de perro, contornos con arcos y su tolerancia.
 - `maqueta`: activa, escala, grosor, diámetro de la varilla y holgura.

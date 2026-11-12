@@ -20,14 +20,13 @@ Funciona en el navegador (Chrome, Edge o Firefox), sin instalar nada y **sin con
 - **Forma paramétrica**: plantillas de banco ondulado, tumbona, pouf / taburete, mesa baja «ola», estantería «duna» y forma libre, con sus medidas en deslizadores.
 - **Perfiles clave**: la forma se define con unos pocos perfiles a lo largo del mueble; cada costilla es la mezcla suave de los perfiles que tiene a los lados. Se editan a mano (puntos de curva o de esquina).
 - **Cuatro tipos**: costillas unidas con varillas (en planta recta, en **arco** o **en S**), **retícula entrelazada** a media madera, **radiales** (lámparas y columnas alrededor de un tubo, con discos de unión) y **paneles de pared** (lamas sobre rastreles).
-- **Arte mural, rótulos y estanterías**: relieve de pared a partir de un **texto** (nombres, logos) o de una **figura STL/OBJ** (caras, labios, formas; trae cuatro STL de ejemplo en `assets/modelos`), en lamas verticales u horizontales, y estantería de pared ondulada de lamas.
+- **Arte mural, rótulos y estanterías**: relieve de pared a partir de un **texto** (nombres, logos) o de una **imagen en escala de grises**, o de una **figura STL/OBJ** (caras, labios, formas; trae cuatro STL de ejemplo en `assets/modelos`), en lamas verticales u horizontales, y estantería de pared ondulada de lamas.
 - **Perfiles clave en el 3D**: se seleccionan pinchándolos.
 - **Costillas**: grosor del tablero, reparto por separación o por número, base aplanada y corte plano arriba.
 - **Varillas**: roscada, redondo de madera o tubo, con separadores; colocación automática y comprobación de la madera que queda al borde en cada costilla.
 - **Comprobaciones**: varillas que no caben o demasiado juntas, costillas sueltas o con una sola varilla, separadores que asoman.
 - **3D**: maderas y cantos de contrachapado, varillas, tuercas y separadores, vista explosionada, volumen ideal e imagen PNG.
 - **CNC**: hueso de perro automático en ranuras y muescas, y contornos en rectas y arcos (G02/G03).
-- **➜ Calcador**: cada pieza se abre en el Calcador de la Suite CNC para programar su G-code.
 - **Fabricar**: costillas colocadas en tableros con su número grabado; **DXF** (capas CORTE, TALADROS, GRABADO, TABLERO) y **SVG** en mm.
 - **Despiece y lista de compra** en CSV, y **CSV de cortes** con el formato del Anidador.
 - **Maqueta a escala** (1:2 a 1:20) para cortarla antes en la láser.
@@ -44,6 +43,7 @@ Funciona en el navegador (Chrome, Edge o Firefox), sin instalar nada y **sin con
 | `assets/js/three-bundle.js` | [Three.js](https://threejs.org) empaquetado sin módulos, para funcionar con doble clic |
 | `assets/texturas/` | Maderas y almas de tablero (`texturas.js`) |
 | `assets/ejemplos/` | Muebles de ejemplo (`ejemplos.js`) |
+| `assets/imagenes/` | Imágenes en grises de ejemplo para el relieve (`.png` e `imagenes.js`) |
 | `assets/modelos/` | Modelos 3D de ejemplo para el relieve (`cara.stl`, `labios.stl`, `ondas.stl`, `burbuja.stl` y `modelos.js`) |
 | `assets/anidador/` | Anidador de tableros de la Suite CNC (`anidador.html`), que se abre desde el programa |
 | `ayuda/` | Manual en HTML y PDF |

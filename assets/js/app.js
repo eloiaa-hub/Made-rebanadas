@@ -85,7 +85,7 @@ function proyectoBase() {
     pared: { rastreles: 3, alto: 45, grueso: 20, margen: 120, holgura: 0.5, verPared: true },
     relieve: { fuente: 'plantilla', orient: 'v', ancho: 1200, alto: 500, fondo: 20, relieve: 60, suavizado: 10, invertir: false,
       texto: 'Made', letra: 'Arial Black', tamLetra: 320, negrita: true, interlinea: 1.05, ondaAmp: 0, ondas: 2,
-      vista: 'frente', giro: 0, base: 0.15, modelo: null },
+      vista: 'frente', giro: 0, base: 0.15, modelo: null, gama: 1, imagen: null },
   };
 }
 
@@ -774,8 +774,9 @@ function avisosPared(res) {
    La forma de las lamas no sale de los perfiles clave sino de un «mapa de profundidad» del panel:
    - texto: se dibuja con una fuente del sistema, se suaviza y sus letras salen (o se hunden)
    - modelo: un STL u OBJ proyectado desde un lado; lo más cercano sale más
+   - imagen: una foto o dibujo en escala de grises (mapa de alturas); lo claro sale más
    El mapa cubre el panel (ancho × alto, en mm) y vale de 0 (fondo) a 1 (lo que más sale). */
-const relieveActivo = () => P.tipo === 'pared' && P.relieve && (P.relieve.fuente === 'texto' || P.relieve.fuente === 'modelo');
+const relieveActivo = () => P.tipo === 'pared' && P.relieve && ['texto', 'modelo', 'imagen'].includes(P.relieve.fuente);
 // medidas del panel: ancho (horizontal) y alto (vertical)
 function medidasPanel() {
   if (relieveActivo()) return [P.relieve.ancho, P.relieve.alto];
@@ -786,9 +787,9 @@ const anchoPerfil = () => medidasPanel()[0];
 
 const CACHE_MAPA = { clave: '', mapa: null };
 function mapaRelieve() {
-  const Rl = P.relieve, clave = JSON.stringify([Rl.fuente, Rl.ancho, Rl.alto, Rl.texto, Rl.letra, Rl.tamLetra, Rl.negrita, Rl.interlinea, Rl.suavizado, Rl.invertir, Rl.ondaAmp, Rl.ondas, Rl.modelo && Rl.modelo.id]);
+  const Rl = P.relieve, clave = JSON.stringify([Rl.fuente, Rl.ancho, Rl.alto, Rl.texto, Rl.letra, Rl.tamLetra, Rl.negrita, Rl.interlinea, Rl.suavizado, Rl.invertir, Rl.ondaAmp, Rl.ondas, Rl.modelo && Rl.modelo.id, Rl.imagen && Rl.imagen.id, Rl.gama]);
   if (CACHE_MAPA.clave === clave) return CACHE_MAPA.mapa;
-  let m = Rl.fuente === 'texto' ? mapaTexto(Rl) : mapaModelo(Rl);
+  let m = Rl.fuente === 'texto' ? mapaTexto(Rl) : Rl.fuente === 'imagen' ? mapaImagen(Rl) : mapaModelo(Rl);
   if (m && Rl.suavizado > 0) m = suavizarMapa(m, Rl.suavizado / m.mm);
   if (m && Rl.invertir) for (let i = 0; i < m.d.length; i++) m.d[i] = 1 - m.d[i];
   CACHE_MAPA.clave = clave; CACHE_MAPA.mapa = m;
@@ -913,6 +914,47 @@ function mapaModelo(Rl) {
   // el mapa guardado puede tener otro tamaño que el panel: se estira al panel
   return { w: M.w, h: M.h, mm: Rl.ancho / M.w, d, mmY: Rl.alto / M.h };
 }
+/* ---------- imagen en escala de grises ---------- */
+// se guarda reducida (lado mayor ≤ 600 px) en grises de 0 a 255; lo transparente cuenta como negro (fondo)
+function cargarImagenDesde(img, nombre) {
+  const k = Math.min(1, 600 / Math.max(img.naturalWidth || img.width, img.naturalHeight || img.height));
+  const w = Math.max(2, Math.round((img.naturalWidth || img.width) * k)), h = Math.max(2, Math.round((img.naturalHeight || img.height) * k));
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const ctx = cv.getContext('2d'); ctx.drawImage(img, 0, 0, w, h);
+  const px = ctx.getImageData(0, 0, w, h).data; let s = '';
+  for (let i = 0; i < w * h; i++) { const a = px[i * 4 + 3] / 255; s += String.fromCharCode(Math.round((0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2]) * a)); }
+  P.relieve.imagen = { nombre, w, h, d64: btoa(s), id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6) };
+  return { w, h };
+}
+// carga un archivo de imagen (png, jpg, webp…) y, si se pide, ajusta el alto del panel a sus proporciones
+function cargarImagenArchivo(file, ajustarAlto) {
+  return new Promise((ok, mal) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => { try { const r = cargarImagenDesde(img, file.name); if (ajustarAlto) ajustarAltoImagen(); ok(r); } catch (e) { mal(e); } finally { URL.revokeObjectURL(url); } };
+    img.onerror = () => { URL.revokeObjectURL(url); mal(new Error('No se puede leer la imagen «' + file.name + '»')); };
+    img.src = url;
+  });
+}
+function ajustarAltoImagen() {
+  const I = P.relieve.imagen; if (!I) return;
+  P.relieve.alto = Math.max(100, Math.round(P.relieve.ancho * I.h / I.w / 10) * 10);
+}
+function mapaImagen(Rl) {
+  const I = Rl.imagen; if (!I || !I.d64) return null;
+  const bin = atob(I.d64), d = new Float32Array(bin.length), g = Rl.gama > 0 ? Rl.gama : 1;
+  for (let i = 0; i < bin.length; i++) d[i] = Math.pow(bin.charCodeAt(i) / 255, g);
+  return { w: I.w, h: I.h, mm: Rl.ancho / I.w, d, mmY: Rl.alto / I.h };
+}
+// imágenes de ejemplo (assets/imagenes/imagenes.js): ya en grises (d64), con su png para verla
+const imagenesEjemplo = () => window.MADE_IMAGENES || [];
+function cargarImagenEjemplo(id, conMedidas) {
+  const E = imagenesEjemplo().find(e => e.id === id); if (!E) throw new Error('No se encuentra la imagen de ejemplo «' + id + '» (assets/imagenes/imagenes.js)');
+  const Rl = P.relieve; Rl.fuente = 'imagen';
+  Rl.imagen = { nombre: E.nombre, w: E.w, h: E.h, d64: E.d64, id: E.id + '-' + Date.now().toString(36) };
+  if (conMedidas && E.ancho) { Rl.ancho = E.ancho; Rl.alto = E.alto; }
+  return E;
+}
+
 function cargarModelo(buf, nombre) { return cargarTriangulos(leerMalla(buf, nombre), nombre); }
 function cargarTriangulos(tri, nombre, ejemplo) {
   if (!tri.length) throw new Error('No se han encontrado triángulos en «' + nombre + '»');
@@ -2083,7 +2125,7 @@ function iniciarPanel() {
   enlazar('#sOrigen', () => {
     Rl().fuente = $('#sOrigen').value;
     if (relieveActivo() && P.pared.rastreles && Rl().fondo < P.pared.grueso + 15) Rl().fondo = P.pared.grueso + 15;
-    UI.costilla = 0; ponerControles(); cambio({ plantilla: 'Forma desde la plantilla', texto: 'Relieve de texto', modelo: 'Relieve desde un modelo 3D' }[Rl().fuente]);
+    UI.costilla = 0; ponerControles(); cambio({ plantilla: 'Forma desde la plantilla', texto: 'Relieve de texto', modelo: 'Relieve desde un modelo 3D', imagen: 'Relieve desde una imagen' }[Rl().fuente]);
     encuadrarSiHaceFalta(); camara('tres4');
   });
   const num = (sel, k, min = 0) => enlazar(sel, () => { Rl()[k] = Math.max(min, +$(sel).value || 0); cambio(); });
@@ -2110,6 +2152,18 @@ function iniciarPanel() {
     f.click();
   };
   $('#bModeloEjemplo').onclick = dialogoModelos;
+  $('#bImagenEjemplo').onclick = dialogoImagenes;
+  enlazar('#rlGama', () => { Rl().gama = clamp(+$('#rlGama').value || 1, 0.2, 5); cambio(); });
+  $('#bAjustarImagen').onclick = () => { if (!Rl().imagen) { aviso('Carga antes una imagen.'); return; } ajustarAltoImagen(); ponerControles(); cambio('Alto según la imagen'); encuadrarSiHaceFalta(); camara('tres4'); };
+  $('#bCargarImagen').onclick = () => {
+    const f = $('#fImagen'); f.value = '';
+    f.onchange = () => {
+      const a = f.files[0]; if (!a) return;
+      cargarImagenArchivo(a, true).then(r => { ponerControles(); cambio('Imagen: ' + a.name); encuadrarSiHaceFalta(); camara('tres4'); aviso(`${esc(a.name)}: ${r.w} × ${r.h} px`); })
+        .catch(e => aviso('⚠ ' + esc(e.message), 5000));
+    };
+    f.click();
+  };
   enlazar('#paOrient', () => { Rl().orient = $('#paOrient').value; cambio(Rl().orient === 'h' ? 'Lamas horizontales' : 'Lamas verticales'); encuadrarSiHaceFalta(); camara('tres4'); });
   // planta curva
   enlazar('#plForma', () => { P.planta.forma = $('#plForma').value; mostrarSecciones(); cambio('Planta ' + $('#plForma').selectedOptions[0].text.toLowerCase()); camara('tres4'); });
@@ -2206,7 +2260,7 @@ function mostrarSecciones() {
   $('#filaOrigen').classList.toggle('oculto', t !== 'pared');
   $('#filaPlantilla').classList.toggle('oculto', rel); $('#params').classList.toggle('oculto', rel); $('#descPlantilla').classList.toggle('oculto', rel);
   $('#secRelieve').classList.toggle('oculto', !rel);
-  $('#relTexto').classList.toggle('oculto', Rl.fuente !== 'texto'); $('#relModelo').classList.toggle('oculto', Rl.fuente !== 'modelo');
+  $('#relTexto').classList.toggle('oculto', Rl.fuente !== 'texto'); $('#relModelo').classList.toggle('oculto', Rl.fuente !== 'modelo'); $('#relImagen').classList.toggle('oculto', Rl.fuente !== 'imagen');
   $('#secClaves').classList.toggle('oculto', rel);
   $('#sClave').classList.toggle('oculto', rel); $('#bEsquina').classList.toggle('oculto', rel); $('#infoClave').classList.toggle('oculto', rel);
 }
@@ -2234,6 +2288,8 @@ function ponerControles() {
   $('#rlVista').value = Rl.vista; $('#rlGiro').value = String(Rl.giro || 0); $('#rlBase').value = Rl.base;
   $('#rlAncho').value = Rl.ancho; $('#rlAlto').value = Rl.alto; $('#rlFondo').value = Rl.fondo; $('#rlRelieve').value = Rl.relieve; $('#rlSuave').value = Rl.suavizado; $('#rlInvertir').checked = Rl.invertir; $('#rlOnda').value = Rl.ondaAmp; $('#rlOndas').value = Rl.ondas;
   $('#rlModeloInfo').textContent = Rl.modelo ? `Modelo: ${Rl.modelo.nombre}` + (Rl.modelo.triangulos ? ` (${Rl.modelo.triangulos.toLocaleString('es-ES')} triángulos)` : '') + (mallaVigente() ? '' : '. El proyecto guarda su relieve; para cambiar la vista, vuelve a cargarlo.') : 'Sin modelo. Carga un STL u OBJ (rostro, figura, logo en 3D…).';
+  $('#rlGama').value = Rl.gama || 1;
+  $('#rlImagenInfo').textContent = Rl.imagen ? `Imagen: ${Rl.imagen.nombre} (${Rl.imagen.w} × ${Rl.imagen.h} px). Lo blanco sale más.` : 'Sin imagen. Carga una foto o un dibujo: lo blanco sale más y lo negro queda en el fondo.';
   mostrarSecciones();
   const M = P.maqueta; $('#mActiva').checked = M.activa; $('#mEscala').value = String(M.escala); $('#mGrosor').value = M.grosor; $('#mDiam').value = M.diam; $('#mHolgura').value = M.holgura;
   $('#rExplosion').value = P.vista.explosion; $('#cFantasma').checked = P.vista.fantasma; $('#cVarillas3d').checked = P.vista.varillas; $('#cResalta').checked = P.vista.resalta;
@@ -2449,11 +2505,11 @@ function abrirFabricar() {
         <label class="fila" title="Lo que se puede separar el arco de la curva original">Tolerancia de los arcos (mm) <input type="number" id="fTol" value="${P.cnc.tolArco}" min="0.005" max="1" step="0.01"></label>
         <div class="info" id="fInfo"></div>
         <p class="nota" style="margin-top:10px">El DXF lleva las capas <b>CORTE</b> (contornos, con las ranuras), <b>TALADROS</b> (agujeros de las varillas), <b>GRABADO</b> (números) y <b>TABLERO</b> (borde del tablero).</p>
-        <p class="nota">Esta colocación usa el rectángulo de cada costilla. Para encajarlas por su forma real, usa <b>🧩 Anidador</b>. Para programar una pieza en G-code, <b>➜ Calcador</b>.</p>
+        <p class="nota">Esta colocación usa el rectángulo de cada costilla. Para encajarlas por su forma real, usa <b>🧩 Anidador</b>.</p>
       </div>
       <div><canvas id="fPrev" width="900" height="520"></canvas></div>
     </div>`,
-    [['➜ Calcador', () => { cerrarModal(); dialogoCalcador(); }], ['🧩 Anidador', () => { cerrarModal(); abrirAnidador(); }], ['⬇ CSV de cortes', () => exportarCSVCortes()], ['📄 SVG', () => exportarSVG()], ['📐 DXF', () => exportarDXF(), true]], true);
+    [['🧩 Anidador', () => { cerrarModal(); abrirAnidador(); }], ['⬇ CSV de cortes', () => exportarCSVCortes()], ['📄 SVG', () => exportarSVG()], ['📐 DXF', () => exportarDXF(), true]], true);
   const leer = () => {
     const t = $('#fTab').value;
     if (t !== 'otro') { const [a, h] = t.split('x').map(Number); $('#fA').value = a; $('#fH').value = h; }
@@ -3196,11 +3252,10 @@ window.addEventListener('message', e => {
   }, '*');
 });
 
-/* ===================== CNC: HUESO DE PERRO, ARCOS Y CALCADOR =====================
+/* ===================== CNC: HUESO DE PERRO Y ARCOS =====================
    - Hueso de perro: en las esquinas interiores de ranuras y muescas, un círculo del radio de la fresa
      para que la pieza que entra llegue al fondo (la fresa redonda no deja esquinas vivas).
-   - Arcos: el contorno de muchos tramos rectos se convierte en rectas y arcos (bulge), con una tolerancia.
-   - Calcador: cada pieza se puede abrir en el Calcador de la Suite CNC o guardar como su proyecto (.json). */
+   - Arcos: el contorno de muchos tramos rectos se convierte en rectas y arcos (bulge), con una tolerancia. */
 
 const fresaFab = () => enMaqueta() ? (+P.maqueta.fresa || 0) : (+P.cnc.fresa || 0);
 const conHueso = () => P.cnc.hueso && fresaFab() > 0;
@@ -3312,54 +3367,6 @@ function puntosBulge(p, q, bu, cada = 4) {
 function contornoCNC(poly) {
   if (P.cnc.arcos) return ajustarArcos(poly, Math.max(0.005, +P.cnc.tolArco || 0.05));
   const s = simplificaCerrado(poly, 0.05); return { pts: s, b: new Array(s.length).fill(0) };
-}
-
-/* ---------- Calcador de la Suite CNC ---------- */
-const CALCADOR_DEF = 'https://eloiaa-hub.github.io/Suite-CNC/calcador.html';
-const urlCalcador = () => lsGet('made-rebanadas.calcador', CALCADOR_DEF);
-function proyectoCalcador(c) {
-  const pz = piezaCalcador(c), e = grosorFab(), f = fresaFab();
-  return {
-    version: 7, nombre: `${P.nombre} - ${c.nombre}`,
-    calcador: {
-      version: 4, escala: 10, origen: { x: 0, y: 0 }, contornos: pz.calcador.contornos.map((k, i) => ({ ...k, uid: 'mr' + i + '_' + Math.random().toString(36).slice(2, 6) })),
-      cotasAjuste: {}, cotasManuales: [], cfgCotas: { ver: true, cero: true, entrada: true, sentido: true }, aux: [],
-      cfgHoja: { titulo: `${P.nombre} - ${c.nombre}`, material: `${enMaqueta() ? 'Maqueta' : MATERIALES[P.costillas.material].nombre} ${fmt(e, 1)} mm`, herramienta: f ? `Fresa Ø${fmt(f, 1)}` : '' },
-      cfgMec: { prof: +(e + 0.5).toFixed(2) },
-    },
-  };
-}
-function guardarJSONCalcador(c) {
-  const d = proyectoCalcador(c);
-  descargar(nombreArchivo(P.nombre + '_' + c.nombre) + sufijoFab() + '.json', JSON.stringify(d, null, 1), 'application/json');
-}
-function guardarTodasCalcador() {
-  const ps = piezasFab(); if (!ps.length) return;
-  aviso(`Guardando ${ps.length} archivos .json del Calcador…`, 4000);
-  ps.forEach((c, i) => setTimeout(() => guardarJSONCalcador(c), i * 350));
-}
-let paraCalcador = null, ventanaCalcador = null;
-function abrirEnCalcador(c) {
-  if (!c || !c.ok) { aviso('Selecciona antes una pieza.'); return; }
-  const json = JSON.stringify(proyectoCalcador(c));
-  try { localStorage.setItem('suiteCNC:paraCalcador', JSON.stringify({ t: Date.now(), json })); } catch (e) { /* irá por mensaje */ }
-  paraCalcador = json;
-  ventanaCalcador = window.open(urlCalcador() + '#desdeGenerador', '_blank');
-  if (!ventanaCalcador) aviso('El navegador ha bloqueado la pestaña nueva: permite las ventanas emergentes, o usa «⬇ .json del Calcador» y ábrelo allí.', 6000);
-  else aviso(`Abriendo ${esc(c.nombre)} en el Calcador…`);
-}
-window.addEventListener('message', e => {
-  const d = e.data; if (!d || typeof d !== 'object' || d.tipo !== 'calcador-listo' || !paraCalcador || !e.source) return;
-  e.source.postMessage({ tipo: 'proyecto-generador', json: paraCalcador }, '*'); paraCalcador = null;
-});
-function dialogoCalcador() {
-  const c = piezaSel();
-  modal('➜ Calcador de la Suite CNC', `
-    <p class="nota">Abre la pieza seleccionada (<b>${c ? esc(c.nombre) : '—'}</b>) en el Calcador, con su contorno${P.cnc.arcos ? ' en rectas y arcos' : ''}, los agujeros y las ranuras, para programar su G-code. El cero pieza es la esquina de abajo a la izquierda de la pieza.</p>
-    <label class="fila">Dirección del Calcador <input type="text" id="calUrl" value="${esc(urlCalcador())}" style="width:62%"></label>
-    <p class="nota">Puede ser la Suite en internet o tu copia local (por ejemplo <code>file:///C:/Suite-CNC/calcador.html</code>). Si el Calcador no recibe la pieza, guárdala como <b>.json</b> y ábrela allí con 📂 Abrir.</p>`,
-    [['↺ Por defecto', () => { $('#calUrl').value = CALCADOR_DEF; }], ['⬇ .json de todas', () => guardarTodasCalcador()], ['⬇ .json de esta pieza', () => c && guardarJSONCalcador(c)],
-     ['➜ Abrir en el Calcador', () => { lsSet('made-rebanadas.calcador', $('#calUrl').value.trim() || CALCADOR_DEF); cerrarModal(); abrirEnCalcador(c); }, true]]);
 }
 
 /* ===================== VENTANAS, ARCHIVOS, DESHACER, EJEMPLOS ===================== */
@@ -3490,6 +3497,25 @@ function dialogoModelos() {
     } catch (e) { aviso('⚠ ' + esc(e.message), 5000); }
   });
 }
+function dialogoImagenes() {
+  const I = imagenesEjemplo();
+  const items = I.map(m => `<button data-img="${m.id}" style="display:flex;gap:10px;align-items:center;text-align:left"><img src="${m.png}" alt="" style="width:64px;height:64px;object-fit:contain;background:#000;border-radius:4px;flex:none"><span><b>${esc(m.nombre)}</b><small>${esc(m.desc)} · <a href="assets/imagenes/${m.archivo}" download data-png>${m.archivo}</a></small></span></button>`).join('');
+  modal('🖼 Imágenes de ejemplo', `<p class="nota">Imágenes en escala de grises para probar el relieve: <b>lo blanco sale más y lo negro queda en el fondo</b>. Al elegir una se carga con unas medidas de panel adecuadas. Las mismas imágenes están como PNG en <b>assets/imagenes</b>: ábrelas o retócalas en un programa de dibujo y vuelve a cargarlas.</p><div class="ejemplos">${items || '<p>No se encuentra assets/imagenes/imagenes.js</p>'}</div>`);
+  $$('[data-png]').forEach(a => a.onclick = e => e.stopPropagation());
+  $$('[data-img]').forEach(b => b.onclick = () => {
+    cerrarModal();
+    try {
+      const nuevo = P.tipo !== 'pared';
+      if (nuevo && UI.sucio && !confirm('El relieve se hace en un panel de pared nuevo. Hay cambios sin guardar. ¿Seguir?')) return;
+      const ant = P; if (nuevo) P = proyectoDePlantilla('pared_ondas');
+      let E; try { E = cargarImagenEjemplo(b.dataset.img, true); } catch (e) { P = ant; throw e; }
+      if (P.pared.rastreles && P.relieve.fondo < P.pared.grueso + 15) P.relieve.fondo = P.pared.grueso + 15;
+      if (nuevo) { P.nombre = 'Relieve ' + E.nombre; const p = P; P = ant; cargarProyecto(p, true); }
+      else { ponerControles(); cambio('Imagen: ' + E.nombre); encuadrarSiHaceFalta(); camara('tres4'); }
+      aviso(esc(E.nombre));
+    } catch (e) { aviso('⚠ ' + esc(e.message), 5000); }
+  });
+}
 function dialogoEjemplos() {
   const E = window.MADE_EJEMPLOS || [];
   const items = E.map((e, i) => `<button data-ej="${i}"><b>${esc(e.nombre)}</b><small>${esc(e.desc)}</small></button>`).join('');
@@ -3498,7 +3524,7 @@ function dialogoEjemplos() {
     if (UI.sucio && !confirm('Hay cambios sin guardar. ¿Abrir el ejemplo?')) return;
     const e = E[+b.dataset.ej]; cerrarModal();
     const p = proyectoDePlantilla(e.plantilla, e);
-    if (e.modeloEjemplo) { const ant = P; P = p; try { cargarModeloEjemplo(e.modeloEjemplo); } catch (er) { aviso('⚠ ' + esc(er.message), 5000); } P = ant; }
+    if (e.modeloEjemplo || e.imagenEjemplo) { const ant = P; P = p; try { if (e.modeloEjemplo) cargarModeloEjemplo(e.modeloEjemplo); else cargarImagenEjemplo(e.imagenEjemplo); } catch (er) { aviso('⚠ ' + esc(er.message), 5000); } P = ant; }
     cargarProyecto(p, true);
     aviso('Ejemplo: ' + esc(e.nombre));
   });
@@ -3525,7 +3551,6 @@ function iniciar() {
   $('#bFabricar').onclick = abrirFabricar;
   $('#bImagen').onclick = imagenPNG;
   $('#bPlano').onclick = exportarPlano;
-  $('#bCalcador').onclick = dialogoCalcador;
   $('#bAnidador').onclick = abrirAnidador;
   $('#anidCerrar').onclick = cerrarAnidador;
   $('#bTema').onclick = () => ponerTema(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
@@ -3556,7 +3581,7 @@ function iniciar() {
   requestAnimationFrame(() => { ajustar3D(); VP.ajustar(); VC.ajustar(); cargarProyecto(P, true); });
 }
 // para las pruebas automáticas
-window.MadeRebanadas = { get P() { return P; }, get R() { return R; }, cargar: o => cargarProyecto(validarProyecto(o)), dxf: () => dxf(), svg: () => svg(), plano: () => planoPDF(), pieza: i => piezaCalcador(R.costillas[i]), calcador: i => proyectoCalcador([...R.costillas, ...R.otras][i]), geo: i => geoFab([...R.costillas, ...R.otras][i]), camara: t => camara(t), selCostilla: i => selCostilla(i),
+window.MadeRebanadas = { get P() { return P; }, get R() { return R; }, cargar: o => cargarProyecto(validarProyecto(o)), dxf: () => dxf(), svg: () => svg(), plano: () => planoPDF(), pieza: i => piezaCalcador([...R.costillas, ...R.otras][i]), geo: i => geoFab([...R.costillas, ...R.otras][i]), camara: t => camara(t), selCostilla: i => selCostilla(i),
   pantallaPunto: i => { const k = claveActual().pts[i], r = $('#cPerfil').getBoundingClientRect(), q = VP.aPantalla(k[0], k[1]); return [r.left + q[0], r.top + q[1]]; },
   pantallaVarilla: i => { const k = P.varillas.lista[i], r = $('#cPerfil').getBoundingClientRect(), q = VP.aPantalla(k[0], k[1]); return [r.left + q[0], r.top + q[1]]; } };
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();

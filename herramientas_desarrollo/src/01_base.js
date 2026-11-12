@@ -85,6 +85,6 @@ function proyectoBase() {
     pared: { rastreles: 3, alto: 45, grueso: 20, margen: 120, holgura: 0.5, verPared: true },
     relieve: { fuente: 'plantilla', orient: 'v', ancho: 1200, alto: 500, fondo: 20, relieve: 60, suavizado: 10, invertir: false,
       texto: 'Made', letra: 'Arial Black', tamLetra: 320, negrita: true, interlinea: 1.05, ondaAmp: 0, ondas: 2,
-      vista: 'frente', giro: 0, base: 0.15, modelo: null },
+      vista: 'frente', giro: 0, base: 0.15, modelo: null, gama: 1, imagen: null },
   };
 }

@@ -3,8 +3,9 @@
    La forma de las lamas no sale de los perfiles clave sino de un «mapa de profundidad» del panel:
    - texto: se dibuja con una fuente del sistema, se suaviza y sus letras salen (o se hunden)
    - modelo: un STL u OBJ proyectado desde un lado; lo más cercano sale más
+   - imagen: una foto o dibujo en escala de grises (mapa de alturas); lo claro sale más
    El mapa cubre el panel (ancho × alto, en mm) y vale de 0 (fondo) a 1 (lo que más sale). */
-const relieveActivo = () => P.tipo === 'pared' && P.relieve && (P.relieve.fuente === 'texto' || P.relieve.fuente === 'modelo');
+const relieveActivo = () => P.tipo === 'pared' && P.relieve && ['texto', 'modelo', 'imagen'].includes(P.relieve.fuente);
 // medidas del panel: ancho (horizontal) y alto (vertical)
 function medidasPanel() {
   if (relieveActivo()) return [P.relieve.ancho, P.relieve.alto];
@@ -15,9 +16,9 @@ const anchoPerfil = () => medidasPanel()[0];
 
 const CACHE_MAPA = { clave: '', mapa: null };
 function mapaRelieve() {
-  const Rl = P.relieve, clave = JSON.stringify([Rl.fuente, Rl.ancho, Rl.alto, Rl.texto, Rl.letra, Rl.tamLetra, Rl.negrita, Rl.interlinea, Rl.suavizado, Rl.invertir, Rl.ondaAmp, Rl.ondas, Rl.modelo && Rl.modelo.id]);
+  const Rl = P.relieve, clave = JSON.stringify([Rl.fuente, Rl.ancho, Rl.alto, Rl.texto, Rl.letra, Rl.tamLetra, Rl.negrita, Rl.interlinea, Rl.suavizado, Rl.invertir, Rl.ondaAmp, Rl.ondas, Rl.modelo && Rl.modelo.id, Rl.imagen && Rl.imagen.id, Rl.gama]);
   if (CACHE_MAPA.clave === clave) return CACHE_MAPA.mapa;
-  let m = Rl.fuente === 'texto' ? mapaTexto(Rl) : mapaModelo(Rl);
+  let m = Rl.fuente === 'texto' ? mapaTexto(Rl) : Rl.fuente === 'imagen' ? mapaImagen(Rl) : mapaModelo(Rl);
   if (m && Rl.suavizado > 0) m = suavizarMapa(m, Rl.suavizado / m.mm);
   if (m && Rl.invertir) for (let i = 0; i < m.d.length; i++) m.d[i] = 1 - m.d[i];
   CACHE_MAPA.clave = clave; CACHE_MAPA.mapa = m;
@@ -142,6 +143,47 @@ function mapaModelo(Rl) {
   // el mapa guardado puede tener otro tamaño que el panel: se estira al panel
   return { w: M.w, h: M.h, mm: Rl.ancho / M.w, d, mmY: Rl.alto / M.h };
 }
+/* ---------- imagen en escala de grises ---------- */
+// se guarda reducida (lado mayor ≤ 600 px) en grises de 0 a 255; lo transparente cuenta como negro (fondo)
+function cargarImagenDesde(img, nombre) {
+  const k = Math.min(1, 600 / Math.max(img.naturalWidth || img.width, img.naturalHeight || img.height));
+  const w = Math.max(2, Math.round((img.naturalWidth || img.width) * k)), h = Math.max(2, Math.round((img.naturalHeight || img.height) * k));
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const ctx = cv.getContext('2d'); ctx.drawImage(img, 0, 0, w, h);
+  const px = ctx.getImageData(0, 0, w, h).data; let s = '';
+  for (let i = 0; i < w * h; i++) { const a = px[i * 4 + 3] / 255; s += String.fromCharCode(Math.round((0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2]) * a)); }
+  P.relieve.imagen = { nombre, w, h, d64: btoa(s), id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6) };
+  return { w, h };
+}
+// carga un archivo de imagen (png, jpg, webp…) y, si se pide, ajusta el alto del panel a sus proporciones
+function cargarImagenArchivo(file, ajustarAlto) {
+  return new Promise((ok, mal) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => { try { const r = cargarImagenDesde(img, file.name); if (ajustarAlto) ajustarAltoImagen(); ok(r); } catch (e) { mal(e); } finally { URL.revokeObjectURL(url); } };
+    img.onerror = () => { URL.revokeObjectURL(url); mal(new Error('No se puede leer la imagen «' + file.name + '»')); };
+    img.src = url;
+  });
+}
+function ajustarAltoImagen() {
+  const I = P.relieve.imagen; if (!I) return;
+  P.relieve.alto = Math.max(100, Math.round(P.relieve.ancho * I.h / I.w / 10) * 10);
+}
+function mapaImagen(Rl) {
+  const I = Rl.imagen; if (!I || !I.d64) return null;
+  const bin = atob(I.d64), d = new Float32Array(bin.length), g = Rl.gama > 0 ? Rl.gama : 1;
+  for (let i = 0; i < bin.length; i++) d[i] = Math.pow(bin.charCodeAt(i) / 255, g);
+  return { w: I.w, h: I.h, mm: Rl.ancho / I.w, d, mmY: Rl.alto / I.h };
+}
+// imágenes de ejemplo (assets/imagenes/imagenes.js): ya en grises (d64), con su png para verla
+const imagenesEjemplo = () => window.MADE_IMAGENES || [];
+function cargarImagenEjemplo(id, conMedidas) {
+  const E = imagenesEjemplo().find(e => e.id === id); if (!E) throw new Error('No se encuentra la imagen de ejemplo «' + id + '» (assets/imagenes/imagenes.js)');
+  const Rl = P.relieve; Rl.fuente = 'imagen';
+  Rl.imagen = { nombre: E.nombre, w: E.w, h: E.h, d64: E.d64, id: E.id + '-' + Date.now().toString(36) };
+  if (conMedidas && E.ancho) { Rl.ancho = E.ancho; Rl.alto = E.alto; }
+  return E;
+}
+
 function cargarModelo(buf, nombre) { return cargarTriangulos(leerMalla(buf, nombre), nombre); }
 function cargarTriangulos(tri, nombre, ejemplo) {
   if (!tri.length) throw new Error('No se han encontrado triángulos en «' + nombre + '»');

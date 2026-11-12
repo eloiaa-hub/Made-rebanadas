@@ -8,13 +8,15 @@
 - **Lamas horizontales** (con rastreles verticales) además de las verticales.
 - Plantilla **Estantería de pared ondulada**: lamas con baldas y ménsulas, de fondo ondulado.
 - Los paneles de pared empiezan con **lamas de 12 mm cada 26 mm** (antes 18 mm cada 60 mm); los ejemplos de pared, más juntos.
+- **Relieve desde una imagen en escala de grises** (png, jpg…): lo blanco sale más; gama, invertir, suavizado y «Alto según la imagen». Cuatro imágenes de ejemplo en `assets/imagenes` (mapa de la cara, espiral, hoja, montañas) y dos ejemplos nuevos.
 - **Modelos 3D de ejemplo** (STL en `assets/modelos` y botón «🗿 Modelos de ejemplo…»): cara, labios, ondas en el agua y anomalía (burbuja).
+- Se quita el enlace al **Calcador** (botón «➜ Calcador»): las piezas siguen saliendo en DXF y SVG con arcos, y en el Anidador.
 - Seis ejemplos nuevos: estantería ondulada, rótulo de texto, arte mural «ondas», retrato en lamas horizontales, labios y anomalía.
 
 ## v1.4
 
 - **Hueso de perro** automático en las esquinas interiores de ranuras (retícula) y muescas (discos y rastreles), con el Ø de la fresa; la maqueta tiene su propia fresa (0 en láser). Aviso si la fresa no cabe en la ranura.
-- **Contornos con arcos**: el DXF (polilínea con *bulge*), el SVG, el Anidador y el Calcador reciben rectas y arcos en lugar de cientos de tramos rectos, con la tolerancia que se elija (0,05 mm por defecto).
+- **Contornos con arcos**: el DXF (polilínea con *bulge*), el SVG, y el Anidador reciben rectas y arcos en lugar de cientos de tramos rectos, con la tolerancia que se elija (0,05 mm por defecto).
 - **➜ Calcador**: cada pieza se abre en el Calcador de la Suite CNC (en internet o copia local) para programar su G-code, o se guarda como proyecto del Calcador (.json), de una en una o todas.
 
 ## v1.3
