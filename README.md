@@ -2,12 +2,14 @@
 
 **Versión 1.0** · novedades en [NOVEDADES.md](NOVEDADES.md)
 
+**Portada en línea:** <https://eloiaa-hub.github.io/Made-recabandas/>
+
 Muebles de formas orgánicas hechos con **rebanadas**: costillas de tablero puestas una detrás de otra, separadas y unidas con varillas pasantes.
 Funciona en el navegador (Chrome, Edge o Firefox), sin instalar nada y **sin conexión a internet**.
 
 ## Cómo se usa
 
-1. Descarga la carpeta y descomprímela.
+1. Descarga el repositorio (**Code → Download ZIP**) y descomprímelo.
 2. Abre **`index.html`** (la portada) o directamente **`Made_Rebanadas.html`**, con doble clic.
 3. Manual en HTML y PDF en `ayuda/` (también en el botón ❓ Ayuda).
 
