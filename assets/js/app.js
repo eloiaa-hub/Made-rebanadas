@@ -2038,6 +2038,11 @@ function iniciarPanel() {
     if (P.tipo === 'radial') { P.costillas.modo = 'numero'; P.costillas.numero = clamp(P.costillas.numero, 3, 48); if (P.costillas.numero > 24) P.costillas.numero = 12;
       if (grosor() > 10 && confirm('Las piezas radiales (lámparas) suelen hacerse con tablero fino. ¿Pasar a contrachapado de 6 mm?')) P.costillas.grosor = 6;
       const tMin = Math.ceil(P.costillas.numero * (grosor() + 1) / Math.PI); if (P.radial.tubo < tMin) P.radial.tubo = tMin; }
+    if (P.tipo === 'pared') {
+      if (grosor() > 12 && confirm('Los paneles de pared suelen hacerse con lamas de 12 mm, bastante juntas. ¿Pasar a tablero de 12 mm?')) P.costillas.grosor = 12;
+      P.costillas.modo = 'separacion';
+      if (P.costillas.separacion > 2.5 * grosor()) P.costillas.separacion = Math.round(2.2 * grosor());
+    }
     if (P.tipo === 'reticula' && P.costillas.modo === 'separacion' && P.costillas.separacion < 3 * grosor()) P.costillas.separacion = Math.round(Math.max(100, 6 * grosor()));
     if (P.tipo !== 'radial' && P.costillas.modo === 'numero' && grupoDe(P.plantilla) !== 'radial') P.costillas.modo = 'separacion';
     R = calcular();
@@ -3366,6 +3371,8 @@ function irHistoria(d) {
 // ---------- proyecto ----------
 function proyectoDePlantilla(id, extra) {
   const p = proyectoBase(); p.plantilla = id; p.params = paramsDefecto(id); p.nombre = PLANTILLAS[id].nombre;
+  // paneles de pared: lamas finas y juntas (tablero de 12 mm cada 26 mm, hueco de 14 mm)
+  if (grupoDe(id) === 'pared') { p.tipo = 'pared'; p.costillas.grosor = 12; p.costillas.separacion = 26; }
   if (extra) {
     if (extra.params) Object.assign(p.params, extra.params);
     if (extra.costillas) Object.assign(p.costillas, extra.costillas);

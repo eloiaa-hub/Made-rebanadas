@@ -35,6 +35,8 @@ function irHistoria(d) {
 // ---------- proyecto ----------
 function proyectoDePlantilla(id, extra) {
   const p = proyectoBase(); p.plantilla = id; p.params = paramsDefecto(id); p.nombre = PLANTILLAS[id].nombre;
+  // paneles de pared: lamas finas y juntas (tablero de 12 mm cada 26 mm, hueco de 14 mm)
+  if (grupoDe(id) === 'pared') { p.tipo = 'pared'; p.costillas.grosor = 12; p.costillas.separacion = 26; }
   if (extra) {
     if (extra.params) Object.assign(p.params, extra.params);
     if (extra.costillas) Object.assign(p.costillas, extra.costillas);

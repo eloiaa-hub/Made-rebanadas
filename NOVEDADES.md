@@ -7,6 +7,7 @@
 - **Figuras desde un modelo 3D** (caras, labios, formas de arte mural): vista, giro y base; el proyecto guarda el mapa de alturas.
 - **Lamas horizontales** (con rastreles verticales) además de las verticales.
 - Plantilla **Estantería de pared ondulada**: lamas con baldas y ménsulas, de fondo ondulado.
+- Los paneles de pared empiezan con **lamas de 12 mm cada 26 mm** (antes 18 mm cada 60 mm); los ejemplos de pared, más juntos.
 - Tres ejemplos nuevos: estantería ondulada, rótulo de texto y arte mural «ondas».
 
 ## v1.4
