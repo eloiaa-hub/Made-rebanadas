@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Made-rebanadas — Por Eloi A.A.</title>
+<meta name="description" content="Muebles orgánicos hechos con rebanadas de tablero: diseño paramétrico, comprobación de varillas y DXF para la CNC, en el navegador y sin internet.">
+<style>
+:root{--fondo:#f4f2ee;--panel:#ffffff;--texto:#23262b;--suave:#626872;--borde:#dedad3;--acento:#005A9C;--acento2:#a8743f;--sombra:0 10px 30px rgba(30,25,15,.10)}
+@media (prefers-color-scheme:dark){:root{--fondo:#15181c;--panel:#1f2329;--texto:#e8e9ec;--suave:#9aa1ab;--borde:#323842;--acento:#4ea1e0;--acento2:#d9a46c;--sombra:0 10px 30px rgba(0,0,0,.35)}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--fondo);color:var(--texto);font:16px/1.6 "Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif}
+a{color:var(--acento)}
+.envoltura{max-width:1120px;margin:0 auto;padding:0 20px}
+header{padding:56px 0 34px}
+.firma{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--suave);font-weight:600}
+h1{font-size:clamp(28px,4.4vw,44px);line-height:1.15;margin:10px 0 14px;font-weight:700;letter-spacing:-.01em}
+h1 span{color:var(--acento2)}
+.entrada{font-size:18px;color:var(--suave);max-width:720px}
+.etiquetas{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+.etiquetas span{font-size:13px;border:1px solid var(--borde);background:var(--panel);border-radius:20px;padding:3px 12px;color:var(--suave)}
+.programas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;margin:10px 0 50px}
+.prog{background:var(--panel);border:1px solid var(--borde);border-radius:14px;overflow:hidden;box-shadow:var(--sombra);display:flex;flex-direction:column}
+.prog figure{aspect-ratio:16/9;overflow:hidden;border-bottom:1px solid var(--borde);background:#e9e6e0}
+.prog img{width:100%;height:100%;object-fit:cover;object-position:center;display:block}
+.prog .cuerpo{padding:22px 24px 24px;display:flex;flex-direction:column;gap:12px;flex:1}
+.prog h2{font-size:24px;line-height:1.2;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.vers{font-size:12px;font-weight:700;color:var(--acento);background:color-mix(in srgb,var(--acento) 12%,transparent);border-radius:10px;padding:1px 8px}
+.prog p{color:var(--suave)}
+.prog ul{list-style:none;display:flex;flex-direction:column;gap:6px;font-size:15px}
+.prog li{padding-left:18px;position:relative}
+.prog li::before{content:"";position:absolute;left:3px;top:.62em;width:7px;height:7px;border-radius:2px;background:var(--acento2)}
+.botones{display:flex;flex-wrap:wrap;gap:10px;margin-top:auto;padding-top:8px}
+.bt{display:inline-flex;align-items:center;gap:6px;text-decoration:none;font-weight:600;font-size:15px;border-radius:8px;padding:9px 16px;border:1px solid var(--borde);color:var(--texto);background:var(--fondo)}
+.bt:hover{border-color:var(--acento)}
+.bt.prim{background:var(--acento);border-color:var(--acento);color:#fff}
+.bt.prim:hover{filter:brightness(1.08)}
+section.flujo{margin:0 0 50px}
+h3{font-size:20px;margin-bottom:16px}
+.pasos{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;counter-reset:p}
+.paso{background:var(--panel);border:1px solid var(--borde);border-radius:12px;padding:16px 18px;counter-increment:p}
+.paso::before{content:counter(p);display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--acento2);color:#fff;font-weight:700;font-size:14px;margin-bottom:8px}
+.paso b{display:block;margin-bottom:4px}
+.paso p{font-size:14.5px;color:var(--suave)}
+.paso small{display:block;margin-top:6px;font-size:12.5px;color:var(--acento);font-weight:600}
+.descarga{background:var(--panel);border:1px solid var(--borde);border-radius:12px;padding:22px 24px;display:flex;gap:24px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:46px}
+.descarga p{color:var(--suave);max-width:640px}
+footer{border-top:1px solid var(--borde);padding:22px 0 40px;font-size:14px;color:var(--suave)}
+footer .envoltura{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+@media (max-width:860px){.programas{grid-template-columns:1fr}.pasos{grid-template-columns:repeat(2,minmax(0,1fr))}header{padding:36px 0 24px}}
+@media (max-width:520px){.pasos{grid-template-columns:1fr}.prog .cuerpo{padding:18px}}
+.programas{grid-template-columns:1.25fr 1fr}
+.galeria{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-self:start}
+.galeria img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;border:1px solid var(--borde);display:block;background:#e9e6e0}
+@media (max-width:860px){.programas{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <div class="envoltura">
+    <div class="firma">Por Eloi A.A. · Carpintería y mueble</div>
+    <h1>Muebles <span>orgánicos</span><br>cortados en <span>rebanadas</span></h1>
+    <p class="entrada">Diseña bancos, tumbonas, poufs, mesas y estanterías de formas curvas hechos con costillas de tablero unidas con varillas. Se abre con doble clic, sin instalar nada y sin conexión a internet.</p>
+    <div class="etiquetas"><span>Chrome, Edge o Firefox</span><span>Sin internet</span><span>DXF para la CNC</span><span>Software libre</span></div>
+  </div>
+</header>
+
+<main class="envoltura">
+  <div class="programas">
+    <article class="prog">
+      <figure><img src="ayuda/img/portada.jpg" alt="Banco ondulado hecho con costillas de contrachapado"></figure>
+      <div class="cuerpo">
+        <h2>Made-rebanadas <span class="vers">v1.0</span></h2>
+        <p>La forma se define con unos pocos perfiles a lo largo del mueble; el programa calcula cada costilla, comprueba las uniones y prepara el corte.</p>
+        <ul>
+          <li>Plantillas paramétricas: banco ondulado, tumbona, pouf, mesa baja, estantería y forma libre</li>
+          <li>Editor de perfiles con puntos de curva y de esquina</li>
+          <li>Varillas pasantes y separadores, colocados solos y comprobados en cada costilla</li>
+          <li>Vista 3D con maderas, vista explosionada e imagen PNG</li>
+          <li>Costillas en tableros, DXF y SVG con números grabados, despiece y lista de compra</li>
+        </ul>
+        <div class="botones">
+          <a class="bt prim" href="Made_Rebanadas.html">Abrir el programa</a>
+          <a class="bt" href="ayuda/manual.html">Manual</a>
+          <a class="bt" href="ayuda/manual.pdf">PDF</a>
+        </div>
+      </div>
+    </article>
+    <div class="galeria">
+      <img src="ayuda/img/ej_tumbona.jpg" alt="Tumbona">
+      <img src="ayuda/img/ej_pouf.jpg" alt="Pouf">
+      <img src="ayuda/img/ej_mesa.jpg" alt="Mesa baja">
+      <img src="ayuda/img/ej_estante.jpg" alt="Estantería">
+    </div>
+  </div>
+
+  <section class="flujo">
+    <h3>Del volumen a las piezas</h3>
+    <div class="pasos">
+      <div class="paso"><b>Elige una plantilla</b><p>Ajusta sus medidas con los deslizadores: largo, alturas, ondas, arcos…</p><small>Forma</small></div>
+      <div class="paso"><b>Retoca los perfiles</b><p>Mueve, añade o borra puntos de los perfiles clave; las costillas se mezclan entre ellos.</p><small>Editor de perfil</small></div>
+      <div class="paso"><b>Une las costillas</b><p>Elige grosor y separación, y coloca las varillas: el programa avisa si alguna no cabe.</p><small>Costillas y varillas</small></div>
+      <div class="paso"><b>Prepara el corte</b><p>Coloca las costillas en tableros y saca el DXF numerado para la CNC.</p><small>Fabricar</small></div>
+    </div>
+  </section>
+
+  <div class="descarga">
+    <div>
+      <h3 style="margin-bottom:6px">Para usarlo sin internet</h3>
+      <p>Descarga la carpeta completa, descomprímela y abre <b>index.html</b> o directamente <b>Made_Rebanadas.html</b>. Copia siempre la carpeta entera: el programa necesita <code>assets</code> y <code>ayuda</code>.</p>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="envoltura">
+    <span>Programa: EUPL-1.2 · Manual: CC BY-SA 4.0 · Three.js: MIT</span>
+    <span><a href="NOVEDADES.md">Novedades</a></span>
+  </div>
+</footer>
+</body>
+</html>

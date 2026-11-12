@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manual — Made-rebanadas</title>
+<style>
+:root{--t:#1f2329;--s:#5d6672;--a:#1f6fd1;--b:#d9dde3;--f:#f6f7f9;--m:#a8743f}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--t);font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.pag{max-width:880px;margin:0 auto;padding:36px 28px 60px}
+header.port{border-bottom:3px solid var(--m);padding-bottom:16px;margin-bottom:26px}
+header.port h1{margin:0;font-size:30px}
+header.port p{margin:4px 0 0;color:var(--s)}
+h2{font-size:21px;margin:34px 0 10px;padding-top:6px;border-top:1px solid var(--b)}
+h3{font-size:16px;margin:22px 0 6px}
+p,li{margin:6px 0}
+img{max-width:100%;border:1px solid var(--b);border-radius:6px;display:block;margin:12px auto}
+figure{margin:14px 0}
+figcaption{text-align:center;color:var(--s);font-size:13px}
+.caja{background:var(--f);border-left:4px solid var(--a);padding:10px 14px;border-radius:4px;margin:12px 0}
+.caja.taller{border-left-color:var(--m)}
+kbd{border:1px solid var(--b);border-bottom-width:2px;border-radius:4px;padding:0 5px;font:12px ui-monospace,monospace;background:#fff}
+code{font:13px ui-monospace,monospace;background:var(--f);padding:0 4px;border-radius:3px}
+table{border-collapse:collapse;width:100%;margin:10px 0;font-size:14px}
+th,td{border:1px solid var(--b);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--f)}
+.ind{columns:2;gap:30px;font-size:14px}
+.ind a{color:var(--a);text-decoration:none}
+.dos{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+.dos img{margin:6px auto}
+.estrecha{max-width:330px}
+footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-top:10px;color:var(--s);font-size:12.5px}
+@media screen and (max-width:700px){.dos{grid-template-columns:1fr}.ind{columns:1}}
+@media print{
+  body{font-size:10.5pt}
+  .pag{max-width:none;padding:0}
+  h2{break-after:avoid}
+  h3{break-after:avoid}
+  figure,table,.caja,.dos{break-inside:avoid}
+  img{max-height:105mm;width:auto;max-width:100%}
+  .dos img{max-height:95mm}
+  a{color:inherit;text-decoration:none}
+  @page{size:A4;margin:13mm 13mm 14mm}
+}
+</style>
+</head>
+<body><div class="pag">
+
+<header class="port">
+  <h1>Made-rebanadas</h1>
+  <p>Manual de uso · versión 1.0 · Muebles orgánicos hechos con costillas de tablero, sin internet · Por Eloi A.A.</p>
+</header>
+
+<figure><img src="img/portada.jpg" alt="Banco ondulado hecho con costillas de contrachapado"></figure>
+
+<div class="ind">
+  <a href="#que">1. Qué es</a><br>
+  <a href="#abrir">2. Abrir el programa</a><br>
+  <a href="#pantalla">3. La pantalla</a><br>
+  <a href="#idea">4. Cómo se define la forma</a><br>
+  <a href="#plantilla">5. Paso 1 · La plantilla</a><br>
+  <a href="#perfiles">6. Paso 2 · Retocar los perfiles</a><br>
+  <a href="#costillas">7. Paso 3 · Las costillas</a><br>
+  <a href="#varillas">8. Paso 4 · Las varillas</a><br>
+  <a href="#comprobar">9. Comprobaciones</a><br>
+  <a href="#vista3d">10. La vista 3D</a><br>
+  <a href="#fabricar">11. Paso 5 · Fabricar: tableros y DXF</a><br>
+  <a href="#despiece">12. Despiece y lista de compra</a><br>
+  <a href="#archivos">13. Guardar, abrir y ejemplos</a><br>
+  <a href="#teclas">14. Atajos de teclado</a><br>
+  <a href="#taller">15. Consejos de taller</a><br>
+  <a href="#limites">16. Limitaciones de esta versión</a>
+</div>
+
+<h2 id="que">1. Qué es</h2>
+<p><b>Made-rebanadas</b> sirve para diseñar muebles de formas orgánicas (bancos ondulados, tumbonas, poufs, mesas, estanterías) hechos con <b>rebanadas</b>: una serie de piezas planas de tablero, llamadas <b>costillas</b>, puestas una detrás de otra con un pequeño hueco entre ellas. Cada costilla es una <b>sección</b> de la forma 3D, como si cortaras el volumen del mueble en lonchas.</p>
+<p>Las costillas se unen con <b>varillas pasantes</b> (varilla roscada, redondo de madera o tubo) y unos <b>separadores</b> que mantienen el hueco. El programa calcula el contorno de cada costilla, comprueba que las varillas caben en todas, coloca las piezas en los tableros y prepara el <b>DXF</b> para cortarlas en la CNC.</p>
+<p>Funciona en el navegador (Chrome, Edge o Firefox), con doble clic, sin instalar nada y sin conexión a internet.</p>
+
+<h2 id="abrir">2. Abrir el programa</h2>
+<ol>
+  <li>Descomprime el archivo <code>.zip</code> en una carpeta.</li>
+  <li>Abre <code>Made_Rebanadas.html</code> con doble clic (o <code>index.html</code>, la portada).</li>
+</ol>
+<div class="caja">Copia siempre <b>la carpeta completa</b>: el programa necesita la carpeta <code>assets</code> (código, Three.js, texturas de madera y ejemplos) y la carpeta <code>ayuda</code> (este manual).</div>
+
+<h2 id="pantalla">3. La pantalla</h2>
+<figure><img src="img/pantalla.jpg" alt="Pantalla del programa"><figcaption>De izquierda a derecha: forma, costillas y varillas · vista 3D · editor del perfil y costilla seleccionada · perfiles clave, comprobaciones, lista de costillas y resumen.</figcaption></figure>
+<table>
+  <tr><th>Zona</th><th>Para qué sirve</th></tr>
+  <tr><td><b>Barra superior</b></td><td>Nuevo, Abrir, Guardar, Ejemplos, Deshacer/Rehacer, Despiece, <b>Fabricar</b>, Imagen PNG, modo claro/oscuro y Ayuda.</td></tr>
+  <tr><td><b>Panel izquierdo</b></td><td><b>Forma</b> (plantilla y sus medidas), <b>Costillas</b> (grosor, separación, material) y <b>Uniones</b> (varillas y separadores).</td></tr>
+  <tr><td><b>Vista 3D</b></td><td>El mueble con sus costillas reales. Gira con el botón izquierdo, desplaza con el derecho y acerca con la rueda. Clic en una costilla para seleccionarla.</td></tr>
+  <tr><td><b>Editor de perfil</b></td><td>El perfil clave que estás editando, con sus puntos, las varillas y la silueta de todas las costillas.</td></tr>
+  <tr><td><b>Costilla</b></td><td>La costilla seleccionada tal y como se va a cortar: contorno, agujeros, número y medidas.</td></tr>
+  <tr><td><b>Panel derecho</b></td><td>Perfiles clave, comprobaciones, lista de costillas y resumen (medidas, tableros, varillas, separadores).</td></tr>
+</table>
+<p>Los botones <b>▦ 3D + perfil</b>, <b>✎ Perfil grande</b> y <b>■ Solo 3D</b> cambian el reparto de las vistas. Los botones <b>◀ ▶</b> ocultan los paneles laterales y los títulos de cada apartado (▾) lo pliegan.</p>
+
+<h2 id="idea">4. Cómo se define la forma</h2>
+<p>El programa trabaja con tres ejes, en milímetros:</p>
+<ul>
+  <li><b>X, el largo</b>: la dirección en la que se reparten las costillas.</li>
+  <li><b>Y, el alto</b>, y <b>Z, el fondo</b>: el plano de cada costilla. En el editor de perfil, el fondo es la horizontal (<b>u</b>) y el alto la vertical (<b>v</b>).</li>
+</ul>
+<p>La forma se define con unos pocos <b>perfiles clave</b> colocados a lo largo del mueble. Cada costilla está en una posición X y su contorno es <b>la mezcla suave de los dos perfiles clave que tiene a los lados</b>. Así, con 5 o 7 perfiles se obtienen 30 costillas distintas que cambian poco a poco, que es lo que da el aspecto orgánico.</p>
+<p>Todos los perfiles clave tienen <b>los mismos puntos</b> (el punto 3 de un perfil se mezcla con el punto 3 del siguiente). Por eso, al añadir o borrar un punto, se añade o se borra en todos los perfiles a la vez.</p>
+<div class="caja">Cada perfil es una curva cerrada que pasa por sus puntos. Un punto puede ser <b>curva</b> (círculo, pasa suave) o <b>esquina</b> (cuadrado). Entre dos esquinas seguidas el tramo es <b>recto</b>: así se hacen las bases que apoyan en el suelo.</div>
+
+<h2 id="plantilla">5. Paso 1 · La plantilla</h2>
+<p>Empieza con <b>🗋 Nuevo</b> o eligiendo una <b>Plantilla</b> en el panel izquierdo. Cada plantilla genera los perfiles clave a partir de unas medidas que cambias con el deslizador o escribiendo el número:</p>
+<figure><img src="img/nuevo.png" class="estrecha" style="max-width:520px" alt="Diálogo de mueble nuevo"></figure>
+<table>
+  <tr><th>Plantilla</th><th>Medidas que se pueden cambiar</th></tr>
+  <tr><td>Banco ondulado</td><td>Largo, fondo, altura del asiento, altura y número de ondas, arco inferior, ancho de los apoyos, hundido del asiento y panza de los lados.</td></tr>
+  <tr><td>Tumbona</td><td>Ancho, largo de la cabeza a los pies, alturas del respaldo, asiento y pies, curva de las rodillas, grueso bajo el asiento y abombado.</td></tr>
+  <tr><td>Pouf / taburete</td><td>Largo, fondo, altura, forma (de huevo a cubo blando), cintura y base aplanada.</td></tr>
+  <tr><td>Mesa baja «ola»</td><td>Largo, fondo, altura, arco inferior y su variación en ola, apoyos, vuelo del tablero y curva de los lados.</td></tr>
+  <tr><td>Estantería «duna»</td><td>Largo, fondo, altura, ondulación del frente, profundidad, alto y altura del hueco.</td></tr>
+  <tr><td>Forma libre</td><td>Largo, fondo y altura de un bloque redondeado para dibujar tus propios perfiles.</td></tr>
+</table>
+<div class="caja">Si ya has retocado los perfiles a mano y cambias una medida de la plantilla, la forma <b>se vuelve a generar</b> y se pierden los retoques (el programa te avisa antes). Solo el <b>largo</b> se puede cambiar sin perderlos: los perfiles clave se estiran a la nueva medida.</div>
+
+<h2 id="perfiles">6. Paso 2 · Retocar los perfiles</h2>
+<figure><img src="img/perfil.png" alt="Editor de perfil"><figcaption>Perfil clave en azul con sus puntos (● curva, ■ esquina), otros perfiles clave en gris discontinuo, la silueta de todas las costillas en marrón claro y las varillas V1, V2, V3 con su zona de seguridad.</figcaption></figure>
+<table>
+  <tr><th>Qué quieres hacer</th><th>Cómo</th></tr>
+  <tr><td>Elegir el perfil clave</td><td>Desplegable del título del editor, la lista <b>Perfiles clave</b> del panel derecho, o <kbd>RePág</kbd> / <kbd>AvPág</kbd>.</td></tr>
+  <tr><td>Mover un punto</td><td>Arrástralo. Se ajusta a la <b>rejilla al mover</b> (5 mm por defecto); con <kbd>Mayús</kbd> se mueve libre.</td></tr>
+  <tr><td>Mover el punto en todos los perfiles</td><td>Marca <b>Al mover un punto, moverlo en todas las claves</b>: el punto se desplaza lo mismo en todos los perfiles y la forma conserva sus ondas.</td></tr>
+  <tr><td>Añadir un punto</td><td><b>Doble clic sobre la línea</b> del perfil. Se añade en todos los perfiles clave, en el mismo sitio de la curva.</td></tr>
+  <tr><td>Esquina o curva</td><td><b>Doble clic sobre el punto</b>, tecla <kbd>E</kbd> o botón <b>◇ Esquina</b>.</td></tr>
+  <tr><td>Borrar un punto</td><td><b>Clic derecho</b> sobre él, o selecciónalo y pulsa <kbd>Supr</kbd> (mínimo 3 puntos).</td></tr>
+  <tr><td>Moverte por el dibujo</td><td>Arrastra en vacío para desplazar y usa la rueda para acercar. <b>⤢</b> o <kbd>F</kbd> encuadra.</td></tr>
+</table>
+<h3>Perfiles clave</h3>
+<div class="dos">
+  <img src="img/claves_panel.png" alt="Panel de perfiles clave">
+  <div>
+    <ul>
+      <li><b>Posición (mm)</b>: dónde está el perfil a lo largo del mueble.</li>
+      <li><b>＋ Clave</b>: añade un perfil clave justo en la costilla seleccionada, con la forma que ya tenía. Úsalo para retocar una zona concreta del mueble.</li>
+      <li><b>⧉ A todas</b>: copia el perfil actual en todas las claves (el mueble queda igual de punta a punta).</li>
+      <li><b>🗑 Quitar</b>: borra el perfil clave.</li>
+      <li><b>Transición entre claves</b>: <i>suave</i> hace una curva que pasa por todos los perfiles; <i>lineal</i> va en línea recta de uno a otro.</li>
+    </ul>
+  </div>
+</div>
+<p>La base de cada costilla se <b>aplana</b> en el suelo (v = 0) para que apoye bien, aunque la curva baje más. Con <b>Cortar plano arriba</b> se hace lo mismo en una altura, para un asiento o un tablero de mesa planos; la línea roja discontinua del editor marca ese corte.</p>
+
+<h2 id="costillas">7. Paso 3 · Las costillas</h2>
+<div class="dos">
+  <img src="img/costillas_panel.png" alt="Panel de costillas">
+  <div>
+    <ul>
+      <li><b>Grosor del tablero</b>: 10 a 30 mm, u otro.</li>
+      <li><b>Reparto</b>: <i>por separación</i> (de centro a centro, el programa ajusta el número para llenar el largo) o <i>por número</i> de costillas.</li>
+      <li>El recuadro gris resume el reparto: número de costillas, separación real y <b>hueco</b> entre ellas (separación − grosor). Con hueco 0 las costillas quedan <b>apiladas</b>.</li>
+      <li><b>Material</b>: contrachapados (abedul, chopo, pino, chapa de roble o nogal), alistonado de pino, MDF crudo o MDF lacado del color que quieras.</li>
+    </ul>
+  </div>
+</div>
+<figure><img src="img/costilla.png" alt="Vista de la costilla seleccionada"><figcaption>La costilla seleccionada, como se va a cortar: contorno, agujeros de las varillas, número de montaje y medidas. Cambia de costilla con ◀ ▶, las flechas <kbd>←</kbd> <kbd>→</kbd> o un clic en el 3D.</figcaption></figure>
+
+<h2 id="varillas">8. Paso 4 · Las varillas</h2>
+<div class="dos">
+  <img src="img/varillas_panel.png" alt="Panel de varillas">
+  <div>
+    <ul>
+      <li><b>Tipo y diámetro</b>: varilla roscada métrica (M6 a M25), redondo de madera o tubo de acero.</li>
+      <li><b>Holgura del agujero</b>: cuánto más grande es el agujero que la varilla (0,5 mm: Ø 10 → broca de 10,5).</li>
+      <li><b>Madera al borde</b>: lo mínimo que tiene que quedar entre el agujero y el borde de la costilla.</li>
+      <li><b>Las varillas pasan por todas las costillas</b> o <b>solo donde caben</b> (para formas como el pouf, en las que las costillas de los extremos son muy pequeñas).</li>
+      <li><b>Separadores</b>: tubos entre costillas que mantienen el hueco; su Ø exterior.</li>
+      <li><b>Sobresale por extremo</b>: lo que sale la varilla para la arandela y la tuerca.</li>
+    </ul>
+  </div>
+</div>
+<p><b>✨ Auto</b> busca sitio para el número de varillas indicado: prueba miles de posiciones y se queda con las que caben en todas las costillas, lo más separadas posible (así el mueble no se retuerce). <b>＋ Varilla</b> añade una: después haz clic en el editor de perfil donde la quieras. Las varillas se arrastran en el editor y se borran con clic derecho o <kbd>Supr</kbd>.</p>
+<div class="caja">El círculo discontinuo alrededor de cada varilla es la <b>zona de seguridad</b> (agujero + madera al borde). Si una varilla se sale de alguna costilla, se pinta en <b>rojo</b> en el editor y en el 3D.</div>
+
+<h2 id="comprobar">9. Comprobaciones</h2>
+<figure><img src="img/comprobaciones.png" class="estrecha" alt="Comprobaciones"></figure>
+<p>El programa revisa el mueble cada vez que cambias algo y lo indica en el panel <b>Comprobaciones</b>. Haz clic en un aviso para ir a la costilla afectada.</p>
+<table>
+  <tr><th>Aviso</th><th>Qué significa y cómo arreglarlo</th></tr>
+  <tr><td style="color:#c0392b">Varilla que no cabe</td><td>Le falta madera alrededor en alguna costilla. Muévela hacia dentro, baja la madera al borde o usa «solo donde caben».</td></tr>
+  <tr><td style="color:#c0392b">Costillas sueltas</td><td>No las atraviesa ninguna varilla.</td></tr>
+  <tr><td style="color:#c0392b">Varillas demasiado juntas</td><td>Los agujeros se comen la madera entre ellos.</td></tr>
+  <tr><td style="color:#c0392b">Separación menor que el grosor</td><td>Las costillas se pisan: sube la separación o baja el número.</td></tr>
+  <tr><td style="color:#b26b00">Una sola varilla</td><td>La costilla puede girar sobre ella: hacen falta al menos 2.</td></tr>
+  <tr><td style="color:#b26b00">El separador asoma</td><td>El tubo separador es más ancho que la madera que hay alrededor de la varilla.</td></tr>
+  <tr><td style="color:#1f6fd1">No llegan al suelo</td><td>Información: esas costillas cuelgan de las varillas (normal en un pouf).</td></tr>
+</table>
+<p>En la lista <b>Costillas</b> del panel derecho, las que tienen algún problema llevan un <b style="color:#c0392b">!</b>.</p>
+
+<h2 id="vista3d">10. La vista 3D</h2>
+<div class="dos">
+  <figure><img src="img/explosion.jpg" alt="Vista explosionada"><figcaption>💥 Explosión: separa las costillas para ver el montaje.</figcaption></figure>
+  <figure><img src="img/volumen.jpg" alt="Volumen ideal"><figcaption>Volumen: la forma ideal, transparente, para comparar con las costillas.</figcaption></figure>
+</div>
+<ul>
+  <li>Botones de cámara: <b>¾</b>, <b>Frente</b>, <b>Lado</b>, <b>Arriba</b> y <b>⤢</b> encuadrar.</li>
+  <li><b>Varillas</b> muestra u oculta varillas, tuercas y separadores; <b>Resaltar</b> colorea la costilla seleccionada.</li>
+  <li><b>📷 Imagen</b> guarda la vista 3D en PNG a alta resolución.</li>
+</ul>
+
+<h2 id="fabricar">11. Paso 5 · Fabricar: tableros y DXF</h2>
+<figure><img src="img/fabricar.png" alt="Ventana Fabricar"></figure>
+<p><b>🪚 Fabricar</b> coloca todas las costillas en tableros y muestra cuántos hacen falta y el aprovechamiento. Puedes elegir:</p>
+<ul>
+  <li><b>Tablero</b>: medidas habituales (2440 × 1220, 2500 × 1250, 1525 × 1525 de abedul báltico…) u otras.</li>
+  <li><b>Margen al borde</b> y <b>separación entre piezas</b>: deja al menos el diámetro de la fresa más unos milímetros.</li>
+  <li><b>Permitir girar 90°</b>: aprovecha mejor el tablero, pero la veta de la cara queda girada en esas piezas.</li>
+  <li><b>Grabar el número</b> de cada costilla, para montarlas en orden.</li>
+  <li><b>En fila (sin tablero)</b>: todas las costillas seguidas, para colocarlas tú en otro programa.</li>
+</ul>
+<p>El <b>DXF</b> (versión R12, la que abre cualquier programa) está en milímetros y lleva cuatro capas:</p>
+<table>
+  <tr><th>Capa</th><th>Contenido</th><th>Mecanizado</th></tr>
+  <tr><td>CORTE</td><td>Contorno de cada costilla (polilínea cerrada)</td><td>Contorneado exterior, profundidad = grosor</td></tr>
+  <tr><td>TALADROS</td><td>Agujeros de las varillas (círculos)</td><td>Taladrado o vaciado interior</td></tr>
+  <tr><td>GRABADO</td><td>Número de cada costilla (texto)</td><td>Grabado de 0,5 a 1 mm, o rotulador</td></tr>
+  <tr><td>TABLERO</td><td>Borde del tablero</td><td>Solo de referencia</td></tr>
+</table>
+<p>El <b>SVG</b> tiene lo mismo, en milímetros, para la cortadora láser o para imprimir plantillas a escala 1:1.</p>
+<div class="caja taller">Taladra y vacía <b>los agujeros antes que el contorno</b>: si cortas primero la pieza, se puede mover al hacer los agujeros. Deja puentes (pestañas) si la pieza es pequeña.</div>
+
+<h2 id="despiece">12. Despiece y lista de compra</h2>
+<figure><img src="img/despiece.png" alt="Despiece"></figure>
+<p><b>📋 Despiece</b> muestra todas las costillas (posición, ancho, alto, superficie y agujeros) y la <b>lista de compra</b>: tableros, varillas con su largo, separadores con su número y largo, tuercas y arandelas y la broca de los agujeros. <b>⬇ CSV</b> la guarda para abrirla en una hoja de cálculo.</p>
+
+<h2 id="archivos">13. Guardar, abrir y ejemplos</h2>
+<ul>
+  <li><b>💾 Guardar</b> (<kbd>Ctrl</kbd>+<kbd>S</kbd>) descarga el proyecto en un archivo <code>.json</code> con todo: perfiles, costillas, varillas y material. <b>📂 Abrir</b> lo carga de nuevo.</li>
+  <li><b>↶ ↷</b> (<kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd>) deshacen y rehacen.</li>
+  <li><b>🪑 Ejemplos</b>: banco ondulado de abedul, banco largo de pino, tumbona de jardín, pouf redondo, mesa baja lacada y estantería duna.</li>
+</ul>
+<div class="dos">
+  <img src="img/ej_tumbona.jpg" alt="Tumbona">
+  <img src="img/ej_pouf.jpg" alt="Pouf">
+  <img src="img/ej_mesa.jpg" alt="Mesa baja">
+  <img src="img/ej_estante.jpg" alt="Estantería">
+</div>
+
+<h2 id="teclas">14. Atajos de teclado</h2>
+<table>
+  <tr><th>Tecla</th><th>Acción</th></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Deshacer / rehacer</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Guardar el proyecto</td></tr>
+  <tr><td><kbd>E</kbd></td><td>Punto seleccionado: esquina / curva</td></tr>
+  <tr><td><kbd>Supr</kbd></td><td>Borrar el punto o la varilla seleccionados</td></tr>
+  <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Costilla anterior / siguiente</td></tr>
+  <tr><td><kbd>RePág</kbd> <kbd>AvPág</kbd></td><td>Perfil clave anterior / siguiente</td></tr>
+  <tr><td><kbd>F</kbd></td><td>Encuadrar todas las vistas</td></tr>
+  <tr><td><kbd>Mayús</kbd> al arrastrar</td><td>Mover sin ajustar a la rejilla</td></tr>
+  <tr><td><kbd>Esc</kbd></td><td>Cancelar la colocación de una varilla y quitar la selección</td></tr>
+</table>
+
+<h2 id="taller">15. Consejos de taller</h2>
+<ul>
+  <li>Comprueba el <b>grosor real</b> del tablero con el calibre: un contrachapado «de 18» puede medir 17,5. Pon ese valor (Grosor → Otro…).</li>
+  <li>Para un asiento, una separación de <b>2,5 a 3,5 veces el grosor</b> queda bien y no pellizca. Para apoyar objetos, mejor más juntas.</li>
+  <li>Con <b>3 varillas</b> repartidas en triángulo el mueble no se retuerce. En bancos largos (más de 2 m), pon 4.</li>
+  <li>Los separadores pueden ser tubo de acero, tubo de PVC o casquillos de madera hechos en el torno, todos del mismo largo (el hueco).</li>
+  <li>Aprieta las tuercas poco a poco y por igual, alternando las varillas, como las ruedas de un coche.</li>
+  <li>Lija los cantos de las costillas antes de montar: después no se llega bien a los huecos.</li>
+</ul>
+
+<h2 id="limites">16. Limitaciones de esta versión</h2>
+<ul>
+  <li>Solo hace <b>costillas separadas</b> en una dirección. Las rebanadas en retícula (con ranuras a media madera) y las radiales quedan para otras versiones.</li>
+  <li>Los contornos del DXF son polilíneas de muchos tramos rectos cortos (no arcos), con una tolerancia de 0,05 mm.</li>
+  <li>La colocación en tableros usa el rectángulo que envuelve cada costilla; no encaja unas piezas dentro de los huecos de otras.</li>
+  <li>Las varillas son rectas y paralelas al largo del mueble.</li>
+</ul>
+
+<footer>Made-rebanadas · Por Eloi A.A. · Programa con licencia EUPL-1.2 · Este manual: CC BY-SA 4.0 · Usa Three.js (MIT).</footer>
+</div></body>
+</html>

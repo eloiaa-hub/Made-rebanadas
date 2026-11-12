@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Made-rebanadas — Por Eloi A.A.</title>
+<link rel="stylesheet" href="assets/css/estilo.css">
+</head>
+<body>
+<header class="barra">
+  <div class="marca">
+    <a href="index.html" class="ir-portada" title="Portada de Made-rebanadas">⌂</a>
+    <span class="logo">▥</span>
+    <div><b>Made-rebanadas</b> <span class="version" id="version" title="Versión del programa">v1.0</span> <span class="autor">— Por Eloi A.A.</span></div>
+  </div>
+  <div class="grupo">
+    <button id="bNuevo" title="Mueble nuevo desde una plantilla"><span>🗋</span><span class="txt"> Nuevo</span></button>
+    <button id="bAbrir" title="Abrir proyecto (.json)"><span>📂</span><span class="txt"> Abrir</span></button>
+    <button id="bGuardar" title="Guardar proyecto (.json)"><span>💾</span><span class="txt"> Guardar</span></button>
+    <button id="bEjemplo" title="Abrir un mueble de ejemplo"><span>🪑</span><span class="txt"> Ejemplos</span></button>
+    <span class="sep"></span>
+    <button id="bDeshacer" title="Deshacer (Ctrl+Z)">↶</button>
+    <button id="bRehacer" title="Rehacer (Ctrl+Y)">↷</button>
+    <span class="sep"></span>
+    <button id="bDespiece" title="Despiece y lista de compra (CSV)"><span>📋</span><span class="txt"> Despiece</span></button>
+    <button id="bFabricar" class="primario" title="Colocar las costillas en tableros y exportar DXF / SVG para la CNC"><span>🪚</span><span class="txt"> Fabricar</span></button>
+    <button id="bImagen" title="Guardar la vista 3D como imagen PNG"><span>📷</span><span class="txt"> Imagen</span></button>
+    <span class="sep"></span>
+    <button id="bTema" title="Modo claro / oscuro">🌓</button>
+    <button id="bAyuda" title="Manual de uso"><span>❓</span><span class="txt"> Ayuda</span></button>
+  </div>
+</header>
+
+<main class="app" id="app">
+  <!-- ============ PANEL IZQUIERDO ============ -->
+  <aside class="panel izq">
+    <section>
+      <h3>Forma</h3>
+      <div class="sec-cuerpo">
+        <label class="fila">Plantilla <select id="sPlantilla"></select></label>
+        <p class="nota" id="descPlantilla"></p>
+        <div id="params"></div>
+        <p class="nota aviso-edit oculto" id="avisoEditado">Has retocado los perfiles a mano: si cambias un parámetro, la forma se vuelve a generar.</p>
+      </div>
+    </section>
+
+    <section>
+      <h3>Costillas</h3>
+      <div class="sec-cuerpo">
+        <label class="fila">Grosor del tablero (mm)
+          <select id="cGrosor">
+            <option>10</option><option>12</option><option>15</option><option>16</option><option selected>18</option>
+            <option>19</option><option>22</option><option>25</option><option>30</option><option value="otro">Otro…</option>
+          </select></label>
+        <label class="fila oculto" id="filaGrosorOtro">Grosor (mm) <input type="number" id="cGrosorOtro" min="3" max="80" step="0.5" value="18"></label>
+        <label class="fila">Reparto
+          <select id="cModo"><option value="separacion">Por separación</option><option value="numero">Por número</option></select></label>
+        <label class="fila" id="filaSep" title="Distancia de centro a centro entre costillas">Separación (mm) <input type="number" id="cSep" min="5" step="1" value="60"></label>
+        <label class="fila oculto" id="filaNum">Número de costillas <input type="number" id="cNum" min="2" max="400" step="1" value="25"></label>
+        <div class="resumenCost" id="resCost"></div>
+        <label class="fila chk"><input type="checkbox" id="cBase" checked> Aplanar la base (apoyo en el suelo)</label>
+        <label class="fila chk"><input type="checkbox" id="cTope"> Cortar plano arriba</label>
+        <label class="fila oculto" id="filaTope">Altura del corte (mm) <input type="number" id="cTopeAlt" min="10" step="1" value="400"></label>
+        <label class="fila">Material
+          <select id="cMaterial"></select></label>
+        <label class="fila oculto" id="filaColor">Color <input type="color" id="cColor" value="#f2efe8"></label>
+      </div>
+    </section>
+
+    <section>
+      <h3>Uniones: varillas</h3>
+      <div class="sec-cuerpo">
+        <p class="nota">Las costillas se unen con varillas pasantes y separadores. Arrastra las varillas en el editor de perfil.</p>
+        <label class="fila">Tipo
+          <select id="vTipo"><option value="roscada">Varilla roscada (métrica)</option><option value="madera">Espiga / redondo de madera</option><option value="tubo">Tubo de acero</option></select></label>
+        <label class="fila">Diámetro (mm)
+          <select id="vDiam"><option>6</option><option>8</option><option selected>10</option><option>12</option><option>14</option><option>16</option><option>20</option><option>25</option></select></label>
+        <label class="fila" title="Lo que se agranda el agujero respecto a la varilla">Holgura del agujero (mm) <input type="number" id="vHolgura" min="0" max="5" step="0.1" value="0.5"></label>
+        <label class="fila" title="Madera mínima entre el agujero y el borde de la costilla">Madera al borde (mm) <input type="number" id="vMargen" min="3" max="100" step="1" value="20"></label>
+        <label class="fila">Las varillas pasan
+          <select id="vTramo"><option value="todas">Por todas las costillas</option><option value="cabe">Solo donde caben</option></select></label>
+        <label class="fila chk"><input type="checkbox" id="vSep" checked> Separadores entre costillas</label>
+        <label class="fila" id="filaSepD">Ø exterior separador (mm) <input type="number" id="vSepD" min="6" max="80" step="1" value="22"></label>
+        <label class="fila" title="Lo que sale la varilla por cada extremo (tuerca y arandela)">Sobresale por extremo (mm) <input type="number" id="vSobra" min="0" max="80" step="1" value="12"></label>
+        <div class="col3">
+          <button id="bVarAuto" title="Busca sitio para las varillas en todas las costillas">✨ Auto</button>
+          <button id="bVarMas" title="Añadir una varilla: luego haz clic en el editor de perfil">＋ Varilla</button>
+          <button id="bVarQuitar" class="peligro" title="Quitar todas las varillas">🗑 Todas</button>
+        </div>
+        <label class="fila">Varillas en Auto <input type="number" id="vAutoN" min="1" max="8" step="1" value="3"></label>
+      </div>
+    </section>
+  </aside>
+
+  <!-- ============ VISTAS ============ -->
+  <section class="centro">
+    <div class="vbarra">
+      <button id="bPanelIzq" class="bPanel" title="Ocultar / mostrar el panel izquierdo">◀</button>
+      <div class="grupo">
+        <button data-dist="todo" class="activo" title="3D, perfil y costilla">▦ 3D + perfil</button>
+        <button data-dist="perfil" title="Editor de perfil grande">✎ Perfil grande</button>
+        <button data-dist="solo3d" title="Solo 3D">■ Solo 3D</button>
+      </div>
+      <div id="estado" class="estado"></div>
+      <button id="bPanelDer" class="bPanel" title="Ocultar / mostrar el panel derecho">▶</button>
+    </div>
+    <div id="vistas" class="vistas todo">
+      <div class="vista v3d" id="v3d">
+        <div class="vtit">3D
+          <span class="cams">
+            <button data-cam="tres4">¾</button><button data-cam="frente">Frente</button><button data-cam="lado">Lado</button><button data-cam="arriba">Arriba</button><button data-cam="encuadrar" title="Encuadrar (F)">⤢</button>
+          </span>
+        </div>
+        <canvas id="c3d"></canvas>
+        <div class="mov3d">
+          <label title="Separa las costillas para ver cómo se monta">💥 Explosión <input type="range" id="rExplosion" min="0" max="1" step="0.01" value="0"></label>
+          <label class="chk3d" title="Volumen ideal de la forma, transparente"><input type="checkbox" id="cFantasma"> Volumen</label>
+          <label class="chk3d"><input type="checkbox" id="cVarillas3d" checked> Varillas</label>
+          <label class="chk3d" title="Colorea la costilla seleccionada"><input type="checkbox" id="cResalta" checked> Resaltar</label>
+        </div>
+      </div>
+      <div class="vista vperfil" id="vPerfil">
+        <div class="vtit">
+          <select id="sClave" class="selVista" title="Perfil clave que se edita"></select>
+          <small id="infoClave"></small>
+          <span class="cams">
+            <button id="bEsquina" title="Convierte el punto seleccionado en esquina / curva (E o doble clic en el punto)">◇ Esquina</button>
+            <button id="bEncuadrarPerfil" title="Encuadrar el perfil">⤢</button>
+          </span>
+        </div>
+        <canvas id="cPerfil"></canvas>
+        <div class="pie2d" id="piePerfil"></div>
+      </div>
+      <div class="vista vcost" id="vCost">
+        <div class="vtit">
+          <span>Costilla</span>
+          <button id="bCostAnt" class="mini" title="Costilla anterior (←)">◀</button>
+          <b id="numCost">1</b>
+          <button id="bCostSig" class="mini" title="Costilla siguiente (→)">▶</button>
+          <small id="infoCost"></small>
+        </div>
+        <canvas id="cCost"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PANEL DERECHO ============ -->
+  <aside class="panel der">
+    <section>
+      <h3>Perfiles clave <span id="nClaves" class="cuenta">0</span></h3>
+      <div class="sec-cuerpo">
+        <p class="nota">La forma se define con unos pocos perfiles a lo largo del mueble; cada costilla es la mezcla suave de los que tiene a los lados.</p>
+        <ul id="listaClaves" class="lista corta"></ul>
+        <label class="fila">Posición (mm) <input type="number" id="kPos" step="1"></label>
+        <div class="col3">
+          <button id="bClaveMas" title="Añade un perfil clave en la costilla seleccionada">＋ Clave</button>
+          <button id="bClaveCopia" title="Copia este perfil en todas las claves">⧉ A todas</button>
+          <button id="bClaveMenos" class="peligro" title="Quitar este perfil clave">🗑 Quitar</button>
+        </div>
+        <label class="fila chk"><input type="checkbox" id="kTodas"> Al mover un punto, moverlo en todas las claves</label>
+        <label class="fila">Rejilla al mover
+          <select id="kRejilla"><option value="0">Sin ajuste</option><option value="1">1 mm</option><option value="5" selected>5 mm</option><option value="10">10 mm</option></select></label>
+        <label class="fila">Transición entre claves
+          <select id="kInterp"><option value="curva">Suave (curva)</option><option value="recta">Lineal</option></select></label>
+      </div>
+    </section>
+
+    <section>
+      <h3>Comprobaciones <span id="nAvisos" class="cuenta">0</span></h3>
+      <div class="sec-cuerpo"><ul id="avisos" class="avisos"></ul></div>
+    </section>
+
+    <section class="crece">
+      <h3>Costillas <span id="nCost" class="cuenta">0</span></h3>
+      <div class="sec-cuerpo"><ul id="listaCost" class="lista"></ul></div>
+    </section>
+
+    <section>
+      <h3>Resumen</h3>
+      <div class="sec-cuerpo" id="resumen"></div>
+    </section>
+  </aside>
+</main>
+
+<!-- modal genérico -->
+<div id="modal" class="modal oculto"><div class="caja">
+  <div class="mtit"><span id="mTitulo"></span><button id="mCerrar">✕</button></div>
+  <div id="mCuerpo" class="mcuerpo"></div>
+  <div id="mPie" class="mpie"></div>
+</div></div>
+
+<input type="file" id="fArchivo" class="oculto" accept=".json,application/json">
+<div id="aviso" class="aviso"></div>
+
+<script src="assets/js/three-bundle.js"></script>
+<script src="assets/texturas/texturas.js"></script>
+<script src="assets/ejemplos/ejemplos.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>

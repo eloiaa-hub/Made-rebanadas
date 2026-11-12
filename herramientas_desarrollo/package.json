@@ -1,0 +1,7 @@
+{
+  "name": "made-rebanadas-desarrollo",
+  "private": true,
+  "description": "Herramientas para reconstruir assets/js/three-bundle.js",
+  "devDependencies": { "esbuild": "0.28.2", "three": "0.187.0" },
+  "scripts": { "three": "esbuild entry.js --bundle --format=iife --minify --outfile=../assets/js/three-bundle.js" }
+}

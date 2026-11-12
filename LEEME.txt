@@ -1,0 +1,17 @@
+MADE-REBANADAS — Por Eloi A.A.   (versión 1.0)
+
+Muebles orgánicos hechos con rebanadas: costillas de tablero separadas, unidas con varillas.
+
+Abre con doble clic: Made_Rebanadas.html  (Chrome, Edge o Firefox; no necesita internet)
+Portada: index.html
+Manual: ayuda/manual.html y ayuda/manual.pdf
+
+Copia siempre la carpeta completa:
+  assets/js        programa (app.js) y Three.js empaquetado sin módulos
+  assets/css       estilos
+  assets/texturas  maderas y almas de tablero (texturas.js)
+  assets/ejemplos  muebles de ejemplo (ejemplos.js)
+  ayuda/           manual
+  herramientas_desarrollo/  solo para cambiar el programa (ver su LEEME.md)
+
+Licencias: programa EUPL-1.2 · manual CC BY-SA 4.0 · Three.js MIT
