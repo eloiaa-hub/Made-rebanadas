@@ -3477,14 +3477,15 @@ const TABLEROS = [
   { n: '2500 × 1220', a: 2500, h: 1220 },
   { n: '1525 × 1525 (abedul báltico)', a: 1525, h: 1525 },
   { n: '2850 × 2070 (aglomerado / MDF)', a: 2850, h: 2070 },
-  { n: '1220 × 610 (medio tablero)', a: 1220, h: 610 },
+  { n: '1220 × 1220 (medio tablero)', a: 1220, h: 1220 },
+  { n: '1220 × 610 (cuarto de tablero)', a: 1220, h: 610 },
 ];
 const TABLEROS_MAQ = [
   { n: '600 × 400 (láser)', a: 600, h: 400 },
   { n: '900 × 600 (láser)', a: 900, h: 600 },
   { n: '1000 × 600', a: 1000, h: 600 },
   { n: '420 × 297 (A3)', a: 420, h: 297 },
-  { n: '1220 × 610 (medio tablero)', a: 1220, h: 610 },
+  { n: '1220 × 610 (cuarto de tablero)', a: 1220, h: 610 },
 ];
 
 /* ---------- maqueta: medidas de fabricación ---------- */
