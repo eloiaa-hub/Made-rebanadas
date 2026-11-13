@@ -37,9 +37,13 @@ function geoFab(c) {
   // hueso de perro en las esquinas interiores de ranuras y muescas (radio de la fresa)
   let huesosMal = 0, nHuesos = 0;
   if (conHueso() && esq.length) { const h = huesoDePerro(base, esq, fresaFab() / 2 / k); base = h.poly; huesosMal = h.fallan; nHuesos = esq.length - h.fallan; }
-  const poly = base.map(p => [p[0] * k, p[1] * k]);
+  // huecos: la pieza puede ser solo un trozo de la lama o costilla, y tener agujeros por dentro
+  let int = c.int || [];
+  if (c.conHuecos && c.ranuras && c.ranuras.length && !c.modulo) { const q = parteFab(c, base); base = q.poly; int = q.int || []; }
+  else if (c.conHuecos && !c.generar) base = c.poly;
+  const poly = base.map(p => [p[0] * k, p[1] * k]), interiores = int.map(hh => hh.map(p => [p[0] * k, p[1] * k]));
   return {
-    c, poly, caja: cajaDe(poly), r: radioFab(), area: Math.abs(c.area) * k * k, huesosMal, nHuesos, nEsq: esq.length,
+    c, poly, interiores, caja: cajaDe(poly), r: radioFab(), area: Math.abs(c.area) * k * k, huesosMal, nHuesos, nEsq: esq.length,
     // agujeros [x, y, radio]: los de las varillas y los propios de la pieza (el tubo en los discos)
     agujeros: c.agujeros.map(j => [P.varillas.lista[j][0] * k, P.varillas.lista[j][1] * k, radioFab()]).concat((c.huecos || []).map(h => [h.x * k, h.y * k, h.r * k])),
     etiqueta: puntoEtiqueta(c).map(v => v * k),
@@ -165,8 +169,9 @@ function dibujarTableros(ctx, col, f, Wc, opciones = {}) {
     }
     t.piezas.forEach(pz => {
       ctx.beginPath();
-      pz.g.poly.forEach((p, i) => { const [x, y] = P2(...aTablero(pz, p)); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
-      ctx.closePath(); ctx.fillStyle = 'rgba(168,116,63,.35)'; ctx.fill(); ctx.strokeStyle = '#7a5226'; ctx.stroke();
+      pz.g.poly.forEach((p, i) => { const [x, y] = P2(...aTablero(pz, p)); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.closePath();
+      (pz.g.interiores || []).forEach(hh => { hh.forEach((p, i) => { const [x, y] = P2(...aTablero(pz, p)); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.closePath(); });
+      ctx.fillStyle = 'rgba(168,116,63,.35)'; ctx.fill('evenodd'); ctx.strokeStyle = '#7a5226'; ctx.stroke();
       pz.g.agujeros.forEach(q => { const [x, y] = P2(...aTablero(pz, q)); ctx.beginPath(); ctx.arc(x, y, Math.max(1.2, q[2] * sc), 0, PI2); ctx.strokeStyle = '#c0392b'; ctx.stroke(); });
       if (f.numeros) {
         const [x, y] = P2(...aTablero(pz, pz.g.etiqueta));
@@ -222,6 +227,8 @@ function dxf() {
     if (f.modo !== 'fila') poli('TABLERO', [[ox, 0], [ox + f.ancho, 0], [ox + f.ancho, f.alto], [ox, f.alto]]);
     t.piezas.forEach(pz => {
       const cc = contornoCNC(pz.g.poly);
+      // primero los huecos de dentro (así la pieza no se suelta antes de tiempo) y luego el contorno
+      (pz.g.interiores || []).forEach(hh => { const ci = contornoCNC(hh); poli('CORTE', ci.pts.map(p => { const q = aTablero(pz, p); return [ox + q[0], q[1]]; }), ci.b); });
       poli('CORTE', cc.pts.map(p => { const q = aTablero(pz, p); return [ox + q[0], q[1]]; }), cc.b);
       pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); g(0, 'CIRCLE'); g(8, 'TALADROS'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(a[2])); });
       if (f.numeros) {
@@ -245,15 +252,18 @@ function svg() {
     const Y = y => th - y, n = v => Math.round(v * 100) / 100;
     if (f.modo !== 'fila') partes.push(`<rect x="${ox}" y="0" width="${tw}" height="${th}" fill="none" stroke="#999" stroke-width="0.5"/>`);
     t.piezas.forEach(pz => {
-      const cc = contornoCNC(pz.g.poly), qs = cc.pts.map(p => aTablero(pz, p));
-      let d = 'M' + n(ox + qs[0][0]) + ' ' + n(Y(qs[0][1]));
-      qs.forEach((q, i) => {
-        const r2 = qs[(i + 1) % qs.length], bu = cc.b[i];
-        if (!bu) { if (i + 1 < qs.length) d += ' L' + n(ox + r2[0]) + ' ' + n(Y(r2[1])); return; }
-        const cu = Math.hypot(r2[0] - q[0], r2[1] - q[1]), Rr = cu * (1 + bu * bu) / (4 * Math.abs(bu));
-        d += ` A${n(Rr)} ${n(Rr)} 0 ${Math.abs(bu) > 1 ? 1 : 0} ${bu > 0 ? 0 : 1} ${n(ox + r2[0])} ${n(Y(r2[1]))}`;
+      let d = '';
+      [pz.g.poly, ...(pz.g.interiores || [])].forEach(pol => {
+        const cc = contornoCNC(pol), qs = cc.pts.map(p => aTablero(pz, p));
+        d += (d ? ' ' : '') + 'M' + n(ox + qs[0][0]) + ' ' + n(Y(qs[0][1]));
+        qs.forEach((q, i) => {
+          const r2 = qs[(i + 1) % qs.length], bu = cc.b[i];
+          if (!bu) { if (i + 1 < qs.length) d += ' L' + n(ox + r2[0]) + ' ' + n(Y(r2[1])); return; }
+          const cu = Math.hypot(r2[0] - q[0], r2[1] - q[1]), Rr = cu * (1 + bu * bu) / (4 * Math.abs(bu));
+          d += ` A${n(Rr)} ${n(Rr)} 0 ${Math.abs(bu) > 1 ? 1 : 0} ${bu > 0 ? 0 : 1} ${n(ox + r2[0])} ${n(Y(r2[1]))}`;
+        });
+        d += ' Z';
       });
-      d += ' Z';
       partes.push(`<path d="${d}" fill="none" stroke="#000" stroke-width="0.2"/>`);
       pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); partes.push(`<circle cx="${n(ox + q[0])}" cy="${n(Y(q[1]))}" r="${n(a[2])}" fill="none" stroke="#d00" stroke-width="0.2"/>`); });
       if (f.numeros) { const q = aTablero(pz, pz.g.etiqueta); partes.push(`<text x="${n(ox + q[0])}" y="${n(Y(q[1]))}" font-family="Arial" font-size="${n(altoTexto(pz.g))}" text-anchor="middle" dominant-baseline="middle" fill="#00f">${pz.c.etq}</text>`); }

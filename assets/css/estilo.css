@@ -20,6 +20,10 @@ button.ancho{width:100%;margin-top:8px}
 select,input[type=text],input[type=number]{background:var(--panel);border:1px solid var(--borde);border-radius:5px;padding:4px 6px;min-width:0}
 input[type=range]{accent-color:var(--acento)}
 .oculto{display:none!important}
+.oculto2{display:none!important}
+.botonesHueco{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:6px 0}
+.botonesHueco button{padding:5px 4px;font-size:12px}
+#bVistaHuecos.activo{background:var(--acento);color:#fff}
 
 .barra{height:46px;background:var(--barra);color:var(--barraTxt);display:flex;align-items:center;justify-content:space-between;padding:0 12px;gap:10px}
 .barra .marca{display:flex;align-items:center;gap:8px;font-size:15px}

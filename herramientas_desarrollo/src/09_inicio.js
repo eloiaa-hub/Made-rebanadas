@@ -9,7 +9,7 @@ function iniciar() {
   const tema = lsGet('made-rebanadas.tema', window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   document.documentElement.dataset.theme = tema;
   P = proyectoDePlantilla('banco');
-  iniciarEditor(); iniciarPanel(); iniciar3D(); arrastrarModal();
+  iniciarEditor(); iniciarHuecos(); iniciarPanel(); iniciar3D(); arrastrarModal();
   $('#bNuevo').onclick = dialogoNuevo;
   $('#bAbrir').onclick = abrirArchivo;
   $('#bGuardar').onclick = guardarArchivo;

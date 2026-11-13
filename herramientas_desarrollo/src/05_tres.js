@@ -116,9 +116,10 @@ function cilindroEntre(a, b, r, mat, lados = 18) {
   m.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), d.normalize()); m.castShadow = true;
   return m;
 }
-function extruir(poly, huecos, e) {
+function extruir(poly, huecos, e, interiores) {
   const sh = new T.Shape(poly.map(p => new T.Vector2(p[0], p[1])));
   (huecos || []).forEach(h => { const pa = new T.Path(); pa.absarc(h.x, h.y, h.r, 0, PI2, true); sh.holes.push(pa); });
+  (interiores || []).forEach(hh => sh.holes.push(new T.Path(hh.map(p => new T.Vector2(p[0], p[1])))));
   const g = new T.ExtrudeGeometry(sh, { depth: e, bevelEnabled: false, curveSegments: 24 });
   g.translate(0, 0, -e / 2); return g;
 }
@@ -138,7 +139,7 @@ function construir3D() {
   R.costillas.forEach(c => {
     if (!c.ok) { G.costillas.push(null); return; }
     const hs = c.agujeros.map(k => ({ x: V.lista[k][0], y: V.lista[k][1], r: rh }));
-    const m = new T.Mesh(extruir(c.poly, hs, e), mats); m.castShadow = m.receiveShadow = true;
+    const m = new T.Mesh(extruir(c.poly, hs, e, c.int), mats); m.castShadow = m.receiveShadow = true;
     m.userData = { i: c.i, x: c.x };
     G.modelo.add(m); G.costillas.push(m);
   });
@@ -147,6 +148,28 @@ function construir3D() {
     if (!z.ok) return;
     const m = new T.Mesh(extruir(z.poly, [], e), mats); m.castShadow = m.receiveShadow = true;
     m.userData = { i: z.i, u: z.u, z: true };
+    G.modelo.add(m); G.largueros.push(m);
+  });
+  // huecos: trozos de lamas, costillas o largueros, y los tableros de los muebles
+  (R.trozos || []).forEach(t => {
+    if (!t.ok) return;
+    const hs = t.agujeros.map(k => ({ x: V.lista[k][0], y: V.lista[k][1], r: rh }));
+    const m = new T.Mesh(extruir(t.poly, hs, e, t.int), mats); m.castShadow = m.receiveShadow = true;
+    m.userData = t.z ? { i: t.i, u: t.u, z: true } : { i: t.i, trozoX: t.x };
+    G.modelo.add(m); G.largueros.push(m);
+  });
+  (R.modulos || []).forEach(t => {
+    const [x0, x1, u0, u1, v0, v1] = t.caja3, m0 = marcoEn(x0), m1 = marcoEn(x1);
+    const o = puntoMarco(m0, u0, v0), px = puntoMarco(m1, u0, v0), pu = puntoMarco(m0, u1, v0), pv = puntoMarco(m0, u0, v1);
+    const g = new T.BoxGeometry(1, 1, 1); g.translate(.5, .5, .5);
+    const ax = new T.Vector3(px[0] - o[0], px[1] - o[1], px[2] - o[2]), au = new T.Vector3(pu[0] - o[0], pu[1] - o[1], pu[2] - o[2]), av = new T.Vector3(pv[0] - o[0], pv[1] - o[1], pv[2] - o[2]);
+    g.groups.forEach(gr => { gr.materialIndex = 0; });
+    const m = new T.Mesh(g, mats); m.castShadow = m.receiveShadow = true;
+    // el cubo unidad es el mismo con los ejes en otro orden: así la base no queda «del revés»
+    m.matrixAutoUpdate = false; m.matrix.makeBasis(ax, au, av);
+    if (m.matrix.determinant() < 0) m.matrix.makeBasis(au, ax, av);
+    m.matrix.setPosition(o[0], o[1], o[2]);
+    m.userData = { i: t.i, modulo: true };
     G.modelo.add(m); G.largueros.push(m);
   });
   // radial: discos (horizontales) y tubo central
@@ -164,16 +187,16 @@ function construir3D() {
   if (P.tipo === 'pared') {
     const mR = new T.MeshStandardMaterial({ color: '#cdb38a', roughness: .8 }); mR.userData.propio = true;
     const x0 = R.costillas[0].x - e / 2 - 30, x1 = R.costillas[R.n - 1].x + e / 2 + 30, Pa = P.pared;
-    R.rastreles.forEach(r => {
-      // de la primera a la última lama, 30 mm más por cada lado, a la altura del rastrel
-      const m0 = marcoEn(R.costillas[0].x), m1 = marcoEn(R.costillas[R.n - 1].x), ae = ejeGrosor(m0), av = ejeV(m0);
+    R.rastreles.forEach(r => (r.tramos || [[R.costillas[0].x - e / 2 - 30, R.costillas[R.n - 1].x + e / 2 + 30]]).forEach(([xa, xb]) => {
+      // de la primera a la última lama, 30 mm más por cada lado (o el tramo que dejan los huecos), a la altura del rastrel
+      const m0 = marcoEn(xa), m1 = marcoEn(xb), ae = ejeGrosor(m0), av = ejeV(m0);
       const a = puntoMarco(m0, Pa.grueso / 2, r.v), b = puntoMarco(m1, Pa.grueso / 2, r.v);
-      const d = new T.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]), L = d.length() + e + 60;
+      const d = new T.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]), L = d.length();
       const caja = new T.Mesh(new T.BoxGeometry(L, Pa.alto, Pa.grueso), mR);
       const ex = new T.Vector3(...ae), ey = new T.Vector3(...av), ez = ex.clone().cross(ey);
       caja.matrixAutoUpdate = false; caja.matrix.makeBasis(ex, ey, ez).setPosition((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
       caja.castShadow = true; caja.userData.extra = 'rastrel'; G.modelo.add(caja);
-    });
+    }));
 
     if (Pa.verPared) {
       const mP = new T.MeshStandardMaterial({ color: '#e9e5de', roughness: .95 }); mP.userData.propio = true;
@@ -300,6 +323,8 @@ function colocarExplosion() {
   const e = grosor(), ex = P.vista.explosion || 0;
   G.costillas.forEach(m => { if (m) ponerEnMarco(m, marcoExpl(m.userData.x)); });
   G.largueros.forEach(m => {
+    if (m.userData.modulo) return;
+    if (m.userData.trozoX != null) { ponerEnMarco(m, marcoExpl(m.userData.trozoX)); return; }
     if (m.userData.disco) { m.position.set(0, m.userData.v, 0); return; }
     // en la retícula, la explosión levanta los largueros (así se ve cómo encajan)
     m.position.set(-P.largo / 2, ex * (G.alto || 400) * 1.1, -(m.userData.u - (R.uc || 0)));

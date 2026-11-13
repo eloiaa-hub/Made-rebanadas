@@ -28,7 +28,7 @@ window.MADE_EJEMPLOS = [
     params: {}, costillas: { grosor: 6, modo: 'numero', numero: 12, material: 'abedul' }, radial: { tubo: 27, discos: 2, rDisco: 0 } },
   { nombre: 'Columna torsionada', plantilla: 'columna', tipo: 'radial', desc: 'Pie de lámpara o peana de 1,1 m: 8 costillas de 18 mm con lóbulos en espiral.',
     params: {}, costillas: { grosor: 18, modo: 'numero', numero: 8, material: 'nogal' }, radial: { tubo: 60, discos: 3, rDisco: 0 } },
-  { nombre: 'Panel de pared ondulado', plantilla: 'pared_ondas', tipo: 'pared', desc: 'Lamas de 18 mm cada 6 cm con ondas en diagonal, sobre 3 rastreles.',
+  { nombre: 'Panel de pared ondulado', plantilla: 'pared_ondas', tipo: 'pared', desc: 'Lamas de 15 mm cada 32 mm con ondas en diagonal, sobre 3 rastreles.',
     params: {}, costillas: { grosor: 15, separacion: 32, material: 'roble' }, pared: { rastreles: 3 } },
   { nombre: 'Panel de pared con relieve', plantilla: 'pared_relieve', tipo: 'pared', desc: 'Lamas que dibujan dos relieves redondeados, tipo duna, en MDF lacado blanco.',
     params: {}, costillas: { grosor: 16, separacion: 34, material: 'lacado', color: '#f4f2ee' }, pared: { rastreles: 3 } },
@@ -62,4 +62,13 @@ window.MADE_EJEMPLOS = [
     params: {}, costillas: { grosor: 12, modo: 'separacion', separacion: 22, material: 'mdf' }, varillas: { diam: 6, margen: 12, autoN: 3, tramo: 'todas' }, figura: { activa: true, alto: 600, eje: 'x', giro: 0, minArea: 6 } },
   { nombre: 'Busto en retícula', plantilla: 'libre', tipo: 'reticula', figuraEjemplo: 'cara', desc: 'Figura de pie en retícula: el «Busto de mujer» cortado en costillas y largueros de contrachapado de 6 mm que se cruzan a media madera.',
     params: {}, costillas: { grosor: 6, modo: 'separacion', separacion: 45, material: 'abedul' }, reticula: { num: 5, margen: 40, vuelo: 0 }, figura: { activa: true, alto: 500, eje: 'x', giro: 0, minArea: 6 } },
+  { nombre: 'Pared con hornacinas y armario', plantilla: 'pared_ondas', tipo: 'pared', desc: 'Panel ondulado con huecos: una ventana redondeada a la pared, una hornacina (caja) y un armario con puerta.',
+    params: {}, costillas: { grosor: 16, separacion: 32, material: 'roble' }, pared: { rastreles: 3 },
+    huecos: [
+      { forma: 'redondeado', x: 160, y: 660, ancho: 480, alto: 360, radio: 70, modo: 'pasante' },
+      { forma: 'rect', x: 760, y: 380, ancho: 520, alto: 300, modo: 'mueble', holgura: 2, mueble: { tipo: 'caja', fondo: 180, trasera: true } },
+      { forma: 'rect', x: 1380, y: 60, ancho: 320, alto: 520, modo: 'mueble', holgura: 2, mueble: { tipo: 'armario', fondo: 220, trasera: true, puerta: 'lisa', holguraPuerta: 3 } } ] },
+  { nombre: 'Banco con revistero', plantilla: 'banco', tipo: 'costillas', desc: 'Banco ondulado con un túnel a lo largo, forrado por dentro (revistero o leñero).',
+    params: {}, costillas: { grosor: 18, modo: 'separacion', separacion: 45, material: 'abedul' }, varillas: { diam: 10, autoN: 3, tramo: 'cabe' },
+    huecos: [ { forma: 'redondeado', x: 120, y: 190, ancho: 220, alto: 120, radio: 20, modo: 'mueble', holgura: 1, desde: 0, hasta: 99999, mueble: { tipo: 'caja' } } ] },
 ];

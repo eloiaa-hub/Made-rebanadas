@@ -70,17 +70,18 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <a href="#pared">12. Paneles de pared</a><br>
   <a href="#relieve">13. Figuras, rótulos y estanterías de pared</a><br>
   <a href="#figura">14. Figuras de pie desde un modelo 3D</a><br>
-  <a href="#comprobar">15. Comprobaciones</a><br>
-  <a href="#vista3d">16. La vista 3D</a><br>
-  <a href="#fabricar">17. Paso 5 · Fabricar: tableros, DXF y SVG</a><br>
-  <a href="#despiece">18. Despiece y lista de compra</a><br>
-  <a href="#maqueta">19. Maqueta a escala</a><br>
-  <a href="#plano">20. Plano de montaje en PDF</a><br>
-  <a href="#anidador">21. Anidador de tableros</a><br>
-  <a href="#archivos">22. Guardar, abrir y ejemplos</a><br>
-  <a href="#teclas">23. Atajos de teclado</a><br>
-  <a href="#taller">24. Consejos de taller</a><br>
-  <a href="#limites">25. Limitaciones de esta versión</a>
+  <a href="#huecos">15. Huecos: recortes, hornacinas, baldas y armarios</a><br>
+  <a href="#comprobar">16. Comprobaciones</a><br>
+  <a href="#vista3d">17. La vista 3D</a><br>
+  <a href="#fabricar">18. Paso 5 · Fabricar: tableros, DXF y SVG</a><br>
+  <a href="#despiece">19. Despiece y lista de compra</a><br>
+  <a href="#maqueta">20. Maqueta a escala</a><br>
+  <a href="#plano">21. Plano de montaje en PDF</a><br>
+  <a href="#anidador">22. Anidador de tableros</a><br>
+  <a href="#archivos">23. Guardar, abrir y ejemplos</a><br>
+  <a href="#teclas">24. Atajos de teclado</a><br>
+  <a href="#taller">25. Consejos de taller</a><br>
+  <a href="#limites">26. Limitaciones de esta versión</a>
 </div>
 
 <h2 id="que">1. Qué es</h2>
@@ -228,7 +229,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 <p><b>Comprobaciones de la retícula</b>: costillas sin ningún larguero, largueros que cruzan menos de 2 costillas, cruces muy bajos (unión floja), largueros que se pisan y ranuras imposibles (cuando el borde es casi vertical en el cruce: cambia el margen o el número de largueros).</p>
 <p>Fabricar, el DXF, el SVG, el despiece, el CSV de cortes, el Anidador y la maqueta funcionan igual, con las ranuras ya dibujadas en el contorno (capa CORTE). En la maqueta, las ranuras se hacen con el grosor de la maqueta más su holgura. El <b>plano</b> trae la planta de la retícula, los largueros acotados y los pasos de montaje propios:</p>
 <figure><img src="img/ret_plano2.jpg" alt="Plano de la retícula" style="max-width:640px"></figure>
-<div class="caja taller">Con una fresa redonda las esquinas interiores de las ranuras quedan redondeadas y la otra pieza no llega al fondo. Activa el <b>hueso de perro</b> en Fabricar (sección 17): el programa lo dibuja solo con el Ø de tu fresa.</div>
+<div class="caja taller">Con una fresa redonda las esquinas interiores de las ranuras quedan redondeadas y la otra pieza no llega al fondo. Activa el <b>hueso de perro</b> en Fabricar (sección 18): el programa lo dibuja solo con el Ø de tu fresa.</div>
 
 <h2 id="curva">10. Planta curva (arco y S)</h2>
 <p>Con <b>Costillas con varillas</b>, el apartado <b>Planta</b> permite que el mueble siga una curva vista desde arriba. Las costillas van <b>perpendiculares a la curva</b>, abiertas en abanico, y las varillas la siguen.</p>
@@ -381,7 +382,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 </div>
 <div class="dos">
   <figure><img src="img/capa_normal.jpg" alt="Texto sobre ondas"><figcaption>«MAR» sobre el ejemplo de las ondas, con la luz normal…</figcaption></figure>
-  <figure><img src="img/capa_rasante.jpg" alt="Con luz rasante"><figcaption>…y con <b>Luz rasante</b> (apartado 16): así se lee el relieve.</figcaption></figure>
+  <figure><img src="img/capa_rasante.jpg" alt="Con luz rasante"><figcaption>…y con <b>Luz rasante</b> (apartado 17): así se lee el relieve.</figcaption></figure>
 </div>
 <h3>Letras propias (.ttf, .otf)</h3>
 <p>Debajo de cada lista de letras está <b>🔤 Cargar una letra (.ttf, .otf)…</b>. La letra se añade arriba de la lista, en «Tus letras», y <b>se guarda dentro del proyecto</b>: el rótulo sale igual en otro ordenador aunque no tenga esa letra instalada. Hay muchas letras libres en Google Fonts o en Font Squirrel; mira su licencia si vas a vender las piezas.</p>
@@ -441,7 +442,53 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 </ul>
 <div class="caja taller">En retícula, las formas muy complicadas dan ranuras que no se pueden hacer (bordes casi verticales en el cruce). Prueba a separar más las costillas, poner menos largueros o cambiar el margen hasta que no salgan errores en Comprobaciones.</div>
 
-<h2 id="comprobar">15. Comprobaciones</h2>
+<h2 id="huecos">15. Huecos: recortes, hornacinas, baldas y armarios</h2>
+<p>Un <b>hueco</b> es una forma que se resta de las lamas o de las costillas. Sirve para abrir una ventana a la pared, rebajar las lamas para apoyar algo, meter una balda, una hornacina o un armario entre las lamas, o hacer un túnel a lo largo de un banco (revistero, leñero). Funciona con <b>paneles de pared</b>, <b>costillas con varillas</b> y <b>retícula</b>.</p>
+<div class="dos">
+  <img src="img/huecos_panel.png" alt="Apartado Huecos" class="estrecha">
+  <div>
+    <ul>
+      <li>En el apartado <b>Huecos</b> (panel izquierdo) se añade uno con su forma: <b>▭ Rectángulo</b>, <b>▢ Redondeado</b>, <b>⌒ Arco</b> (medio punto arriba), <b>◯ Círculo u óvalo</b> o <b>✎ Libre</b>.</li>
+      <li>Al añadir el primero se abre la vista <b>▦ Huecos</b> (en el sitio del editor de perfil; el mismo botón vuelve al perfil).</li>
+      <li>Cada hueco tiene su <b>posición</b> (X, Y de la esquina de abajo a la izquierda), <b>ancho</b>, <b>alto</b> y, si es redondeado, <b>radio</b>. Se puede <b>apagar</b> sin borrarlo, <b>duplicar</b> o <b>quitar</b>.</li>
+      <li><b>Tipo de hueco</b>:
+        <ul>
+          <li><b>Pasante</b>: se quita todo (se ve la pared, o se abre un túnel en el mueble).</li>
+          <li><b>Rebaje</b> (solo pared): las lamas se recortan a una <b>profundidad desde la pared</b>, para apoyar algo plano.</li>
+          <li><b>Con mueble dentro</b>: además se dibujan y se fabrican los tableros de una <b>balda</b>, una <b>caja (hornacina)</b> o, en la pared, un <b>armario con puerta</b>. La <b>holgura</b> separa el mueble de las lamas.</li>
+        </ul>
+      </li>
+      <li>En costillas y retícula el hueco se dibuja en el perfil y es un <b>túnel</b> que va <b>desde x</b> <b>hasta x</b> a lo largo del mueble.</li>
+    </ul>
+  </div>
+</div>
+<h3>La vista ▦ Huecos</h3>
+<div class="dos">
+  <img src="img/huecos_vista.png" alt="Vista Huecos">
+  <div>
+    <ul>
+      <li>En la pared se ve el <b>frente del panel</b>: las lamas (ya partidas), los rastreles y los muebles. En costillas y retícula, el <b>perfil</b> con todas las costillas.</li>
+      <li><b>Arrastra</b> un hueco para moverlo; las <b>asas</b> lo estiran. Se ajusta a la rejilla de 10 mm (con <kbd>Mayús</kbd>, sin rejilla).</li>
+      <li>En la <b>forma libre</b> se mueven los vértices; <b>doble clic</b> en un lado añade uno y <b>clic derecho</b> en un vértice lo quita.</li>
+      <li>Rueda: zoom; arrastrar fuera de los huecos: mover la vista.</li>
+    </ul>
+  </div>
+</div>
+<div class="dos">
+  <figure><img src="img/huecos_pared.jpg" alt="Pared con hornacinas"><figcaption>Ejemplo «Pared con hornacinas y armario»: ventana redondeada a la pared, hornacina y armario con puerta.</figcaption></figure>
+  <figure><img src="img/huecos_banco.jpg" alt="Banco con revistero"><figcaption>Ejemplo «Banco con revistero»: un túnel a lo largo, forrado por dentro.</figcaption></figure>
+</div>
+<h3>Lo que hace el programa con las piezas</h3>
+<ul>
+  <li>Una lama o costilla cortada por un hueco puede quedar en <b>varios trozos</b>: se numeran <b>12a, 12b…</b> y salen así en el DXF, el SVG, el Anidador, el despiece y el plano. Si el hueco queda por dentro, la pieza lleva un <b>agujero</b> (se corta primero el de dentro y luego el contorno).</li>
+  <li>Los <b>rastreles</b> se cortan donde hay un hueco pasante o con mueble.</li>
+  <li><b>Armario con puerta de lamas</b>: los trozos de lama que caen delante de la puerta van <b>pegados a la puerta</b> («(puerta)» en el nombre) y la puerta queda escondida en el panel. Para que haya lamas delante, el <b>fondo del armario</b> tiene que ser menor que lo que salen las lamas.</li>
+  <li>Los tableros de los muebles tienen el <b>mismo grosor</b> que las lamas o costillas y salen en la hoja <b>3c</b> del plano, con la lista de huecos.</li>
+</ul>
+<div class="caja taller"><b>Comprobaciones:</b> el programa avisa si un trozo de lama no llega a ningún rastrel ni a un mueble (quedaría suelto), si un trozo de costilla no tiene dos varillas, si un rebaje es tan poco profundo que la muesca del rastrel se come la lama, o si quedan trozos muy pequeños. Casi siempre se arregla moviendo un poco el hueco, poniendo un rastrel más o haciéndolo con mueble.</div>
+<figure><img src="img/huecos_costilla.png" alt="Costilla con túnel" style="max-width:380px"><figcaption>Una costilla del banco con el túnel por dentro.</figcaption></figure>
+
+<h2 id="comprobar">16. Comprobaciones</h2>
 <figure><img src="img/comprobaciones.png" class="estrecha" alt="Comprobaciones"></figure>
 <p>El programa revisa el mueble cada vez que cambias algo y lo indica en el panel <b>Comprobaciones</b>. Haz clic en un aviso para ir a la costilla afectada.</p>
 <table>
@@ -456,7 +503,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 </table>
 <p>En la lista <b>Costillas</b> del panel derecho, las que tienen algún problema llevan un <b style="color:#c0392b">!</b>.</p>
 
-<h2 id="vista3d">16. La vista 3D</h2>
+<h2 id="vista3d">17. La vista 3D</h2>
 <div class="dos">
   <figure><img src="img/explosion.jpg" alt="Vista explosionada"><figcaption>💥 Explosión: separa las costillas para ver el montaje.</figcaption></figure>
   <figure><img src="img/volumen.jpg" alt="Volumen ideal"><figcaption>Volumen: la forma ideal, transparente, para comparar con las costillas.</figcaption></figure>
@@ -484,7 +531,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 </div>
 <div class="caja taller">Para imprimir en 3D a escala, comprueba que las lamas o costillas no queden demasiado finas: a 1:10 un tablero de 12 mm se queda en 1,2 mm.</div>
 
-<h2 id="fabricar">17. Paso 5 · Fabricar: tableros, DXF y SVG</h2>
+<h2 id="fabricar">18. Paso 5 · Fabricar: tableros, DXF y SVG</h2>
 <figure><img src="img/fabricar.png" alt="Ventana Fabricar"></figure>
 <p><b>🪚 Fabricar</b> coloca todas las costillas en tableros y muestra cuántos hacen falta y el aprovechamiento. Puedes elegir:</p>
 <ul>
@@ -517,14 +564,14 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   </div>
 </div>
 <figure><img src="img/hueso.png" alt="Hueso de perro en las ranuras" style="max-width:560px"><figcaption>Fondo de las ranuras de un larguero, con el hueso de perro en cada esquina.</figcaption></figure>
-<p><b>⬇ CSV de cortes</b> guarda una línea por costilla (nombre, largo y ancho de su rectángulo, cantidad y veta) con el mismo formato de despiece que lee el <b>Anidador</b> y que abre cualquier hoja de cálculo. <b>🧩 Anidador</b> abre el Anidador con las costillas por su forma real (sección 21).</p>
+<p><b>⬇ CSV de cortes</b> guarda una línea por costilla (nombre, largo y ancho de su rectángulo, cantidad y veta) con el mismo formato de despiece que lee el <b>Anidador</b> y que abre cualquier hoja de cálculo. <b>🧩 Anidador</b> abre el Anidador con las costillas por su forma real (sección 22).</p>
 <div class="caja taller">Taladra y vacía <b>los agujeros antes que el contorno</b>: si cortas primero la pieza, se puede mover al hacer los agujeros. Deja puentes (pestañas) si la pieza es pequeña.</div>
 
-<h2 id="despiece">18. Despiece y lista de compra</h2>
+<h2 id="despiece">19. Despiece y lista de compra</h2>
 <figure><img src="img/despiece.png" alt="Despiece"></figure>
 <p><b>📋 Despiece</b> muestra todas las costillas (posición, ancho, alto, superficie y agujeros) y la <b>lista de compra</b>: tableros, varillas con su largo, separadores con su número y largo, tuercas y arandelas y la broca de los agujeros. <b>⬇ Despiece (CSV)</b> la guarda para abrirla en una hoja de cálculo y <b>⬇ CSV de cortes</b> guarda la lista de cortes para el Anidador. Si está activa la maqueta, todo sale con las medidas de la maqueta.</p>
 
-<h2 id="maqueta">19. Maqueta a escala</h2>
+<h2 id="maqueta">20. Maqueta a escala</h2>
 <div class="dos">
   <img src="img/maqueta.png" alt="Apartado Maqueta a escala">
   <div>
@@ -539,7 +586,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 <p>Con la maqueta activa, <b>Fabricar</b> (con la etiqueta <b>1:5</b> en el botón), el DXF, el SVG, el despiece, el CSV de cortes, el plano y el Anidador salen <b>a escala</b>, con tableros de láser (600 × 400, 900 × 600, A3…). Los archivos llevan <code>_maqueta_1-5</code> en el nombre. El 3D y el panel <b>Resumen</b> siguen a tamaño real.</p>
 <div class="caja">Comprobaciones de la maqueta: avisa si las costillas se pisan (grosor de la maqueta mayor que la separación a escala), si queda menos de 1,5 mm de material alrededor de un agujero, y si el grosor no es proporcional al del tablero real (la maqueta se verá más llena o más calada que el mueble).</div>
 
-<h2 id="plano">20. Plano de montaje en PDF</h2>
+<h2 id="plano">21. Plano de montaje en PDF</h2>
 <p><b>📄 Plano</b> descarga un PDF apaisado (A4) para llevar al taller. Lleva:</p>
 <ol>
   <li><b>Conjunto</b>: el mueble en 3D, sus datos y la lista de compra.</li>
@@ -554,7 +601,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 </div>
 <p>Si está activa la maqueta, el plano sale con las medidas y los pasos de la maqueta.</p>
 
-<h2 id="anidador">21. Anidador de tableros</h2>
+<h2 id="anidador">22. Anidador de tableros</h2>
 <figure><img src="img/anidador.jpg" alt="Anidador dentro de Made-rebanadas"><figcaption>El Anidador dentro de Made-rebanadas, con las costillas de una maqueta 1:5 colocadas por su forma real.</figcaption></figure>
 <p><b>🧩 Anidador</b> (en la barra o en la ventana Fabricar) abre el <b>Anidador de tableros</b> de la Suite CNC dentro del programa. Le llegan solas todas las costillas, cada una con su contorno exterior y los agujeros de las varillas, y las medidas, el grosor y el margen del tablero de Fabricar. Coloca las piezas <b>por su forma real</b>: encaja unas en los huecos de otras y aprovecha mucho mejor el tablero que la colocación de Fabricar.</p>
 <ul>
@@ -565,7 +612,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 </ul>
 <div class="caja">El Anidador es un programa aparte de la Suite CNC: está en <code>assets/anidador/anidador.html</code> y también se puede abrir solo. Tiene su propia ayuda (❓).</div>
 
-<h2 id="archivos">22. Guardar, abrir y ejemplos</h2>
+<h2 id="archivos">23. Guardar, abrir y ejemplos</h2>
 <ul>
   <li><b>💾 Guardar</b> (<kbd>Ctrl</kbd>+<kbd>S</kbd>) descarga el proyecto en un archivo <code>.json</code> con todo: perfiles, costillas, varillas y material. <b>📂 Abrir</b> lo carga de nuevo.</li>
   <li><b>↶ ↷</b> (<kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd>) deshacen y rehacen.</li>
@@ -578,7 +625,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <img src="img/ej_estante.jpg" alt="Estantería">
 </div>
 
-<h2 id="teclas">23. Atajos de teclado</h2>
+<h2 id="teclas">24. Atajos de teclado</h2>
 <table>
   <tr><th>Tecla</th><th>Acción</th></tr>
   <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Deshacer / rehacer</td></tr>
@@ -592,9 +639,9 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <tr><td><kbd>Esc</kbd></td><td>Cancelar la colocación de una varilla y quitar la selección</td></tr>
 </table>
 
-<h2 id="taller">24. Consejos de taller</h2>
+<h2 id="taller">25. Consejos de taller</h2>
 <ul>
-  <li>Corta antes una <b>maqueta</b> (sección 19): es barata, se hace en minutos con la láser y descubre los fallos de forma y de montaje.</li>
+  <li>Corta antes una <b>maqueta</b> (sección 20): es barata, se hace en minutos con la láser y descubre los fallos de forma y de montaje.</li>
   <li>Comprueba el <b>grosor real</b> del tablero con el calibre: un contrachapado «de 18» puede medir 17,5. Pon ese valor (Grosor → Otro…).</li>
   <li>Para un asiento, una separación de <b>2,5 a 3,5 veces el grosor</b> queda bien y no pellizca. Para apoyar objetos, mejor más juntas.</li>
   <li>Con <b>3 varillas</b> repartidas en triángulo el mueble no se retuerce. En bancos largos (más de 2 m), pon 4.</li>
@@ -603,7 +650,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <li>Lija los cantos de las costillas antes de montar: después no se llega bien a los huecos.</li>
 </ul>
 
-<h2 id="limites">25. Limitaciones de esta versión</h2>
+<h2 id="limites">26. Limitaciones de esta versión</h2>
 <ul>
   <li>La retícula solo se hace en planta recta. En la retícula, las costillas son perpendiculares al largo y los largueros paralelos a él (no hay ángulos libres).</li>
   <li>En la planta curva, las varillas se dibujan curvadas: hay que curvarlas en el taller al radio que indica el plano.</li>

@@ -152,6 +152,51 @@
       </div>
     </section>
 
+    <section id="secHuecos">
+      <h3>Huecos <span id="nHuecos" class="cuenta">0</span></h3>
+      <div class="sec-cuerpo">
+        <p class="nota">Recortes en las lamas o costillas: para ver la pared, rebajar, poner una balda, una hornacina o un armario con puerta. Se dibujan y se mueven en la vista <b>▦ Huecos</b>.</p>
+        <div class="botonesHueco">
+          <button data-hnuevo="rect" title="Hueco rectangular">▭ Rectángulo</button>
+          <button data-hnuevo="redondeado" title="Rectángulo con las esquinas redondeadas">▢ Redondeado</button>
+          <button data-hnuevo="arco" title="Rectángulo con arco de medio punto arriba">⌒ Arco</button>
+          <button data-hnuevo="circulo" title="Círculo u óvalo">◯ Círculo</button>
+          <button data-hnuevo="libre" title="Forma libre: mueve los vértices en la vista; doble clic en un lado añade uno">✎ Libre</button>
+        </div>
+        <ul id="listaHuecos" class="lista corta"></ul>
+        <div id="hcCampos" class="oculto">
+          <p class="nota"><b id="hcTit"></b></p>
+          <label class="fila chk"><input type="checkbox" id="hcActivo"> Activo</label>
+          <label class="fila">Forma <select id="hcForma"><option value="rect">Rectángulo</option><option value="redondeado">Redondeado</option><option value="arco">Arco</option><option value="circulo">Círculo u óvalo</option><option value="libre">Forma libre</option></select></label>
+          <label class="fila"><span id="hcXTit">X (mm)</span> <input type="number" id="hcX" step="5"></label>
+          <label class="fila"><span id="hcYTit">Y (mm)</span> <input type="number" id="hcY" step="5"></label>
+          <label class="fila">Ancho (mm) <input type="number" id="hcAncho" min="10" step="5"></label>
+          <label class="fila">Alto (mm) <input type="number" id="hcAlto" min="10" step="5"></label>
+          <label class="fila" id="filaHcRadio">Radio de las esquinas (mm) <input type="number" id="hcRadio" min="0" step="5"></label>
+          <div id="filaHcDesde">
+            <label class="fila" title="El túnel empieza en esta posición a lo largo del mueble">Desde x (mm) <input type="number" id="hcDesde" step="10"></label>
+            <label class="fila" title="Y termina en esta">Hasta x (mm) <input type="number" id="hcHasta" step="10"></label>
+          </div>
+          <label class="fila">Tipo de hueco <select id="hcModo"><option value="pasante">Pasante (se quita todo)</option><option value="rebaje">Rebaje (hasta una profundidad)</option><option value="mueble">Con mueble dentro</option></select></label>
+          <label class="fila" id="filaHcProf" title="Las lamas se recortan a esta distancia de la pared">Profundidad desde la pared (mm) <input type="number" id="hcProf" min="0" step="5"></label>
+          <label class="fila" id="filaHcHolgura" title="Holgura entre el mueble y las lamas o costillas">Holgura (mm) <input type="number" id="hcHolgura" min="0" step="0.5"></label>
+          <div id="hcMuebleCampos">
+            <label class="fila">Mueble <select id="hcMueble"><option value="balda">Balda</option><option value="caja">Caja (hornacina)</option><option value="armario">Armario con puerta</option></select></label>
+            <label class="fila" id="filaHcFondo" title="Fondo del mueble desde la pared">Fondo del mueble (mm) <input type="number" id="hcFondo" min="0" step="5"></label>
+            <label class="fila chk" id="filaHcTrasera"><input type="checkbox" id="hcTrasera"> Con trasera</label>
+            <div id="filaHcPuerta">
+              <label class="fila" title="Puerta lisa, o puerta que lleva delante sus trozos de lama (queda escondida en el panel)">Puerta <select id="hcPuerta"><option value="lisa">Lisa</option><option value="lamas">Con las lamas (escondida)</option></select></label>
+              <label class="fila">Holgura de la puerta (mm) <input type="number" id="hcHolPuerta" min="0" step="0.5"></label>
+            </div>
+          </div>
+          <div class="col3">
+            <button id="bHuecoCopia" title="Duplicar este hueco">⧉ Duplicar</button>
+            <button class="peligro" id="bHuecoQuitar" title="Quitar este hueco">🗑 Quitar</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section id="secFigura">
       <h3>Figura (modelo 3D)</h3>
       <div class="sec-cuerpo">
@@ -270,11 +315,13 @@
           <select id="sClave" class="selVista" title="Perfil clave que se edita"></select>
           <small id="infoClave"></small>
           <span class="cams">
+            <button id="bVistaHuecos" title="Ver y dibujar los huecos (recortes, hornacinas, baldas, puertas)">▦ Huecos</button>
             <button id="bEsquina" title="Convierte el punto seleccionado en esquina / curva (E o doble clic en el punto)">◇ Esquina</button>
             <button id="bEncuadrarPerfil" title="Encuadrar el perfil">⤢</button>
           </span>
         </div>
         <canvas id="cPerfil"></canvas>
+        <canvas id="cHuecos" class="oculto"></canvas>
         <div class="pie2d" id="piePerfil"></div>
       </div>
       <div class="vista vcost" id="vCost">
@@ -351,9 +398,10 @@
 <input type="file" id="fLetra" class="oculto" accept=".ttf,.otf,.woff,.woff2">
 <div id="aviso" class="aviso"></div>
 
-<script src="assets/js/three-bundle.js?v=202611131224"></script>
-<script src="assets/texturas/texturas.js?v=202611131224"></script>
-<script src="assets/ejemplos/ejemplos.js?v=202611131224"></script>
-<script src="assets/js/app.js?v=202611131224"></script>
+<script src="assets/js/three-bundle.js?v=202611132125"></script>
+<script src="assets/texturas/texturas.js?v=202611132125"></script>
+<script src="assets/ejemplos/ejemplos.js?v=202611132125"></script>
+<script src="assets/js/clipper.js?v=202611132125"></script>
+<script src="assets/js/app.js?v=202611132125"></script>
 </body>
 </html>

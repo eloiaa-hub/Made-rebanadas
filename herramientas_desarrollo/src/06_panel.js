@@ -8,7 +8,7 @@ function recalcular() {
   if (UI.varilla >= P.varillas.lista.length) UI.varilla = -1;
   construir3D();
   refrescarListas();
-  VP.pintar(); refrescarCostilla(); VC.pintar();
+  VP.pintar(); refrescarCostilla(); VC.pintar(); if (VH) VH.pintar();
 }
 // durante un arrastre: como mucho cada 70 ms
 function recalcularPronto() {
@@ -21,7 +21,7 @@ function cambio(txt) {
   UI.sucio = true;
   guardarHistoria();
   recalcular();
-  refrescarClaves();
+  refrescarClaves(); refrescarHuecos();
   if (txt) $('#estado').textContent = txt;
 }
 
@@ -334,7 +334,7 @@ function mostrarSecciones(forzarFigura) {
   $('#sClave').classList.toggle('oculto', calc); $('#bEsquina').classList.toggle('oculto', calc); $('#infoClave').classList.toggle('oculto', calc);
 }
 function ponerControles() {
-  llenarPlantillas(); llenarLetras();
+  llenarPlantillas(); llenarLetras(); refrescarHuecos();
   const C = P.costillas, V = P.varillas;
   const op = [...$('#cGrosor').options].map(o => o.value);
   if (op.includes(String(C.grosor))) { $('#cGrosor').value = String(C.grosor); $('#filaGrosorOtro').classList.add('oculto'); }

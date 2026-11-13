@@ -104,6 +104,7 @@ function proyectoBase() {
       vista: 'frente', giro: 0, base: 0.15, modelo: null, gama: 1, imagen: null,
       letras: [],
       capa: { activa: false, texto: 'Hola', letra: 'Arial Black', negrita: true, tamLetra: 160, relieve: 30, x: 50, y: 15, modo: 'sale' } },
+    huecos: [],
     figura: { activa: false, malla: null, alto: 800, eje: 'x', giro: 0, minArea: 2, unir: true },
   };
 }

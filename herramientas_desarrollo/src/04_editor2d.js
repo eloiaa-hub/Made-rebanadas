@@ -309,6 +309,7 @@ function dibujarPerfilRelieve(ctx, V) {
   ctx.textAlign = 'left';
 }
 function ayudaPerfil() {
+  if (UI.vistaHuecos) return '<span><kbd>Arrastrar</kbd> mover el hueco · asas: estirar</span><span><kbd>Doble clic</kbd> vértice nuevo (libre)</span><span><kbd>Clic dcho.</kbd> quitar vértice</span><span><kbd>Mayús</kbd> sin rejilla</span>';
   return '<span><kbd>Doble clic</kbd> línea: punto nuevo · punto: esquina</span><span><kbd>Clic dcho.</kbd> borrar</span><span><kbd>Mayús</kbd> sin rejilla</span>';
 }
 function encuadrarPerfil() {
@@ -325,7 +326,11 @@ function dibujarCostilla(ctx, V) {
   if (!R) return;
   const c = piezaSel(); if (!c || !c.ok) return;
   ctx.fillStyle = colorCostilla(.28); ctx.strokeStyle = colorCostilla(1); ctx.lineWidth = 2;
-  V.camino(ctx, c.poly); ctx.fill(); ctx.stroke();
+  // la pieza con sus huecos de dentro (si los tiene)
+  ctx.beginPath(); [c.poly, ...(c.int || [])].forEach(pol => pol.forEach((p, i) => { const [x, y] = V.aPantalla(p[0], p[1]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }) || ctx.closePath());
+  ctx.fill('evenodd'); ctx.stroke();
+  // los otros trozos de la misma lama o costilla, en claro
+  const pad = c.padre || c; (pad.partes || []).forEach(q => { if (q === c || !q.ok) return; ctx.save(); ctx.globalAlpha = .35; ctx.setLineDash([4, 3]); V.camino(ctx, q.poly); ctx.stroke(); ctx.restore(); });
   const r = radioAgujero();
   c.agujeros.forEach(k => {
     const [x, y] = V.aPantalla(P.varillas.lista[k][0], P.varillas.lista[k][1]);

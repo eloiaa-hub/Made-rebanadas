@@ -7,6 +7,8 @@ function piezaCalcador(c) {
   const g = geoFab(c), b = g.caja, r3 = v => +v.toFixed(3);
   const cc = contornoCNC(g.poly), ext = cc.pts.map(p => ({ x: r3(p[0] - b.x0), y: r3(p[1] - b.y0) }));
   const contornos = [{ pts: ext, b: cc.b.map(v => +v.toFixed(6)), cerrado: true, tipo: 'exterior', mec: { op: 'corte', prof: null, puentes: { ...PUENTES0 } } }];
+  // huecos interiores de la pieza (túneles, ventanas)
+  (g.interiores || []).forEach(hh => { const ci = contornoCNC(hh); contornos.push({ pts: ci.pts.map(p => ({ x: r3(p[0] - b.x0), y: r3(p[1] - b.y0) })), b: ci.b.map(v => +v.toFixed(6)), cerrado: true, tipo: 'interior', mec: { op: 'corte', prof: null, puentes: { ...PUENTES0 } } }); });
   // cada agujero: círculo de dos medias vueltas (bulge 1)
   g.agujeros.forEach(a => {
     const x = a[0] - b.x0, y = a[1] - b.y0;

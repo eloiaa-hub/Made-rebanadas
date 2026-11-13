@@ -216,22 +216,25 @@ function planoPDF() {
 
   // ---- hojas de costillas: 4 × 2 por hoja, todas a la misma escala ----
   const porHoja = 8, cols = 4, filas = 2, cw = (W - 2 * M) / cols, ch = (H - 2 * M - 22) / filas;
-  const mw = Math.max(...cs.map(c => c.caja.w)), mh = Math.max(...cs.map(c => c.caja.h));
+  // con huecos, los trozos van junto a su lama o costilla (12a, 12b…)
+  const csP = cs.flatMap(c => (c.partes || [c]).filter(q => q.ok));
+  const mw = Math.max(...csP.map(c => c.caja.w)), mh = Math.max(...csP.map(c => c.caja.h));
   const s3 = Math.min((cw - 10) / mw, (ch - 16) / mh);
-  for (let h0 = 0; h0 < cs.length; h0 += porHoja) {
-    cabecera(`3. ${P.tipo === 'pared' ? 'Lamas' : 'Costillas'} ${cs[h0].i + 1} a ${cs[Math.min(cs.length, h0 + porHoja) - 1].i + 1} (todas a la misma escala, 1:${fmt(k / s3, 0)} aprox.)`);
-    cs.slice(h0, h0 + porHoja).forEach((c, j) => {
+  for (let h0 = 0; h0 < csP.length; h0 += porHoja) {
+    cabecera(`3. ${P.tipo === 'pared' ? 'Lamas' : 'Costillas'} ${csP[h0].etq} a ${csP[Math.min(csP.length, h0 + porHoja) - 1].etq} (todas a la misma escala, 1:${fmt(k / s3, 0)} aprox.)`);
+    csP.slice(h0, h0 + porHoja).forEach((c, j) => {
       const g = geoFab(c), cx = M + (j % cols) * cw, cy = M + 18 + Math.floor(j / cols) * ch;
       D.trazo([225, 225, 225]).grosor(0.2).rect(cx + 1, cy + 1, cw - 2, ch - 2);
       const ox = cx + (cw - c.caja.w * s3) / 2, oy = cy + ch - 9;
       const PX = u => ox + (u - c.caja.x0) * s3, PY = v => oy - (v - c.caja.y0) * s3;
       D.relleno([240, 228, 208]).trazo(madera).grosor(0.35).poli(simplificaCerrado(c.poly, 0.05).map(p => [PX(p[0]), PY(p[1])]), true, 'b');
+      (c.int || []).forEach(hh => D.relleno([255, 255, 255]).trazo(madera).grosor(0.35).poli(hh.map(p => [PX(p[0]), PY(p[1])]), true, 'b'));
       D.relleno([255, 255, 255]).trazo(rojo).grosor(0.25);
       c.agujeros.forEach(j2 => D.circulo(PX(V.lista[j2][0]), PY(V.lista[j2][1]), Math.max(0.6, radioAgujero() * s3), 'b'));
       D.relleno([0, 0, 0]).trazo();
       const et = puntoEtiqueta(c);
       D.texto(PX(et[0]), PY(et[1]) + 2.2, c.etq, { pt: 14, b: true, al: 'c', col: azul });
-      D.texto(cx + 3, cy + 6, `${P.tipo === 'pared' ? 'Lama' : 'Costilla'} ${c.i + 1}`, { pt: 9, b: true });
+      D.texto(cx + 3, cy + 6, c.nombre, { pt: 9, b: true });
       D.texto(cx + cw - 3, cy + 6, `${fmt(g.caja.w, maq ? 1 : 0)} × ${fmt(g.caja.h, maq ? 1 : 0)} mm`, { pt: 8.5, al: 'r', col: gris });
       D.texto(cx + 3, cy + ch - 3.5, (P.tipo === 'radial' ? `a ${fmt(c.x, 1)}° · ` : `x = ${fmt(c.x * k)} mm · `) + (ret ? `${c.ranuras.length} ranuras` : P.tipo === 'radial' || P.tipo === 'pared' ? `${c.ranuras.length} muescas` : `${c.agujeros.length} agujeros`), { pt: 7.5, col: gris });
     });
@@ -258,6 +261,20 @@ function planoPDF() {
     }
   }
 
+  // ---- muebles de los huecos: lista de tableros ----
+  const mods = (R.modulos || []);
+  if (huecosActivos().length) {
+    cabecera('3c. Huecos y sus muebles');
+    const filas = [{ titulo: P.tipo === 'pared' ? 'Huecos (medidas desde la esquina de abajo a la izquierda del panel)' : 'Huecos (túneles, en el perfil: u fondo, v altura)' }];
+    huecosActivos().forEach(h => { const cb = cajaHueco(h), n = P.huecos.indexOf(h) + 1, mod = { pasante: 'pasante', rebaje: `rebaje a ${fmt(h.prof * k)} mm de la pared`, mueble: { balda: 'con balda', caja: 'con caja (hornacina)', armario: `con armario y puerta ${h.mueble.puerta === 'lamas' ? 'de lamas' : 'lisa'}` }[h.mueble.tipo] }[h.modo];
+      const [x0, x1] = P.tipo === 'pared' ? [0, 0] : tramoX(h);
+      filas.push([`Hueco H${n}`, `${{ rect: 'rectángulo', redondeado: 'redondeado', arco: 'arco', circulo: 'círculo', libre: 'forma libre' }[h.forma]} ${fmt(cb.w * k)} × ${fmt(cb.h * k)} mm en (${fmt(cb.x0 * k)}, ${fmt(cb.y0 * k)})${P.tipo === 'pared' ? '' : ` · de x = ${fmt(x0 * k)} a ${fmt(x1 * k)} mm`} · ${mod}`]); });
+    if (mods.length) {
+      filas.push({ titulo: `Tableros de los muebles: ${fmt(grosor() * k, 1)} mm (el mismo grosor que las ${P.tipo === 'pared' ? 'lamas' : 'costillas'})` });
+      mods.forEach(m => filas.push([`${m.etq} · ${m.nombre}`, `${fmt(m.medidas[0] * k)} × ${fmt(m.medidas[1] * k)} mm`]));
+    }
+    tabla(M, M + 22, W - 2 * M, filas, { c1: 70 });
+  }
   // ---- tableros ----
   const f = fabActual(), col = colocarEnTableros(f);
   if (f.modo !== 'fila' && col.tableros.length) {
@@ -321,6 +338,9 @@ function planoPDF() {
     'Acabado: aceite, cera o barniz. Si va al exterior, usa varilla inoxidable y un acabado para exterior.',
   ];
   let yp = M + 24;
+  if (huecosActivos().length) pasos.splice(Math.max(1, pasos.length - 1), 0, P.tipo === 'pared'
+    ? 'Huecos (hoja 3c): cuelga primero los muebles de los huecos (cajas, armarios, baldas) atornillados a la pared; después pon las lamas de alrededor. Los trozos de lama (12a, 12b…) van en su sitio, cada uno en su rastrel o atornillado por detrás al mueble.'
+    : 'Huecos (hoja 3c): monta el forro del túnel (suelo, techo y laterales) a la vez que las costillas, encolado o atornillado; los trozos de costilla (12a, 12b…) van en su sitio en las varillas.');
   pasos.forEach((t, i) => {
     D.relleno(madera).circulo(M + 4, yp - 1.2, 3.2, 'f'); D.relleno([0, 0, 0]);
     D.texto(M + 4, yp + 0.1, String(i + 1), { pt: 9, b: true, al: 'c', col: [255, 255, 255] });
@@ -443,7 +463,7 @@ function hojaRadial(D, cabecera, tabla, o) {
 function hojaPared(D, cabecera, tabla, o) {
   const { M, W, k, gris, azul, madera, cm } = o;
   cabecera('2. Alzado de la pared, rastreles y orden de colocación');
-  const cs = R.costillas.filter(c => c.ok), Pa = P.pared, e = grosor(), hor = P.relieve && P.relieve.orient === 'h';
+  const cs = R.costillas.filter(c => c.ok), Pa = P.pared, e = grosor(), hor = P.relieve && P.relieve.orient === 'h', tz = (R.trozos || []).filter(t => t.ok);
   // rectángulo de cada lama visto de frente (X, Y del mundo)
   const rect = c => { const m = marcoEn(c.x), a = puntoMarco(m, 0, c.caja.y0), b = puntoMarco(m, 0, c.caja.y1), g = ejeGrosor(m);
     const xs = [a[0], b[0], a[0] + g[0] * e / 2, a[0] - g[0] * e / 2], ys = [a[1], b[1], a[1] + g[1] * e / 2, a[1] - g[1] * e / 2];
@@ -453,13 +473,20 @@ function hojaPared(D, cabecera, tabla, o) {
   const PX = x => zona.x + (x - X0 + 40) * s, PY = v => zona.y + zona.h - v * s;
   D.texto(zona.x, zona.y - 4, `Alzado (de frente): ${R.n} lamas ${hor ? 'horizontales' : 'verticales'} numeradas y ${R.rastreles.length} rastreles detrás.`, { pt: 8.5, col: gris });
   D.relleno([205, 179, 138]);
-  R.rastreles.forEach(r => {
-    const m0 = marcoEn(cs[0].x), m1 = marcoEn(cs[cs.length - 1].x), a = puntoMarco(m0, 0, r.v), b = puntoMarco(m1, 0, r.v);
-    if (hor) D.rect(PX(a[0] - Pa.alto / 2), PY(Math.max(a[1], b[1]) + e / 2 + 30), Pa.alto * s, (Math.abs(b[1] - a[1]) + e + 60) * s, 'f');
-    else D.rect(PX(Math.min(a[0], b[0]) - e / 2 - 30), PY(r.v + Pa.alto / 2), (Math.abs(b[0] - a[0]) + e + 60) * s, Pa.alto * s, 'f');
-  });
+  R.rastreles.forEach(r => (r.tramos || [[cs[0].x - e / 2 - 30, cs[cs.length - 1].x + e / 2 + 30]]).forEach(([xa, xb]) => {
+    const a = puntoMarco(marcoEn(xa), 0, r.v), b = puntoMarco(marcoEn(xb), 0, r.v);
+    if (hor) D.rect(PX(a[0] - Pa.alto / 2), PY(Math.max(a[1], b[1])), Pa.alto * s, Math.abs(b[1] - a[1]) * s, 'f');
+    else D.rect(PX(Math.min(a[0], b[0])), PY(r.v + Pa.alto / 2), Math.abs(b[0] - a[0]) * s, Pa.alto * s, 'f');
+  }));
   D.relleno([226, 205, 172]).trazo(madera).grosor(0.15);
-  rs.forEach(r => D.rect(PX(r[0]), PY(r[3]), Math.max(0.3, (r[2] - r[0]) * s), Math.max(0.3, (r[3] - r[1]) * s), 'b'));
+  rs.concat(tz.map(rect)).forEach(r => D.rect(PX(r[0]), PY(r[3]), Math.max(0.3, (r[2] - r[0]) * s), Math.max(0.3, (r[3] - r[1]) * s), 'b'));
+  // huecos: su contorno, en rojo, con su número
+  huecosActivos().forEach(h => {
+    const pts = formaHueco(h).map(([X, Y]) => { const [x, v] = aXUV(X, Y), q = puntoMarco(marcoEn(x), 0, v); return [PX(q[0]), PY(q[1])]; });
+    D.trazo([200, 60, 40]).grosor(0.35).poli(pts, true, 's');
+    const cb = cajaHueco(h), [xc, vc] = aXUV(cb.x0 + cb.w / 2, cb.y0 + cb.h / 2), q = puntoMarco(marcoEn(xc), 0, vc);
+    D.relleno([200, 60, 40]); D.texto(PX(q[0]), PY(q[1]) + 1.5, 'H' + (P.huecos.indexOf(h) + 1), { pt: 8, al: 'c', col: [200, 60, 40] });
+  });
   D.relleno([0, 0, 0]).trazo();
   const paso = Math.max(1, Math.ceil(cs.length / (hor ? 25 : 40)));
   cs.forEach((c, i) => { if (i % paso === 0 || i === cs.length - 1) { const r = rs[i]; if (hor) D.texto(PX(r[0]) - 2, PY((r[1] + r[3]) / 2) + 1.2, String(c.i + 1), { pt: 6.5, al: 'r', col: azul }); else D.texto(PX((r[0] + r[2]) / 2), PY(r[3]) - 1.5, String(c.i + 1), { pt: 6.5, al: 'c', col: azul }); } });

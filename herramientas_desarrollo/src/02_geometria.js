@@ -180,14 +180,25 @@ function calcular() {
   const okc = res.costillas.filter(c => c.ok);
   res.uc = P.tipo === 'radial' || P.tipo === 'pared' || !okc.length ? 0 : (Math.min(...okc.map(c => c.caja.x0)) + Math.max(...okc.map(c => c.caja.x1))) / 2;
   ucActual = res.uc;
-  const fin = () => { res.otras = [...res.largueros, ...res.discos]; res.otras.forEach((o, k) => o.i = res.n + k); return res; };
-  if (P.tipo === 'reticula') { reticula(res); avisosReticula(res); return fin(); }
+  const fin = () => {
+    res.trozos = res.trozos || []; res.modulos = res.modulos || [];
+    res.otras = [...res.largueros, ...res.discos, ...res.trozos, ...res.modulos]; res.otras.forEach((o, k) => o.i = res.n + k);
+    const nh = {}; res.modulos.forEach(m => { nh[m.hueco] = (nh[m.hueco] || 0) + 1; m.etq = 'H' + (m.hueco + 1) + '-' + nh[m.hueco]; });
+    return res;
+  };
+  if (P.tipo === 'reticula') { reticula(res); aplicarHuecos(res); avisosHuecos(res); avisosReticula(res); return fin(); }
   if (P.tipo === 'radial') { radialExtras(res); aplicarRanuras(res, e + P.radial.holgura); avisosRadial(res); return fin(); }
-  if (P.tipo === 'pared') { paredExtras(res); aplicarRanuras(res, e); avisosPared(res); return fin(); }
+  if (P.tipo === 'pared') {
+    paredExtras(res); aplicarRanuras(res, e); aplicarHuecos(res);
+    if (res.rastreles.length && R0ok(res)) { const cs = res.costillas, xA = cs[0].x - e / 2 - 30, xB = cs[cs.length - 1].x + e / 2 + 30; res.rastreles.forEach(r => { r.tramos = usaHuecos() ? tramosRastrel(r.v, P.pared.alto, xA, xB) : [[xA, xB]]; }); }
+    avisosHuecos(res); avisosPared(res); return fin();
+  }
+  aplicarHuecos(res);
   // varillas: ¿caben en cada costilla?
   const need = radioAgujero() + V.margen;
   V.lista.forEach((p, k) => {
-    const cabe = res.costillas.map(c => c.ok && distBorde(c.poly, p[0], p[1]) >= need - 1e-6);
+    const parte = res.costillas.map(c => c.ok ? (c.partes ? parteConPunto(c, p[0], p[1], need) : (distBorde(c.poly, p[0], p[1]) >= need - 1e-6 ? c : null)) : null);
+    const cabe = parte.map(q => !!q);
     // de la primera a la última costilla que existe (en las figuras, las de los extremos pueden faltar)
     let a = Math.max(0, res.costillas.findIndex(c => c.ok)), b = rep.n - 1, usada = true;
     while (b > a && !res.costillas[b].ok) b--;
@@ -201,15 +212,17 @@ function calcular() {
       if (mejor[0] < 0) usada = false; else { a = mejor[0]; b = mejor[1]; }
     }
     const fallan = [];
-    for (let i = a; i <= b && usada; i++) { if (cabe[i]) { res.costillas[i].agujeros.push(k); res.costillas[i].nVar++; } else fallan.push(i); }
+    for (let i = a; i <= b && usada; i++) { if (cabe[i]) { parte[i].agujeros.push(k); res.costillas[i].nVar++; } else fallan.push(i); }
     res.varillas.push({ k, u: p[0], v: p[1], cabe, a, b, usada, fallan,
       largo: usada ? (b - a) * rep.s + e + 2 * V.sobra : 0, dists: usada ? new Array(b - a).fill(rep.s) : [] });
   });
   if (disposicion() === 'curva') varillasCurvas(res);
+  avisosHuecos(res);
   avisosDe(res, need);
   return fin();
 }
 
+const R0ok = res => res.costillas.length > 0;
 function lista(nums) { // «3, 4, 5 y 9» a partir de índices (se muestran desde 1)
   const v = nums.map(i => i + 1);
   if (v.length > 6) return v.slice(0, 5).join(', ') + '… (' + v.length + ')';
@@ -327,6 +340,7 @@ function puntoEtiqueta(c) {
   let mejor = [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2], md = -Infinity;
   for (let y = b.y0 + paso / 2; y < b.y1; y += paso) for (let x = b.x0 + paso / 2; x < b.x1; x += paso) {
     let d = distBorde(c.poly, x, y); if (d <= 0) continue;
+    if (c.int && c.int.length) { if (c.int.some(hh => dentro(hh, x, y))) continue; c.int.forEach(hh => { d = Math.min(d, -distBorde(hh, x, y)); }); }
     for (const k of c.agujeros) d = Math.min(d, Math.hypot(x - P.varillas.lista[k][0], y - P.varillas.lista[k][1]) - r);
     if (d > md) { md = d; mejor = [x, y]; }
   }

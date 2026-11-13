@@ -2,6 +2,12 @@
 
 ## v1.5
 
+- **Huecos** en paneles de pared, costillas y retícula: rectángulo, redondeado, arco, círculo o forma libre, que se dibujan y se arrastran en la nueva vista **▦ Huecos**.
+  - **Pasante** (se ve la pared o se abre un túnel), **rebaje** a una profundidad (pared) o **con mueble**: balda, caja (hornacina) o armario con puerta lisa o con las lamas delante (puerta escondida).
+  - Las lamas y costillas se parten en trozos numerados (12a, 12b…) o llevan agujeros por dentro; los rastreles se cortan; los muebles salen como tableros en el despiece, el DXF, el Anidador y la hoja 3c del plano.
+  - Avisos de trozos sueltos (sin rastrel, sin varillas o sin mueble), rebajes que se comen la muesca y trozos muy pequeños.
+  - Ejemplos «Pared con hornacinas y armario» y «Banco con revistero».
+- Las restas se hacen con **Clipper** (Angus Johnson, licencia Boost), incluido en `assets/js/clipper.js`.
 - **Figuras de pie desde un modelo 3D** (costillas y retícula): cada costilla es un corte de verdad del STL/OBJ. Alto, cortes de lado a lado o de delante a atrás, giro, unir trozos sueltos con puentes y quitar las costillas pequeñas. El modelo se guarda en el proyecto. Ejemplos «Busto de rebanadas» y «Busto en retícula».
 - **Texto añadido encima** de cualquier relieve (imagen, modelo, ondas u otro texto), que sale o se hunde.
 - **Letras propias** (.ttf, .otf, .woff): se guardan dentro del proyecto.
