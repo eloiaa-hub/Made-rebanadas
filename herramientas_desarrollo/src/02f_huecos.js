@@ -17,13 +17,21 @@ function huecoNuevo(forma) {
   const caja = !fr && R ? (() => { const cs = R.costillas.filter(c => c.ok); if (!cs.length) return { x0: 0, y0: 0, w: 400, h: 400 }; let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; cs.forEach(c => { x0 = Math.min(x0, c.caja.x0); y0 = Math.min(y0, c.caja.y0); x1 = Math.max(x1, c.caja.x1); y1 = Math.max(y1, c.caja.y1); }); return { x0, y0, w: x1 - x0, h: y1 - y0 }; })() : null;
   const w = fr ? Math.round(Math.min(600, W * 0.3) / 10) * 10 : Math.round(caja.w * 0.35 / 10) * 10, h = fr ? Math.round(Math.min(500, H * 0.35) / 10) * 10 : Math.round(caja.h * 0.3 / 10) * 10;
   const x = fr ? Math.round((W - w) / 20) * 10 : Math.round((caja.x0 + (caja.w - w) / 2) / 10) * 10, y = fr ? Math.round((H - h) / 20) * 10 : Math.round((caja.y0 + (caja.h - h) / 2) / 10) * 10;
-  const hu = { id: 'h' + Date.now().toString(36) + (sigHueco++), activo: true, forma, x, y, ancho: w, alto: h, radio: Math.round(Math.min(w, h) / 5), pts: null,
+  const hu = { id: 'h' + Date.now().toString(36) + (sigHueco++), activo: true, forma, giro: 0, x, y, ancho: w, alto: h, radio: Math.round(Math.min(w, h) / 5), pts: null,
     modo: 'pasante', prof: 40, holgura: 2, desde: 0, hasta: Math.round(P.largo), mueble: { tipo: 'caja', fondo: fr ? 150 : 0, trasera: true, puerta: 'lisa', holguraPuerta: 3 } };
   if (forma === 'libre') hu.pts = [[x, y], [x + w, y], [x + w * 0.85, y + h], [x + w * 0.15, y + h * 0.8]];
   return hu;
 }
 // contorno de la forma en su plano (frente o perfil)
+// giro: alrededor del centro del rectángulo del hueco (en la forma libre se aplica a los vértices al girar)
+const giraHueco = h => (h.forma !== 'libre' && h.modo !== 'mueble' && h.giro) ? h.giro : 0;
+function rotarPunto(p, c, g) { const a = g * Math.PI / 180, cs = Math.cos(a), sn = Math.sin(a), dx = p[0] - c[0], dy = p[1] - c[1]; return [c[0] + dx * cs - dy * sn, c[1] + dx * sn + dy * cs]; }
+const centroHueco = h => [h.x + h.ancho / 2, h.y + h.alto / 2];
 function formaHueco(h) {
+  const f = formaBase(h), g = giraHueco(h);
+  return g ? f.map(p => rotarPunto(p, centroHueco(h), g)) : f;
+}
+function formaBase(h) {
   const x = h.x, y = h.y, w = Math.max(1, h.ancho), a = Math.max(1, h.alto);
   if (h.forma === 'libre' && h.pts && h.pts.length >= 3) return h.pts.map(p => [p[0], p[1]]);
   if (h.forma === 'circulo') return Array.from({ length: 64 }, (_, i) => { const t = PI2 * i / 64; return [x + w / 2 + w / 2 * Math.cos(t), y + a / 2 + a / 2 * Math.sin(t)]; });

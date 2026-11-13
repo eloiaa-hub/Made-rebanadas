@@ -53,18 +53,28 @@ function dibujarHuecos(ctx, V) {
     ctx.fillText('H' + (k + 1), lx, ly); ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
     if (sel) {
       // asas
-      asasHueco(h).forEach(a => { const [x, y] = V.aPantalla(a.x, a.y); ctx.fillStyle = cssVar('--vista'); ctx.strokeStyle = acento; ctx.lineWidth = 1.6; ctx.beginPath(); a.vert ? ctx.arc(x, y, 5, 0, PI2) : ctx.rect(x - 4.5, y - 4.5, 9, 9); ctx.fill(); ctx.stroke(); });
-      V.cota(ctx, [cb.x0, cb.y0], [cb.x0 + cb.w, cb.y0], 18, fmt(cb.w) + ' mm', false);
-      V.cota(ctx, [cb.x0 + cb.w, cb.y0], [cb.x0 + cb.w, cb.y0 + cb.h], 20, fmt(cb.h) + ' mm', true);
+      asasHueco(h).forEach(a => {
+        const [x, y] = V.aPantalla(a.x, a.y); ctx.fillStyle = cssVar('--vista'); ctx.strokeStyle = acento; ctx.lineWidth = 1.6;
+        if (a.rot) { const [cx, cy] = V.aPantalla(...centroHueco(h)); ctx.save(); ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(x, y); ctx.stroke(); ctx.restore(); ctx.beginPath(); ctx.arc(x, y, 7, 0, PI2); ctx.fill(); ctx.stroke(); ctx.fillStyle = acento; ctx.font = '11px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('↻', x, y + 0.5); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; if (h.giro) ctx.fillText(fmt(h.giro) + '°', x + 10, y - 8); return; }
+        ctx.beginPath(); a.vert ? ctx.arc(x, y, 5, 0, PI2) : ctx.rect(x - 4.5, y - 4.5, 9, 9); ctx.fill(); ctx.stroke();
+      });
+      if (giraHueco(h)) { ctx.fillStyle = acento; ctx.font = '600 11.5px system-ui'; ctx.textAlign = 'center'; ctx.fillText(`${fmt(h.ancho)} × ${fmt(h.alto)} mm · ${fmt(h.giro)}°`, lx, ly + 16); ctx.textAlign = 'left'; }
+      else {
+        V.cota(ctx, [cb.x0, cb.y0], [cb.x0 + cb.w, cb.y0], 18, fmt(cb.w) + ' mm', false);
+        V.cota(ctx, [cb.x0 + cb.w, cb.y0], [cb.x0 + cb.w, cb.y0 + cb.h], 20, fmt(cb.h) + ' mm', true);
+      }
     }
   });
   ctx.fillStyle = acento; ctx.font = '600 12px system-ui';
   ctx.fillText(fr ? 'Huecos · frente del panel' : 'Huecos · perfil (cada hueco es un túnel de «desde» a «hasta»)', 8, V.h - 26);
 }
 function asasHueco(h) {
-  if (h.forma === 'libre' && h.pts) return h.pts.map((p, i) => ({ x: p[0], y: p[1], vert: true, i }));
+  const g = giraHueco(h), c = centroHueco(h), R2 = p => g ? rotarPunto(p, c, g) : p;
+  // asa de girar: encima del hueco (no en los huecos con mueble, que no giran)
+  const rot = h.modo === 'mueble' ? [] : [(() => { const q = R2([h.x + h.ancho / 2, h.y + h.alto + Math.max(25, 22 / ((VH && VH.sc) || 1))]); return { x: q[0], y: q[1], t: 'rot', rot: true }; })()];
+  if (h.forma === 'libre' && h.pts) return h.pts.map((p, i) => ({ x: p[0], y: p[1], vert: true, i })).concat(rot);
   const x0 = h.x, y0 = h.y, x1 = h.x + h.ancho, y1 = h.y + h.alto, xm = (x0 + x1) / 2, ym = (y0 + y1) / 2;
-  return [[x0, y0, 'sw'], [xm, y0, 's'], [x1, y0, 'se'], [x1, ym, 'e'], [x1, y1, 'ne'], [xm, y1, 'n'], [x0, y1, 'nw'], [x0, ym, 'w']].map(([x, y, t]) => ({ x, y, t }));
+  return [[x0, y0, 'sw'], [xm, y0, 's'], [x1, y0, 'se'], [x1, ym, 'e'], [x1, y1, 'ne'], [xm, y1, 'n'], [x0, y1, 'nw'], [x0, ym, 'w']].map(([x, y, t]) => { const q = R2([x, y]); return { x: q[0], y: q[1], t }; }).concat(rot);
 }
 function encuadrarHuecos() {
   if (!VH || !R) return;
@@ -96,7 +106,7 @@ function iniciarHuecos() {
     if (ev.button === 1) { HU.arr = { tipo: 'pan', x: mx, y: my, ox: VH.ox, oy: VH.oy }; return; }
     const a = cerca(mx, my), h = huecoSel();
     if (ev.button === 2) { if (a && a.vert && h.pts.length > 3) { h.pts.splice(a.i, 1); cambio('Vértice quitado'); } return; }
-    if (a) { HU.arr = { tipo: a.vert ? 'vert' : 'asa', a, x0: u, y0: v, orig: JSON.parse(JSON.stringify(h)), movido: false }; return; }
+    if (a) { HU.arr = { tipo: a.rot ? 'rot' : a.vert ? 'vert' : 'asa', a, x0: u, y0: v, orig: JSON.parse(JSON.stringify(h)), movido: false }; return; }
     const k = dentroDe(u, v);
     if (k >= 0) { UI.hueco = k; refrescarHuecos(); HU.arr = { tipo: 'mover', x0: u, y0: v, orig: JSON.parse(JSON.stringify(P.huecos[k])), movido: false }; VH.pintar(); return; }
     HU.arr = { tipo: 'pan', x: mx, y: my, ox: VH.ox, oy: VH.oy };
@@ -111,14 +121,24 @@ function iniciarHuecos() {
     if (A.tipo === 'mover') {
       h.x = snapH(O.x + du, ev); h.y = snapH(O.y + dv, ev);
       if (O.pts) { const dx = h.x - O.x, dy = h.y - O.y; h.pts = O.pts.map(p => [p[0] + dx, p[1] + dy]); }
+    } else if (A.tipo === 'rot') {
+      const C = centroHueco(O), ang = Math.atan2(v - C[1], u - C[0]) * 180 / Math.PI - 90;
+      let g = ev.shiftKey ? Math.round(ang) : Math.round(ang / 15) * 15; g = ((g % 360) + 540) % 360 - 180;
+      if (h.forma === 'libre' && O.pts) { h.pts = O.pts.map(p => rotarPunto(p, C, g - (O.giro || 0))); const cb = cajaDe(h.pts); h.x = cb.x0; h.y = cb.y0; h.ancho = cb.w; h.alto = cb.h; }
+      h.giro = g;
     } else if (A.tipo === 'vert') {
       h.pts[A.a.i] = [snapH(O.pts[A.a.i][0] + du, ev), snapH(O.pts[A.a.i][1] + dv, ev)];
       const cb = cajaDe(h.pts); h.x = cb.x0; h.y = cb.y0; h.ancho = cb.w; h.alto = cb.h;
     } else {
-      const t = A.a.t; let x0 = O.x, y0 = O.y, x1 = O.x + O.ancho, y1 = O.y + O.alto;
-      if (t.includes('w')) x0 = Math.min(x1 - 10, snapH(O.x + du, ev)); if (t.includes('e')) x1 = Math.max(x0 + 10, snapH(O.x + O.ancho + du, ev));
-      if (t.includes('s')) y0 = Math.min(y1 - 10, snapH(O.y + dv, ev)); if (t.includes('n')) y1 = Math.max(y0 + 10, snapH(O.y + O.alto + dv, ev));
-      h.x = x0; h.y = y0; h.ancho = x1 - x0; h.alto = y1 - y0;
+      const t = A.a.t, g = giraHueco(O), [lu, lv] = g ? rotarPunto([du, dv], [0, 0], -g) : [du, dv];
+      let x0 = O.x, y0 = O.y, x1 = O.x + O.ancho, y1 = O.y + O.alto;
+      const sn = q => g ? Math.round(q * 10) / 10 : snapH(q, ev);
+      if (t.includes('w')) x0 = Math.min(x1 - 10, sn(O.x + lu)); if (t.includes('e')) x1 = Math.max(x0 + 10, sn(O.x + O.ancho + lu));
+      if (t.includes('s')) y0 = Math.min(y1 - 10, sn(O.y + lv)); if (t.includes('n')) y1 = Math.max(y0 + 10, sn(O.y + O.alto + lv));
+      const w = x1 - x0, hh = x1 > x0 ? y1 - y0 : 10;
+      if (g) { const C = centroHueco(O), cN = rotarPunto([(x0 + x1) / 2, (y0 + y1) / 2], C, g); h.x = cN[0] - w / 2; h.y = cN[1] - hh / 2; }
+      else { h.x = x0; h.y = y0; }
+      h.ancho = w; h.alto = hh;
     }
     ponerCamposHueco(); VH.pintar();
   });
@@ -139,7 +159,7 @@ function iniciarHuecos() {
     P.huecos.push(h); UI.hueco = P.huecos.length - 1; cambio('Hueco ' + P.huecos.length + ': ' + NOMBRE_FORMA[h.forma].toLowerCase());
     if (!UI.vistaHuecos) verHuecos(true); else encuadrarHuecos();
   });
-  $('#bHuecoQuitar').onclick = () => { if (!huecoSel()) return; P.huecos.splice(UI.hueco, 1); UI.hueco = Math.min(UI.hueco, P.huecos.length - 1); cambio('Hueco quitado'); };
+  $('#bHuecoQuitar').onclick = () => borrarHueco(UI.hueco);
   $('#bHuecoCopia').onclick = () => { const h = huecoSel(); if (!h) return; const c2 = JSON.parse(JSON.stringify(h)); c2.id = 'h' + Date.now().toString(36); c2.x += 50; c2.y += 50; if (c2.pts) c2.pts = c2.pts.map(p => [p[0] + 50, p[1] + 50]); P.huecos.push(c2); UI.hueco = P.huecos.length - 1; cambio('Hueco duplicado'); };
   const campo = (sel, fn) => enlazar(sel, () => { const h = huecoSel(); if (!h) return; fn(h, $(sel)); cambio(); });
   campo('#hcForma', (h, el) => { const v = el.value; if (v === 'libre' && !h.pts) h.pts = formaHueco(h).filter((_, i, a) => a.length <= 8 || i % Math.ceil(a.length / 8) === 0); h.forma = v; });
@@ -149,9 +169,11 @@ function iniciarHuecos() {
       const cb = cajaDe(h.pts), nx = k === 'x' ? v : cb.x0, ny = k === 'y' ? v : cb.y0, sw = k === 'ancho' ? Math.max(10, v) / cb.w : 1, sh = k === 'alto' ? Math.max(10, v) / cb.h : 1;
       h.pts = h.pts.map(p => [nx + (p[0] - cb.x0) * sw, ny + (p[1] - cb.y0) * sh]); const c2 = cajaDe(h.pts); h.x = c2.x0; h.y = c2.y0; h.ancho = c2.w; h.alto = c2.h; return;
     }
+    if (['ancho', 'alto'].includes(k) && giraHueco(h)) { const c = centroHueco(h); h[k] = Math.max(10, v); h.x = c[0] - h.ancho / 2; h.y = c[1] - h.alto / 2; return; }
     h[k] = ['ancho', 'alto'].includes(k) ? Math.max(10, v) : v;
   }));
   campo('#hcModo', (h, el) => { h.modo = el.value; });
+  campo('#hcGiro', (h, el) => { const g = ((Math.round(+el.value || 0) % 360) + 540) % 360 - 180; if (h.forma === 'libre' && h.pts) { const C = centroHueco(h); h.pts = h.pts.map(p => rotarPunto(p, C, g - (h.giro || 0))); const cb = cajaDe(h.pts); h.x = cb.x0; h.y = cb.y0; h.ancho = cb.w; h.alto = cb.h; } h.giro = g; });
   campo('#hcActivo', (h, el) => { h.activo = el.checked; });
   campo('#hcMueble', (h, el) => { h.mueble.tipo = el.value; });
   campo('#hcFondo', (h, el) => { h.mueble.fondo = Math.max(0, +el.value || 0); });
@@ -165,6 +187,7 @@ function ponerCamposHueco() {
   $('#hcTit').textContent = 'H' + (UI.hueco + 1) + ' · ' + NOMBRE_FORMA[h.forma];
   $('#hcActivo').checked = h.activo !== false; $('#hcForma').value = h.forma;
   $('#hcX').value = Math.round(h.x * 10) / 10; $('#hcY').value = Math.round(h.y * 10) / 10; $('#hcAncho').value = Math.round(h.ancho * 10) / 10; $('#hcAlto').value = Math.round(h.alto * 10) / 10;
+  $('#hcGiro').value = h.giro || 0; $('#filaHcGiro').classList.toggle('oculto', h.modo === 'mueble');
   $('#hcRadio').value = h.radio; $('#filaHcRadio').classList.toggle('oculto', h.forma !== 'redondeado');
   [...$('#hcModo').options].forEach(o => { o.hidden = !fr && o.value === 'rebaje'; });
   if (!fr && h.modo === 'rebaje') h.modo = 'pasante';
@@ -179,6 +202,10 @@ function ponerCamposHueco() {
   $('#filaHcPuerta').classList.toggle('oculto', h.mueble.tipo !== 'armario'); $('#hcPuerta').value = h.mueble.puerta; $('#hcHolPuerta').value = h.mueble.holguraPuerta;
   $('#hcXTit').textContent = fr ? 'X desde la izquierda (mm)' : 'u: fondo (mm)'; $('#hcYTit').textContent = fr ? 'Y desde abajo (mm)' : 'v: altura (mm)';
 }
+function borrarHueco(k) {
+  if (k == null || k < 0 || !P.huecos[k]) return;
+  P.huecos.splice(k, 1); UI.hueco = Math.min(k, P.huecos.length - 1); cambio('Hueco H' + (k + 1) + ' borrado');
+}
 function refrescarHuecos() {
   const ok = ['pared', 'costillas', 'reticula'].includes(P.tipo);
   $('#secHuecos').classList.toggle('oculto', !ok); $('#bVistaHuecos').classList.toggle('oculto', !ok);
@@ -190,8 +217,9 @@ function refrescarHuecos() {
   P.huecos.forEach((h, k) => {
     const li = document.createElement('li'); li.className = k === UI.hueco ? 'sel' : '';
     const modo = h.modo === 'mueble' ? { balda: 'con balda', caja: 'con caja', armario: 'con armario' }[h.mueble.tipo] : h.modo;
-    li.innerHTML = `<b>H${k + 1}</b> ${NOMBRE_FORMA[h.forma]} · ${fmt(h.ancho)} × ${fmt(h.alto)} · ${modo}${h.activo === false ? ' <i>(apagado)</i>' : ''}`;
+    li.innerHTML = `<span><b>H${k + 1}</b> ${NOMBRE_FORMA[h.forma]} · ${fmt(h.ancho)} × ${fmt(h.alto)}${giraHueco(h) ? ' · ' + fmt(h.giro) + '°' : ''} · ${modo}${h.activo === false ? ' <i>(apagado)</i>' : ''}</span><button class="quitarHueco" title="Borrar este hueco">🗑</button>`;
     li.onclick = () => { UI.hueco = k; refrescarHuecos(); if (VH) VH.pintar(); };
+    li.querySelector('.quitarHueco').onclick = ev => { ev.stopPropagation(); borrarHueco(k); };
     ul.appendChild(li);
   });
   ponerCamposHueco();

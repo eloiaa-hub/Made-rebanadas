@@ -172,6 +172,7 @@
           <label class="fila"><span id="hcYTit">Y (mm)</span> <input type="number" id="hcY" step="5"></label>
           <label class="fila">Ancho (mm) <input type="number" id="hcAncho" min="10" step="5"></label>
           <label class="fila">Alto (mm) <input type="number" id="hcAlto" min="10" step="5"></label>
+          <label class="fila" id="filaHcGiro" title="Gira el hueco alrededor de su centro (también con el asa ↻ de la vista; Mayús: sin pasos de 15°)">Giro (°) <input type="number" id="hcGiro" min="-180" max="180" step="5"></label>
           <label class="fila" id="filaHcRadio">Radio de las esquinas (mm) <input type="number" id="hcRadio" min="0" step="5"></label>
           <div id="filaHcDesde">
             <label class="fila" title="El túnel empieza en esta posición a lo largo del mueble">Desde x (mm) <input type="number" id="hcDesde" step="10"></label>
@@ -191,7 +192,7 @@
           </div>
           <div class="col3">
             <button id="bHuecoCopia" title="Duplicar este hueco">⧉ Duplicar</button>
-            <button class="peligro" id="bHuecoQuitar" title="Quitar este hueco">🗑 Quitar</button>
+            <button class="peligro" id="bHuecoQuitar" title="Borrar este hueco (también con Supr en la vista ▦ Huecos)">🗑 Borrar</button>
           </div>
         </div>
       </div>
@@ -398,10 +399,10 @@
 <input type="file" id="fLetra" class="oculto" accept=".ttf,.otf,.woff,.woff2">
 <div id="aviso" class="aviso"></div>
 
-<script src="assets/js/three-bundle.js?v=202611140007"></script>
-<script src="assets/texturas/texturas.js?v=202611140007"></script>
-<script src="assets/ejemplos/ejemplos.js?v=202611140007"></script>
-<script src="assets/js/clipper.js?v=202611140007"></script>
-<script src="assets/js/app.js?v=202611140007"></script>
+<script src="assets/js/three-bundle.js?v=202611140012"></script>
+<script src="assets/texturas/texturas.js?v=202611140012"></script>
+<script src="assets/ejemplos/ejemplos.js?v=202611140012"></script>
+<script src="assets/js/clipper.js?v=202611140012"></script>
+<script src="assets/js/app.js?v=202611140012"></script>
 </body>
 </html>

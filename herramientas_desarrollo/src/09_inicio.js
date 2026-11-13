@@ -36,7 +36,8 @@ function iniciar() {
     if (enCampo || !$('#modal').classList.contains('oculto')) { if (ev.key === 'Escape') cerrarModal(); return; }
     if (ev.key === 'Escape') { UI.modo = 'normal'; UI.punto = -1; UI.varilla = -1; VP.pintar(); }
     else if (ev.key === 'Delete' || ev.key === 'Backspace') {
-      if (UI.varilla >= 0) { P.varillas.lista.splice(UI.varilla, 1); UI.varilla = -1; cambio('Varilla quitada'); }
+      if (UI.vistaHuecos && huecoSel()) borrarHueco(UI.hueco);
+      else if (UI.varilla >= 0) { P.varillas.lista.splice(UI.varilla, 1); UI.varilla = -1; cambio('Varilla quitada'); }
       else if (UI.punto >= 0) borrarPunto(UI.punto);
     }
     else if (ev.key.toLowerCase() === 'e') alternarEsquina(UI.punto);

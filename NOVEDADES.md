@@ -2,6 +2,7 @@
 
 ## v1.5
 
+- Huecos: se pueden **girar** (campo Giro o asa ↻ en la vista) y **borrar** desde la lista (🗑), con el botón 🗑 Borrar o con Supr.
 - Tableros: **1220 × 1220** es medio tablero (de 2440 × 1220) y **1220 × 610**, un cuarto (antes se llamaba «medio» por error).
 - **Huecos** en paneles de pared, costillas y retícula: rectángulo, redondeado, arco, círculo o forma libre, que se dibujan y se arrastran en la nueva vista **▦ Huecos**.
   - **Pasante** (se ve la pared o se abre un túnel), **rebaje** a una profundidad (pared) o **con mueble**: balda, caja (hornacina) o armario con puerta lisa o con las lamas delante (puerta escondida).

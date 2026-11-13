@@ -23,6 +23,9 @@ input[type=range]{accent-color:var(--acento)}
 .oculto2{display:none!important}
 .botonesHueco{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:6px 0}
 .botonesHueco button{padding:5px 4px;font-size:12px}
+#listaHuecos li{display:flex;align-items:center;justify-content:space-between;gap:6px}
+#listaHuecos .quitarHueco{padding:1px 6px;font-size:12px;border:none;background:none;cursor:pointer;opacity:.6}
+#listaHuecos .quitarHueco:hover{opacity:1}
 #bVistaHuecos.activo{background:var(--acento);color:#fff}
 
 .barra{height:46px;background:var(--barra);color:var(--barraTxt);display:flex;align-items:center;justify-content:space-between;padding:0 12px;gap:10px}
