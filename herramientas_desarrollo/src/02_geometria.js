@@ -247,8 +247,9 @@ function avisosDe(res, need) {
     if (sueltas.length) add('error', `Sueltas, sin ninguna varilla: ${cst(sueltas)}.`, sueltas[0]);
     const una = res.costillas.filter(c => c.ok && c.nVar === 1).map(c => c.i);
     if (una.length) add('atencion', `Con una sola varilla (pueden girar; hacen falta 2): ${cst(una)}.`, una[0]);
-    if (V.separadores && res.hueco > 0.5 && V.sepD <= V.diam + 1) add('error', `El separador (Ø ${V.sepD}) tiene que ser más ancho que la varilla (Ø ${V.diam}).`);
-    if (V.separadores && res.hueco > 0.5) {
+    if (V.tipo === 'madera' && res.hueco > 0.5) add('info', `Espiga de madera: las costillas se encolan a la espiga, sin separadores. Usa un taco de ${fmt(res.hueco, 1)} mm como plantilla para dejar el hueco entre costillas.`);
+    if (conSeparadores() && res.hueco > 0.5 && V.sepD <= V.diam + 1) add('error', `El separador (Ø ${V.sepD}) tiene que ser más ancho que la varilla (Ø ${V.diam}).`);
+    if (conSeparadores() && res.hueco > 0.5) {
       const r2 = V.sepD / 2, malos = [];
       res.costillas.forEach(c => { if (!c.ok) return; for (const k of c.agujeros) if (distBorde(c.poly, V.lista[k][0], V.lista[k][1]) < r2 - 0.01) { malos.push(c.i); break; } });
       if (malos.length) add('atencion', `El separador asoma por el borde en ${cstLa(malos)}.`, malos[0]);

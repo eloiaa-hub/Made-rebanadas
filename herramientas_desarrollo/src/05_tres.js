@@ -218,14 +218,23 @@ function construirVarillas3D() {
   if (P.tipo !== 'costillas') return;
   const e = grosor(), V = P.varillas, tv = VARILLA_TIPOS[V.tipo] || VARILLA_TIPOS.roscada;
   if (!G.matVar) {
-    G.matVar = new T.MeshStandardMaterial({ color: tv.hex, metalness: tv.metal ? .85 : 0, roughness: tv.metal ? .35 : .7 });
+    // rosca: textura de rayas (relieve) que se repite cada paso de rosca
+    const cv = document.createElement('canvas'); cv.width = 4; cv.height = 32; const cx = cv.getContext('2d');
+    const gr = cx.createLinearGradient(0, 0, 0, 32); gr.addColorStop(0, '#000'); gr.addColorStop(0.5, '#fff'); gr.addColorStop(1, '#000'); cx.fillStyle = gr; cx.fillRect(0, 0, 4, 32);
+    G.texRosca = new T.CanvasTexture(cv); G.texRosca.wrapS = G.texRosca.wrapT = T.RepeatWrapping;
+    G.matVar = new T.MeshStandardMaterial({ color: tv.hex });
     G.matMal = new T.MeshStandardMaterial({ color: '#d0453a', roughness: .5 });
-    G.matSep = new T.MeshStandardMaterial({ color: tv.metal ? '#9ea3a8' : '#c9a36d', metalness: tv.metal ? .8 : 0, roughness: .4 });
+    G.matSep = new T.MeshStandardMaterial({ color: '#9ea3a8' });
     G.matTu = new T.MeshStandardMaterial({ color: '#8d9399', metalness: .9, roughness: .3 });
+    G.matHueco = new T.MeshStandardMaterial({ color: '#202326', roughness: .9 });
   }
-  // los materiales se crean una vez: hay que ponerles el color y el brillo del tipo de varilla cada vez
-  G.matVar.color.set(tv.hex); G.matVar.metalness = tv.metal ? .85 : 0; G.matVar.roughness = tv.metal ? .35 : .7;
+  // los materiales se crean una vez: color, brillo y rosca según el tipo, cada vez
+  const rosca = V.tipo === 'roscada', tubo = V.tipo === 'tubo';
+  G.matVar.color.set(tv.hex); G.matVar.metalness = tv.metal ? (tubo ? .95 : .7) : 0; G.matVar.roughness = tubo ? .16 : rosca ? .5 : .7;
+  G.matVar.bumpMap = rosca ? G.texRosca : null; G.matVar.bumpScale = rosca ? 1.5 : 0; G.matVar.needsUpdate = true;
   G.matSep.color.set(tv.metal ? '#9ea3a8' : '#c9a36d'); G.matSep.metalness = tv.metal ? .8 : 0; G.matSep.roughness = tv.metal ? .4 : .75;
+  const paso = Math.max(0.8, V.diam * 0.125);   // paso de rosca métrica aproximado (M10: 1,25; M20: 2,5)
+  const conRosca = m => { if (!rosca) return m; const uv = m.geometry.attributes.uv, L = m.geometry.parameters.height || 1; for (let i = 0; i < uv.count; i++) uv.setY(i, uv.getY(i) * L / paso); uv.needsUpdate = true; return m; };
   const add = m => { m.userData.var = true; G.modelo.add(m); G.varillas.push(m); };
   R.varillas.forEach(rv => {
     if (!rv.usada) return;
@@ -233,18 +242,33 @@ function construirVarillas3D() {
     for (let i = rv.a; i <= rv.b; i++) pts.push(puntoMarco(marcoExpl(R.costillas[i].x), rv.u, rv.v));
     const dirIni = ejeGrosor(marcoExpl(R.costillas[rv.a].x)), dirFin = ejeGrosor(marcoExpl(R.costillas[rv.b].x));
     const sg = pts.length > 1 ? Math.sign((pts[1][0] - pts[0][0]) * dirIni[0] + (pts[1][2] - pts[0][2]) * dirIni[2]) || 1 : 1;
-    const ext = e / 2 + V.sobra, ini = pts[0].map((v, k) => v - sg * dirIni[k] * ext), fin = pts[pts.length - 1].map((v, k) => v + sg * dirFin[k] * ext);
+    const ext = e / 2 + (tubo ? 0 : V.sobra), ini = pts[0].map((v, k) => v - sg * dirIni[k] * ext), fin = pts[pts.length - 1].map((v, k) => v + sg * dirFin[k] * ext);
     const mat = rv.fallan.length ? G.matMal : G.matVar;
     if (disposicion() === 'curva' && pts.length > 2) {
       const curva = new T.CatmullRomCurve3([ini, ...pts, fin].map(V3));
       const m = new T.Mesh(new T.TubeGeometry(curva, pts.length * 6, V.diam / 2, 12), mat); m.castShadow = true; add(m);
-    } else add(cilindroEntre(ini, fin, V.diam / 2, mat, 20));
-    if (V.tipo !== 'madera') {
-      const tu = (p, d) => add(cilindroEntre(p.map((v, k) => v - d[k] * (V.diam * 0.4)), p.map((v, k) => v + d[k] * (V.diam * 0.4)), V.diam * 0.95, G.matTu, 6));
-      tu(pts[0].map((v, k) => v - sg * dirIni[k] * (e / 2 + V.diam * 0.45)), dirIni);
-      tu(pts[pts.length - 1].map((v, k) => v + sg * dirFin[k] * (e / 2 + V.diam * 0.45)), dirFin);
+    } else add(conRosca(cilindroEntre(ini, fin, V.diam / 2, mat, 20)));
+    if (rosca) {
+      const pieza = (p, d, sg2) => {
+        const fuera = k => p.map((v, j) => v + sg2 * d[j] * k);
+        add(cilindroEntre(fuera(0), fuera(V.diam * 0.16), V.diam * 1.05, G.matTu, 24));                      // arandela
+        add(cilindroEntre(fuera(V.diam * 0.16), fuera(V.diam * 0.96), V.diam * 0.95, G.matTu, 6));          // tuerca hexagonal
+      };
+      pieza(pts[0].map((v, k) => v - sg * dirIni[k] * e / 2), dirIni, -sg);
+      pieza(pts[pts.length - 1].map((v, k) => v + sg * dirFin[k] * e / 2), dirFin, sg);
+    } else if (tubo) {
+      // tapa roscada redonda y abombada (embellecedor) pegada a la costilla; el tubo no sobresale
+      const tapa = (p, d, sg2) => {
+        const fuera = k => p.map((v, j) => v + sg2 * d[j] * k);
+        add(cilindroEntre(fuera(0), fuera(V.diam * 0.12), V.diam * 0.85, G.matVar, 32));
+        const dome = new T.Mesh(new T.SphereGeometry(V.diam * 0.85, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2), G.matVar);
+        dome.scale.set(1, 0.35, 1); dome.position.set(...fuera(V.diam * 0.12));
+        dome.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), new T.Vector3(...d.map(x => x * sg2)).normalize()); dome.castShadow = true; add(dome);
+      };
+      tapa(pts[0].map((v, k) => v - sg * dirIni[k] * e / 2), dirIni, -sg);
+      tapa(pts[pts.length - 1].map((v, k) => v + sg * dirFin[k] * e / 2), dirFin, sg);
     }
-    if (V.separadores && R.hueco > 0.5) for (let i = 0; i + 1 < pts.length; i++) {
+    if (conSeparadores() && R.hueco > 0.5) for (let i = 0; i + 1 < pts.length; i++) {
       if (!rv.cabe[rv.a + i] || !rv.cabe[rv.a + i + 1]) continue;
       const a = V3(pts[i]), b = V3(pts[i + 1]), d = b.clone().sub(a), L = d.length(); if (L <= e + 0.5) continue;
       d.normalize();

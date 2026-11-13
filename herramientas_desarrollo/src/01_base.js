@@ -41,6 +41,8 @@ function cargarRecurso(k) {
   });
   return cargandoRecurso[k];
 }
+// con espiga de madera no hay separadores: las costillas se encolan a la espiga (mismo diámetro en todo el largo)
+const conSeparadores = () => !!P.varillas.separadores && P.varillas.tipo !== 'madera';
 function descargar(nombre, contenido, tipo) {
   const blob = contenido instanceof Blob ? contenido : new Blob([contenido], { type: tipo || 'text/plain' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre;

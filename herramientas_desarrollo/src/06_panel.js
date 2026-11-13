@@ -90,12 +90,12 @@ function iniciarPanel() {
   enlazar('#cColor', () => { P.costillas.color = $('#cColor').value; cambio(); });
   // varillas
   const V = () => P.varillas;
-  enlazar('#vTipo', () => { V().tipo = $('#vTipo').value; cambio(); });
+  enlazar('#vTipo', () => { V().tipo = $('#vTipo').value; $('#filaSepD').classList.toggle('oculto', !conSeparadores()); $('#vSep').closest('label').classList.toggle('oculto', V().tipo === 'madera'); cambio(); });
   enlazar('#vDiam', () => { V().diam = +$('#vDiam').value; if (V().sepD <= V().diam + 4) { V().sepD = V().diam + 12; $('#vSepD').value = V().sepD; } cambio('Varilla Ø ' + V().diam); });
   enlazar('#vHolgura', () => { V().holgura = clamp(+$('#vHolgura').value || 0, 0, 5); cambio(); });
   enlazar('#vMargen', () => { V().margen = clamp(+$('#vMargen').value || 0, 0, 200); cambio(); });
   enlazar('#vTramo', () => { V().tramo = $('#vTramo').value; cambio(); });
-  enlazar('#vSep', () => { V().separadores = $('#vSep').checked; $('#filaSepD').classList.toggle('oculto', !V().separadores); cambio(); });
+  enlazar('#vSep', () => { V().separadores = $('#vSep').checked; $('#filaSepD').classList.toggle('oculto', !conSeparadores()); cambio(); });
   enlazar('#vSepD', () => { V().sepD = clamp(+$('#vSepD').value || 20, 4, 120); cambio(); });
   enlazar('#vSobra', () => { V().sobra = clamp(+$('#vSobra').value || 0, 0, 200); cambio(); });
   enlazar('#vAutoN', () => { V().autoN = clamp(Math.round(+$('#vAutoN').value || 3), 1, 8); });
@@ -359,7 +359,7 @@ function ponerControles() {
   $('#cMaterial').value = C.material; $('#cColor').value = C.color; $('#filaColor').classList.toggle('oculto', !MATERIALES[C.material].color);
   $('#vTipo').value = V.tipo; $('#vDiam').value = String(V.diam); $('#vHolgura').value = V.holgura; $('#vMargen').value = V.margen;
   $('#vTramo').value = V.tramo; $('#vSep').checked = V.separadores; $('#vSepD').value = V.sepD; $('#vSobra').value = V.sobra; $('#vAutoN').value = V.autoN;
-  $('#filaSepD').classList.toggle('oculto', !V.separadores);
+  $('#filaSepD').classList.toggle('oculto', !conSeparadores()); $('#vSep').closest('label').classList.toggle('oculto', V.tipo === 'madera');
   $('#kInterp').value = P.interp;
   $('#sTipo').value = P.tipo; const Rt = P.reticula; $('#rNum').value = Rt.num; $('#rMargen').value = Rt.margen; $('#rVuelo').value = Rt.vuelo; $('#rHolgura').value = Rt.holgura; $('#rArriba').value = Rt.xArriba !== false ? '1' : '0';
   const Pl = P.planta; $('#plForma').value = Pl.forma; $('#plRadio').value = Pl.radio; $('#plSentido').value = String(Pl.sentido === -1 ? -1 : 1); $('#plAmp').value = Pl.amplitud; $('#plOndas').value = Pl.ondas;

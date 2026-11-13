@@ -269,9 +269,9 @@ function exportarSVG() { descargar(nombreArchivo(P.nombre) + '_costillas' + sufi
 function calcularCompraFab() { // material con las medidas de fabricación (maqueta o real)
   const V = P.varillas, k = escalaFab(), f = fabActual(), col = colocarEnTableros(f), eF = grosorFab();
   const usadas = P.tipo === 'costillas' ? R.varillas.filter(v => v.usada) : [];
-  const sobra = enMaqueta() ? Math.max(2, V.sobra * k) : V.sobra, seps = [];
+  const sobra = enMaqueta() ? Math.max(2, V.sobra * k) : V.tipo === 'tubo' ? 0 : V.sobra, seps = [];   // el tubo va enrasado con las tapas
   const varillas = usadas.map(v => {
-    if (V.separadores) v.dists.forEach((d, i) => { const L = d * k - eF; if (L > 0.5 && v.cabe[v.a + i] && v.cabe[v.a + i + 1]) seps.push(L); });
+    if (conSeparadores()) v.dists.forEach((d, i) => { const L = d * k - eF; if (L > 0.5 && v.cabe[v.a + i] && v.cabe[v.a + i + 1]) seps.push(L); });
     return { k: v.k, largo: v.dists.reduce((a, d) => a + d, 0) * k + eF + 2 * sobra };
   });
   const sepF = (P.tipo === 'radial' ? 0 : R.sep * k);
@@ -314,7 +314,7 @@ function listaCompra() {
     const txt = Math.abs(cm.sepMax - cm.sepMin) < 0.2 ? `${cm.nSep} piezas de ${fmt(cm.sepMin, 1)} mm (${fmt(cm.seps.reduce((a, b) => a + b, 0))} mm en total)` : `${cm.nSep} piezas de ${fmt(cm.sepMin, 1)} a ${fmt(cm.sepMax, 1)} mm (cada largo en el plano; ${fmt(cm.seps.reduce((a, b) => a + b, 0))} mm en total)`;
     L.push([maq ? 'Separadores (tubito, pajita o arandela de cartón)' : `${tv.sep} Ø ${V.sepD} mm (agujero interior > ${V.diam} mm)`, txt]);
   }
-  if (cm.nTuercas) L.push([`Tuercas M${V.diam} (mejor ciegas) y arandelas`, `${cm.nTuercas} + ${cm.nTuercas}`]);
+  if (cm.nTuercas) L.push(V.tipo === 'tubo' ? [`Tapas roscadas para tubo Ø ${V.diam} (embellecedor + tornillo)`, `${cm.nTuercas}`] : [`Tuercas M${V.diam} (mejor ciegas) y arandelas`, `${cm.nTuercas} + ${cm.nTuercas}`]);
   L.push([maq ? 'Agujeros' : 'Broca para los agujeros', `Ø ${fmt(2 * radioFab(), maq ? 2 : 1)} mm`]);
   return L;
 }

@@ -41,6 +41,8 @@ function cargarRecurso(k) {
   });
   return cargandoRecurso[k];
 }
+// con espiga de madera no hay separadores: las costillas se encolan a la espiga (mismo diámetro en todo el largo)
+const conSeparadores = () => !!P.varillas.separadores && P.varillas.tipo !== 'madera';
 function descargar(nombre, contenido, tipo) {
   const blob = contenido instanceof Blob ? contenido : new Blob([contenido], { type: tipo || 'text/plain' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre;
@@ -354,8 +356,9 @@ function avisosDe(res, need) {
     if (sueltas.length) add('error', `Sueltas, sin ninguna varilla: ${cst(sueltas)}.`, sueltas[0]);
     const una = res.costillas.filter(c => c.ok && c.nVar === 1).map(c => c.i);
     if (una.length) add('atencion', `Con una sola varilla (pueden girar; hacen falta 2): ${cst(una)}.`, una[0]);
-    if (V.separadores && res.hueco > 0.5 && V.sepD <= V.diam + 1) add('error', `El separador (Ø ${V.sepD}) tiene que ser más ancho que la varilla (Ø ${V.diam}).`);
-    if (V.separadores && res.hueco > 0.5) {
+    if (V.tipo === 'madera' && res.hueco > 0.5) add('info', `Espiga de madera: las costillas se encolan a la espiga, sin separadores. Usa un taco de ${fmt(res.hueco, 1)} mm como plantilla para dejar el hueco entre costillas.`);
+    if (conSeparadores() && res.hueco > 0.5 && V.sepD <= V.diam + 1) add('error', `El separador (Ø ${V.sepD}) tiene que ser más ancho que la varilla (Ø ${V.diam}).`);
+    if (conSeparadores() && res.hueco > 0.5) {
       const r2 = V.sepD / 2, malos = [];
       res.costillas.forEach(c => { if (!c.ok) return; for (const k of c.agujeros) if (distBorde(c.poly, V.lista[k][0], V.lista[k][1]) < r2 - 0.01) { malos.push(c.i); break; } });
       if (malos.length) add('atencion', `El separador asoma por el borde en ${cstLa(malos)}.`, malos[0]);
@@ -2271,14 +2274,23 @@ function construirVarillas3D() {
   if (P.tipo !== 'costillas') return;
   const e = grosor(), V = P.varillas, tv = VARILLA_TIPOS[V.tipo] || VARILLA_TIPOS.roscada;
   if (!G.matVar) {
-    G.matVar = new T.MeshStandardMaterial({ color: tv.hex, metalness: tv.metal ? .85 : 0, roughness: tv.metal ? .35 : .7 });
+    // rosca: textura de rayas (relieve) que se repite cada paso de rosca
+    const cv = document.createElement('canvas'); cv.width = 4; cv.height = 32; const cx = cv.getContext('2d');
+    const gr = cx.createLinearGradient(0, 0, 0, 32); gr.addColorStop(0, '#000'); gr.addColorStop(0.5, '#fff'); gr.addColorStop(1, '#000'); cx.fillStyle = gr; cx.fillRect(0, 0, 4, 32);
+    G.texRosca = new T.CanvasTexture(cv); G.texRosca.wrapS = G.texRosca.wrapT = T.RepeatWrapping;
+    G.matVar = new T.MeshStandardMaterial({ color: tv.hex });
     G.matMal = new T.MeshStandardMaterial({ color: '#d0453a', roughness: .5 });
-    G.matSep = new T.MeshStandardMaterial({ color: tv.metal ? '#9ea3a8' : '#c9a36d', metalness: tv.metal ? .8 : 0, roughness: .4 });
+    G.matSep = new T.MeshStandardMaterial({ color: '#9ea3a8' });
     G.matTu = new T.MeshStandardMaterial({ color: '#8d9399', metalness: .9, roughness: .3 });
+    G.matHueco = new T.MeshStandardMaterial({ color: '#202326', roughness: .9 });
   }
-  // los materiales se crean una vez: hay que ponerles el color y el brillo del tipo de varilla cada vez
-  G.matVar.color.set(tv.hex); G.matVar.metalness = tv.metal ? .85 : 0; G.matVar.roughness = tv.metal ? .35 : .7;
+  // los materiales se crean una vez: color, brillo y rosca según el tipo, cada vez
+  const rosca = V.tipo === 'roscada', tubo = V.tipo === 'tubo';
+  G.matVar.color.set(tv.hex); G.matVar.metalness = tv.metal ? (tubo ? .95 : .7) : 0; G.matVar.roughness = tubo ? .16 : rosca ? .5 : .7;
+  G.matVar.bumpMap = rosca ? G.texRosca : null; G.matVar.bumpScale = rosca ? 1.5 : 0; G.matVar.needsUpdate = true;
   G.matSep.color.set(tv.metal ? '#9ea3a8' : '#c9a36d'); G.matSep.metalness = tv.metal ? .8 : 0; G.matSep.roughness = tv.metal ? .4 : .75;
+  const paso = Math.max(0.8, V.diam * 0.125);   // paso de rosca métrica aproximado (M10: 1,25; M20: 2,5)
+  const conRosca = m => { if (!rosca) return m; const uv = m.geometry.attributes.uv, L = m.geometry.parameters.height || 1; for (let i = 0; i < uv.count; i++) uv.setY(i, uv.getY(i) * L / paso); uv.needsUpdate = true; return m; };
   const add = m => { m.userData.var = true; G.modelo.add(m); G.varillas.push(m); };
   R.varillas.forEach(rv => {
     if (!rv.usada) return;
@@ -2286,18 +2298,33 @@ function construirVarillas3D() {
     for (let i = rv.a; i <= rv.b; i++) pts.push(puntoMarco(marcoExpl(R.costillas[i].x), rv.u, rv.v));
     const dirIni = ejeGrosor(marcoExpl(R.costillas[rv.a].x)), dirFin = ejeGrosor(marcoExpl(R.costillas[rv.b].x));
     const sg = pts.length > 1 ? Math.sign((pts[1][0] - pts[0][0]) * dirIni[0] + (pts[1][2] - pts[0][2]) * dirIni[2]) || 1 : 1;
-    const ext = e / 2 + V.sobra, ini = pts[0].map((v, k) => v - sg * dirIni[k] * ext), fin = pts[pts.length - 1].map((v, k) => v + sg * dirFin[k] * ext);
+    const ext = e / 2 + (tubo ? 0 : V.sobra), ini = pts[0].map((v, k) => v - sg * dirIni[k] * ext), fin = pts[pts.length - 1].map((v, k) => v + sg * dirFin[k] * ext);
     const mat = rv.fallan.length ? G.matMal : G.matVar;
     if (disposicion() === 'curva' && pts.length > 2) {
       const curva = new T.CatmullRomCurve3([ini, ...pts, fin].map(V3));
       const m = new T.Mesh(new T.TubeGeometry(curva, pts.length * 6, V.diam / 2, 12), mat); m.castShadow = true; add(m);
-    } else add(cilindroEntre(ini, fin, V.diam / 2, mat, 20));
-    if (V.tipo !== 'madera') {
-      const tu = (p, d) => add(cilindroEntre(p.map((v, k) => v - d[k] * (V.diam * 0.4)), p.map((v, k) => v + d[k] * (V.diam * 0.4)), V.diam * 0.95, G.matTu, 6));
-      tu(pts[0].map((v, k) => v - sg * dirIni[k] * (e / 2 + V.diam * 0.45)), dirIni);
-      tu(pts[pts.length - 1].map((v, k) => v + sg * dirFin[k] * (e / 2 + V.diam * 0.45)), dirFin);
+    } else add(conRosca(cilindroEntre(ini, fin, V.diam / 2, mat, 20)));
+    if (rosca) {
+      const pieza = (p, d, sg2) => {
+        const fuera = k => p.map((v, j) => v + sg2 * d[j] * k);
+        add(cilindroEntre(fuera(0), fuera(V.diam * 0.16), V.diam * 1.05, G.matTu, 24));                      // arandela
+        add(cilindroEntre(fuera(V.diam * 0.16), fuera(V.diam * 0.96), V.diam * 0.95, G.matTu, 6));          // tuerca hexagonal
+      };
+      pieza(pts[0].map((v, k) => v - sg * dirIni[k] * e / 2), dirIni, -sg);
+      pieza(pts[pts.length - 1].map((v, k) => v + sg * dirFin[k] * e / 2), dirFin, sg);
+    } else if (tubo) {
+      // tapa roscada redonda y abombada (embellecedor) pegada a la costilla; el tubo no sobresale
+      const tapa = (p, d, sg2) => {
+        const fuera = k => p.map((v, j) => v + sg2 * d[j] * k);
+        add(cilindroEntre(fuera(0), fuera(V.diam * 0.12), V.diam * 0.85, G.matVar, 32));
+        const dome = new T.Mesh(new T.SphereGeometry(V.diam * 0.85, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2), G.matVar);
+        dome.scale.set(1, 0.35, 1); dome.position.set(...fuera(V.diam * 0.12));
+        dome.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), new T.Vector3(...d.map(x => x * sg2)).normalize()); dome.castShadow = true; add(dome);
+      };
+      tapa(pts[0].map((v, k) => v - sg * dirIni[k] * e / 2), dirIni, -sg);
+      tapa(pts[pts.length - 1].map((v, k) => v + sg * dirFin[k] * e / 2), dirFin, sg);
     }
-    if (V.separadores && R.hueco > 0.5) for (let i = 0; i + 1 < pts.length; i++) {
+    if (conSeparadores() && R.hueco > 0.5) for (let i = 0; i + 1 < pts.length; i++) {
       if (!rv.cabe[rv.a + i] || !rv.cabe[rv.a + i + 1]) continue;
       const a = V3(pts[i]), b = V3(pts[i + 1]), d = b.clone().sub(a), L = d.length(); if (L <= e + 0.5) continue;
       d.normalize();
@@ -2476,12 +2503,12 @@ function iniciarPanel() {
   enlazar('#cColor', () => { P.costillas.color = $('#cColor').value; cambio(); });
   // varillas
   const V = () => P.varillas;
-  enlazar('#vTipo', () => { V().tipo = $('#vTipo').value; cambio(); });
+  enlazar('#vTipo', () => { V().tipo = $('#vTipo').value; $('#filaSepD').classList.toggle('oculto', !conSeparadores()); $('#vSep').closest('label').classList.toggle('oculto', V().tipo === 'madera'); cambio(); });
   enlazar('#vDiam', () => { V().diam = +$('#vDiam').value; if (V().sepD <= V().diam + 4) { V().sepD = V().diam + 12; $('#vSepD').value = V().sepD; } cambio('Varilla Ø ' + V().diam); });
   enlazar('#vHolgura', () => { V().holgura = clamp(+$('#vHolgura').value || 0, 0, 5); cambio(); });
   enlazar('#vMargen', () => { V().margen = clamp(+$('#vMargen').value || 0, 0, 200); cambio(); });
   enlazar('#vTramo', () => { V().tramo = $('#vTramo').value; cambio(); });
-  enlazar('#vSep', () => { V().separadores = $('#vSep').checked; $('#filaSepD').classList.toggle('oculto', !V().separadores); cambio(); });
+  enlazar('#vSep', () => { V().separadores = $('#vSep').checked; $('#filaSepD').classList.toggle('oculto', !conSeparadores()); cambio(); });
   enlazar('#vSepD', () => { V().sepD = clamp(+$('#vSepD').value || 20, 4, 120); cambio(); });
   enlazar('#vSobra', () => { V().sobra = clamp(+$('#vSobra').value || 0, 0, 200); cambio(); });
   enlazar('#vAutoN', () => { V().autoN = clamp(Math.round(+$('#vAutoN').value || 3), 1, 8); });
@@ -2745,7 +2772,7 @@ function ponerControles() {
   $('#cMaterial').value = C.material; $('#cColor').value = C.color; $('#filaColor').classList.toggle('oculto', !MATERIALES[C.material].color);
   $('#vTipo').value = V.tipo; $('#vDiam').value = String(V.diam); $('#vHolgura').value = V.holgura; $('#vMargen').value = V.margen;
   $('#vTramo').value = V.tramo; $('#vSep').checked = V.separadores; $('#vSepD').value = V.sepD; $('#vSobra').value = V.sobra; $('#vAutoN').value = V.autoN;
-  $('#filaSepD').classList.toggle('oculto', !V.separadores);
+  $('#filaSepD').classList.toggle('oculto', !conSeparadores()); $('#vSep').closest('label').classList.toggle('oculto', V.tipo === 'madera');
   $('#kInterp').value = P.interp;
   $('#sTipo').value = P.tipo; const Rt = P.reticula; $('#rNum').value = Rt.num; $('#rMargen').value = Rt.margen; $('#rVuelo').value = Rt.vuelo; $('#rHolgura').value = Rt.holgura; $('#rArriba').value = Rt.xArriba !== false ? '1' : '0';
   const Pl = P.planta; $('#plForma').value = Pl.forma; $('#plRadio').value = Pl.radio; $('#plSentido').value = String(Pl.sentido === -1 ? -1 : 1); $('#plAmp').value = Pl.amplitud; $('#plOndas').value = Pl.ondas;
@@ -3129,9 +3156,9 @@ function exportarSVG() { descargar(nombreArchivo(P.nombre) + '_costillas' + sufi
 function calcularCompraFab() { // material con las medidas de fabricación (maqueta o real)
   const V = P.varillas, k = escalaFab(), f = fabActual(), col = colocarEnTableros(f), eF = grosorFab();
   const usadas = P.tipo === 'costillas' ? R.varillas.filter(v => v.usada) : [];
-  const sobra = enMaqueta() ? Math.max(2, V.sobra * k) : V.sobra, seps = [];
+  const sobra = enMaqueta() ? Math.max(2, V.sobra * k) : V.tipo === 'tubo' ? 0 : V.sobra, seps = [];   // el tubo va enrasado con las tapas
   const varillas = usadas.map(v => {
-    if (V.separadores) v.dists.forEach((d, i) => { const L = d * k - eF; if (L > 0.5 && v.cabe[v.a + i] && v.cabe[v.a + i + 1]) seps.push(L); });
+    if (conSeparadores()) v.dists.forEach((d, i) => { const L = d * k - eF; if (L > 0.5 && v.cabe[v.a + i] && v.cabe[v.a + i + 1]) seps.push(L); });
     return { k: v.k, largo: v.dists.reduce((a, d) => a + d, 0) * k + eF + 2 * sobra };
   });
   const sepF = (P.tipo === 'radial' ? 0 : R.sep * k);
@@ -3174,7 +3201,7 @@ function listaCompra() {
     const txt = Math.abs(cm.sepMax - cm.sepMin) < 0.2 ? `${cm.nSep} piezas de ${fmt(cm.sepMin, 1)} mm (${fmt(cm.seps.reduce((a, b) => a + b, 0))} mm en total)` : `${cm.nSep} piezas de ${fmt(cm.sepMin, 1)} a ${fmt(cm.sepMax, 1)} mm (cada largo en el plano; ${fmt(cm.seps.reduce((a, b) => a + b, 0))} mm en total)`;
     L.push([maq ? 'Separadores (tubito, pajita o arandela de cartón)' : `${tv.sep} Ø ${V.sepD} mm (agujero interior > ${V.diam} mm)`, txt]);
   }
-  if (cm.nTuercas) L.push([`Tuercas M${V.diam} (mejor ciegas) y arandelas`, `${cm.nTuercas} + ${cm.nTuercas}`]);
+  if (cm.nTuercas) L.push(V.tipo === 'tubo' ? [`Tapas roscadas para tubo Ø ${V.diam} (embellecedor + tornillo)`, `${cm.nTuercas}`] : [`Tuercas M${V.diam} (mejor ciegas) y arandelas`, `${cm.nTuercas} + ${cm.nTuercas}`]);
   L.push([maq ? 'Agujeros' : 'Broca para los agujeros', `Ø ${fmt(2 * radioFab(), maq ? 2 : 1)} mm`]);
   return L;
 }
@@ -3531,9 +3558,9 @@ function planoPDF() {
     `Corta las ${R.n} costillas en ${MATERIALES[P.costillas.material].nombre.toLowerCase()} de ${fmt(grosor(), 1)} mm (DXF en «Fabricar»: capas CORTE, TALADROS y GRABADO). Taladra o vacía los agujeros de Ø ${fmt(2 * radioFab(), 1)} mm antes que el contorno.`,
     'Lija los cantos y las caras de cada costilla y comprueba que lleva su número (grabado o a lápiz en una cara que no se vea).',
     `Corta ${cm.varillas.length} varillas a su largo (tabla de la hoja 2).` + (cm.nSep ? ` Corta ${cm.nSep} separadores de ${fmt(cm.hueco, 1)} mm, todos iguales.` : ''),
-    V.tipo === 'madera' ? 'Pon la costilla 1 tumbada sobre el banco y mete las varillas en sus agujeros.' : 'Pon una tuerca y una arandela en un extremo de cada varilla y mete las varillas en la costilla 1, tumbada sobre el banco.',
-    `Ensarta un separador en cada varilla y después la costilla siguiente. Repite en orden hasta la costilla ${R.n}.`,
-    V.tipo === 'madera' ? 'Encola los extremos de las varillas en la primera y la última costilla, o fíjalos con un pasador.' : 'Pon arandela y tuerca en el otro extremo y aprieta poco a poco y por igual, alternando las varillas, hasta que no quede holgura.',
+    V.tipo === 'madera' ? 'Pon la costilla 1 tumbada sobre el banco, pon cola en sus agujeros y mete las espigas.' : V.tipo === 'tubo' ? 'Pon la tapa roscada (embellecedor y tornillo) en un extremo de cada tubo y mete los tubos en la costilla 1, tumbada sobre el banco.' : 'Pon una tuerca y una arandela en un extremo de cada varilla y mete las varillas en la costilla 1, tumbada sobre el banco.',
+    V.tipo === 'madera' ? `Encola y mete la costilla siguiente, con un taco de ${fmt(cm.hueco, 1)} mm entre costillas para dejar el hueco igual. Repite en orden hasta la costilla ${R.n} y deja secar.` : `Ensarta un separador en cada varilla y después la costilla siguiente. Repite en orden hasta la costilla ${R.n}.`,
+    V.tipo === 'madera' ? 'Enrasa o redondea los extremos de las espigas y lija.' : V.tipo === 'tubo' ? 'Pon la otra tapa roscada en cada tubo y aprieta poco a poco y por igual, alternando los tubos, hasta que no quede holgura.' : 'Pon arandela y tuerca en el otro extremo y aprieta poco a poco y por igual, alternando las varillas, hasta que no quede holgura.',
     'Pon el mueble de pie sobre una superficie plana y comprueba que apoyan todas las costillas que deben llegar al suelo.',
     'Acabado: aceite, cera o barniz. Si va al exterior, usa varilla inoxidable y un acabado para exterior.',
   ];
@@ -3623,7 +3650,7 @@ function hojaCurva(D, cabecera, tabla, o) {
   });
   const fy = tabla(M, M + 126, W - 2 * M, filas, { c1: 80 });
   // largos de los separadores, costilla a costilla
-  if (P.varillas.separadores) {
+  if (conSeparadores()) {
     const us = R.varillas.filter(v => v.usada);
     let txt = 'Separadores (entre la costilla n y la n+1, en mm): ';
     us.forEach(v => { txt += `V${v.k + 1}: ` + v.dists.map((d, i) => `${v.a + i + 1}-${v.a + i + 2} ${fmt(d * k - grosorFab(), 1)}`).join(', ') + '. '; });

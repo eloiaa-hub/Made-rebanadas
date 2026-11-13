@@ -85,7 +85,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 
 <h2 id="que">1. Qué es</h2>
 <p><b>Made-rebanadas</b> sirve para diseñar muebles de formas orgánicas (bancos ondulados, tumbonas, poufs, mesas, estanterías) hechos con <b>rebanadas</b>: una serie de piezas planas de tablero, llamadas <b>costillas</b>, puestas una detrás de otra con un pequeño hueco entre ellas. Cada costilla es una <b>sección</b> de la forma 3D, como si cortaras el volumen del mueble en lonchas.</p>
-<p>Hay cuatro tipos de mueble. En el de <b>costillas con varillas</b>, las costillas se unen con <b>varillas pasantes</b> (varilla roscada, redondo de madera o tubo) y unos <b>separadores</b> que mantienen el hueco. En la <b>retícula entrelazada</b>, unas costillas y unos largueros se cruzan y encajan con ranuras a media madera (sección 9). Las <b>radiales</b> (lámparas y columnas) van alrededor de un eje (sección 11) y los <b>paneles de pared</b> son lamas sobre rastreles (sección 12). Además, las costillas con varillas pueden seguir una <b>planta curva</b>, en arco o en S (sección 10). El programa calcula el contorno de cada pieza, comprueba que las varillas caben en todas, coloca las piezas en los tableros y prepara el <b>DXF</b> para cortarlas en la CNC.</p>
+<p>Hay cuatro tipos de mueble. En el de <b>costillas con varillas</b>, las costillas se unen con <b>varillas pasantes</b> (varilla roscada, tubo de acero o espiga de madera), con <b>separadores</b> que mantienen el hueco o, con la espiga, encoladas. En la <b>retícula entrelazada</b>, unas costillas y unos largueros se cruzan y encajan con ranuras a media madera (sección 9). Las <b>radiales</b> (lámparas y columnas) van alrededor de un eje (sección 11) y los <b>paneles de pared</b> son lamas sobre rastreles (sección 12). Además, las costillas con varillas pueden seguir una <b>planta curva</b>, en arco o en S (sección 10). El programa calcula el contorno de cada pieza, comprueba que las varillas caben en todas, coloca las piezas en los tableros y prepara el <b>DXF</b> para cortarlas en la CNC.</p>
 <p>Funciona en el navegador (Chrome, Edge o Firefox), con doble clic, sin instalar nada y sin conexión a internet.</p>
 
 <h2 id="abrir">2. Abrir el programa</h2>
@@ -185,15 +185,21 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <img src="img/varillas_panel.png" alt="Panel de varillas">
   <div>
     <ul>
-      <li><b>Tipo y diámetro</b>: varilla roscada métrica (M6 a M25), redondo de madera o tubo de acero.</li>
+      <li><b>Tipo y diámetro</b>: varilla roscada métrica (M6 a M25), espiga o redondo de madera, o tubo de acero (ver la tabla de abajo).</li>
       <li><b>Holgura del agujero</b>: cuánto más grande es el agujero que la varilla (0,5 mm: Ø 10 → broca de 10,5).</li>
       <li><b>Madera al borde</b>: lo mínimo que tiene que quedar entre el agujero y el borde de la costilla.</li>
       <li><b>Las varillas pasan por todas las costillas</b> o <b>solo donde caben</b> (para formas como el pouf, en las que las costillas de los extremos son muy pequeñas).</li>
-      <li><b>Separadores</b>: tubos entre costillas que mantienen el hueco; su Ø exterior.</li>
-      <li><b>Sobresale por extremo</b>: lo que sale la varilla para la arandela y la tuerca.</li>
+      <li><b>Separadores</b>: tubos entre costillas que mantienen el hueco; su Ø exterior. Con espiga de madera no hay separadores.</li>
+      <li><b>Sobresale por extremo</b>: lo que sale la varilla para la arandela y la tuerca (con tubo no cuenta: va enrasado con las tapas).</li>
     </ul>
   </div>
 </div>
+<table>
+  <tr><th>Tipo</th><th>Cómo se monta</th><th>En el 3D</th><th>Lista de compra</th></tr>
+  <tr><td><b>Varilla roscada</b></td><td>Separadores entre costillas; en cada extremo, arandela y tuerca (mejor ciega). Se aprieta y el mueble queda rígido. La más barata y fácil de ajustar.</td><td>Gris galvanizado con rosca, arandela y tuerca hexagonal.</td><td>Varillas, separadores, tuercas y arandelas.</td></tr>
+  <tr><td><b>Tubo de acero</b></td><td>Separadores entre costillas; en cada extremo, una tapa roscada (embellecedor con tornillo que rosca dentro del tubo). El tubo no sobresale. Queda más limpio que la varilla.</td><td>Acero brillante con tapas redondas abombadas.</td><td>Tubos, separadores y tapas roscadas.</td></tr>
+  <tr><td><b>Espiga de madera</b></td><td>Sin separadores: cada costilla se encola a la espiga, con un taco del ancho del hueco como plantilla. Todo madera; no se puede desmontar.</td><td>Espiga de madera del mismo diámetro en todo el largo.</td><td>Espigas (redondo de madera) y cola.</td></tr>
+</table>
 <p><b>✨ Auto</b> busca sitio para el número de varillas indicado: prueba miles de posiciones y se queda con las que caben en todas las costillas, lo más separadas posible (así el mueble no se retuerce). <b>＋ Varilla</b> añade una: después haz clic en el editor de perfil donde la quieras. Las varillas se arrastran en el editor y se borran con clic derecho o <kbd>Supr</kbd>.</p>
 <div class="caja">El círculo discontinuo alrededor de cada varilla es la <b>zona de seguridad</b> (agujero + madera al borde). Si una varilla se sale de alguna costilla, se pinta en <b>rojo</b> en el editor y en el 3D.</div>
 

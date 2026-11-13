@@ -7,7 +7,7 @@
 - **Letras propias** (.ttf, .otf, .woff): se guardan dentro del proyecto.
 - **Luz rasante** en la vista 3D, con su dirección.
 - Los modelos y las imágenes de ejemplo **solo se cargan cuando se usan**: el programa abre más rápido.
-- Con **espiga / redondo de madera**, la espiga y los separadores se ven de madera en el 3D (antes se quedaban de metal).
+- **Tres uniones distintas de verdad**: varilla roscada (rosca, arandela y tuerca hexagonal), tubo de acero (brillante, enrasado, con tapas roscadas abombadas) y espiga de madera (mismo diámetro en todo el largo, encolada, sin separadores). El 3D, la lista de compra, los avisos y los pasos del plano cambian con el tipo.
 - Al seleccionar una costilla que tiene perfil clave, se selecciona también ese perfil (y al revés): el editor de arriba y la costilla de abajo van a la par.
 - Las varillas van de la primera a la última costilla que existe.
 - **Origen de la forma** en los paneles de pared: plantilla, **texto en relieve** o **modelo 3D (STL / OBJ)**.
