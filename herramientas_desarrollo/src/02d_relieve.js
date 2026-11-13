@@ -249,12 +249,13 @@ function cargarImagenEjemplo(id, conMedidas) {
 
 /* ---------- convertir el relieve en perfiles clave (no se puede deshacer, salvo con ↶) ----------
    Una clave en cada lama (como mucho 60) y en cada una el mismo número de puntos, repartidos a lo largo de la lama. */
-function convertirRelieveEnPerfiles() {
+function convertirRelieveEnPerfiles(maxClaves = 60) {
   if (!relieveActivo()) return 0;
   const Rl = P.relieve, [W, H] = medidasPanel(), hor = Rl.orient === 'h', largo = hor ? H : W, largoV = hor ? W : H;
   const xs = (R && R.costillas && R.costillas.length ? R.costillas.map(c => c.x) : []).filter(x => x >= 0 && x <= largo);
   let pos = xs.length >= 2 ? xs : Array.from({ length: 13 }, (_, i) => largo * i / 12);
-  if (pos.length > 60) pos = Array.from({ length: 60 }, (_, i) => pos[Math.round(i * (pos.length - 1) / 59)]);
+  const mc = Math.max(2, Math.round(maxClaves));
+  if (pos.length > mc) pos = Array.from({ length: mc }, (_, i) => pos[Math.round(i * (pos.length - 1) / (mc - 1))]);
   if (pos[0] > 0.5) pos.unshift(0); if (pos[pos.length - 1] < largo - 0.5) pos.push(largo);
   const M = clamp(Math.round(largoV / 12), 24, 90);
   const claves = pos.map(x => {

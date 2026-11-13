@@ -8,6 +8,8 @@
 - **Luz rasante** en la vista 3D, con su dirección.
 - Los modelos y las imágenes de ejemplo **solo se cargan cuando se usan**: el programa abre más rápido.
 - **Tres uniones distintas de verdad**: varilla roscada (rosca, arandela y tuerca hexagonal), tubo de acero (brillante, enrasado, con tapas roscadas abombadas) y espiga de madera (mismo diámetro en todo el largo, encolada, sin separadores). El 3D, la lista de compra, los avisos y los pasos del plano cambian con el tipo.
+- **Convertir en perfiles editables** pregunta cuántos perfiles y cuántos puntos por perfil. Nuevo **✂ Simplificar puntos…** en Perfiles clave: quita puntos a la vez en todos los perfiles, primero los que menos cambian la forma.
+- Arreglado: tras convertir una figura no aparecía el apartado Perfiles clave.
 - Con una figura desde un modelo 3D, el editor de perfil ya no enseña los puntos de la plantilla de antes (no se usan y no se podían mover).
 - Al seleccionar una costilla que tiene perfil clave, se selecciona también ese perfil (y al revés): el editor de arriba y la costilla de abajo van a la par.
 - Las varillas van de la primera a la última costilla que existe.

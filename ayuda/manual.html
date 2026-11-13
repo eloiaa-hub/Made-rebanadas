@@ -388,12 +388,19 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 <div class="caja taller">Para cortar con fresa, las letras gruesas y redondeadas (tipo Arial Black o Impact) funcionan mucho mejor que las finas o con remates: los trazos finos dan lamas con entrantes que la fresa no puede hacer.</div>
 
 <h3>Convertir en perfiles editables</h3>
-<p>Con texto, modelo 3D o imagen la forma la calcula el programa y <b>no se pueden mover los puntos</b> de las lamas. Si quieres retocarla a mano (suavizar una zona, cambiar un trozo, añadir un perfil…), pulsa <b>✏ Convertir en perfiles editables…</b>, en el apartado Forma, justo debajo de «Origen de la forma» (solo aparece con texto, modelo 3D o imagen).</p>
+<p>Con texto, modelo 3D, imagen o figura la forma la calcula el programa y <b>no se pueden mover los puntos</b> de las lamas. Si quieres retocarla a mano (suavizar una zona, cambiar un trozo, añadir un perfil…), pulsa <b>✏ Convertir en perfiles editables…</b>, en el apartado Forma, justo debajo de «Origen de la forma» (solo aparece con texto, modelo 3D o imagen).</p>
 <ul>
-  <li>Se pone un <b>perfil clave en cada lama</b> (como mucho 60), con los puntos repartidos a lo largo de la lama. Las lamas salen iguales que antes.</li>
+  <li>Antes de convertir se elige:
+    <ul>
+      <li><b>Perfiles clave</b>: por defecto, uno en cada lama o costilla (como mucho 60), y así salen casi iguales que antes. Con menos perfiles es más fácil de editar, pero las piezas de en medio se calculan mezclando y cambian más.</li>
+      <li><b>Puntos por perfil</b>: con 12 a 24 suele bastar. Se quitan primero los puntos que menos cambian la forma.</li>
+    </ul>
+  </li>
   <li>La forma pasa a <b>Origen: Plantilla</b>, con la plantilla <b>Panel de pared libre</b>. Desde ahí se editan los puntos y los perfiles como en cualquier mueble: arrastrar, doble clic para añadir, Supr para borrar, añadir o quitar perfiles, copiar un perfil en todos…</li>
   <li>Sigue valiendo todo lo demás: lamas verticales u horizontales, rastreles, separación, grosor, fabricar y plano.</li>
 </ul>
+<p>Si después hay demasiados puntos, <b>✂ Simplificar puntos…</b> (en Perfiles clave) los quita a la vez en todos los perfiles, primero los que menos cambian la forma; las esquinas se quedan. Se puede deshacer con ↶. Si alguna varilla deja de caber, se recolocan solas.</p>
+<figure><img src="img/convertir_dlg.png" alt="Convertir en perfiles editables" style="max-width:380px"><figcaption>La ventana de convertir: cuántos perfiles y cuántos puntos.</figcaption></figure>
 <div class="caja aviso"><b>⚠ No se puede revertir.</b> Antes de convertir sale un aviso: después ya no se puede volver al texto, al modelo o a la imagen, ni cambiar su relieve, suavizado o medidas (solo con ↶ Deshacer antes de cerrar). Si quieres conservar el original, <b>guarda antes una copia</b> del proyecto.</div>
 <div class="dos">
   <figure><img src="img/convertir_3d.jpg" alt="Retrato convertido"><figcaption>El «Retrato» convertido: un perfil clave (azul) en cada lama.</figcaption></figure>

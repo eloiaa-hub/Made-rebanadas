@@ -218,13 +218,17 @@ function remuestrearLazo(poly, M) {
   }
   return out;
 }
-function convertirFiguraEnPerfiles() {
+function convertirFiguraEnPerfiles(maxClaves = 60) {
   if (!figuraActiva() || !R) return 0;
   let cs = R.costillas.filter(c => c.ok && c.poly.length >= 3);
-  if (cs.length > 60) cs = Array.from({ length: 60 }, (_, i) => cs[Math.round(i * (cs.length - 1) / 59)]);
+  const mc = Math.max(2, Math.round(maxClaves));
+  if (cs.length > mc) cs = Array.from({ length: mc }, (_, i) => cs[Math.round(i * (cs.length - 1) / (mc - 1))]);
   if (cs.length < 2) return 0;
   const M = 64;
-  P.claves = cs.map(c => ({ x: Math.round(c.x * 10) / 10, pts: remuestrearLazo(c.poly, M) }));
+  // el mueble pasa a ir de la primera a la última costilla que existía (las de los extremos que se quitaron no vuelven)
+  const e = grosor(), x0 = Math.max(0, cs[0].x - e / 2), x1 = cs[cs.length - 1].x + e / 2;
+  P.claves = cs.map(c => ({ x: Math.round((c.x - x0) * 10) / 10, pts: remuestrearLazo(c.poly, M) }));
+  P.largo = Math.round((x1 - x0) * 10) / 10;
   P.esquinas = new Array(M).fill(false);
   P.plantilla = 'libre'; P.params = { largo: P.largo, fondo: Math.round(mallaFigura().ancho), alto: Math.round(mallaFigura().alto) };
   P.editado = true; P.figura.activa = false; P.figura.malla = null;
@@ -236,4 +240,30 @@ function cargarFiguraTriangulos(tri, nombre, ejemplo) {
   if (!tri.length) throw new Error('No se han encontrado triángulos en «' + nombre + '»');
   const m = guardarMallaFigura(tri, nombre, ejemplo); P.figura.activa = true;
   return m;
+}
+
+/* ---------- simplificar los perfiles clave: quitar puntos a la vez en todas las claves ----------
+   Todas las claves tienen los mismos puntos (y las mismas esquinas), así que se quita el mismo punto
+   en todas: cada vez el que menos cambia la forma (la mayor separación de ese punto a la recta entre
+   sus vecinos, mirando todas las claves). Las esquinas no se quitan. */
+function simplificarPerfiles(n) {
+  const K = P.claves; if (!K.length) return 0;
+  let idx = K[0].pts.map((_, i) => i);
+  const esq = i => !!P.esquinas[i], minimo = Math.max(3, idx.filter(esq).length + 2);
+  n = Math.max(minimo, Math.round(n));
+  const dSeg = (p, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy; let t = L ? ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L : 0; t = clamp(t, 0, 1); return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy); };
+  while (idx.length > n) {
+    let mej = -1, md = Infinity;
+    for (let j = 0; j < idx.length; j++) {
+      if (esq(idx[j])) continue;
+      const a = idx[(j - 1 + idx.length) % idx.length], i = idx[j], b = idx[(j + 1) % idx.length];
+      let d = 0; for (const k of K) d = Math.max(d, dSeg(k.pts[i], k.pts[a], k.pts[b]));
+      if (d < md) { md = d; mej = j; }
+    }
+    if (mej < 0) break;
+    idx.splice(mej, 1);
+  }
+  K.forEach(k => { k.pts = idx.map(i => k.pts[i]); });
+  P.esquinas = idx.map(i => !!P.esquinas[i]);
+  return idx.length;
 }

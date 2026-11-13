@@ -1052,12 +1052,13 @@ function cargarImagenEjemplo(id, conMedidas) {
 
 /* ---------- convertir el relieve en perfiles clave (no se puede deshacer, salvo con ↶) ----------
    Una clave en cada lama (como mucho 60) y en cada una el mismo número de puntos, repartidos a lo largo de la lama. */
-function convertirRelieveEnPerfiles() {
+function convertirRelieveEnPerfiles(maxClaves = 60) {
   if (!relieveActivo()) return 0;
   const Rl = P.relieve, [W, H] = medidasPanel(), hor = Rl.orient === 'h', largo = hor ? H : W, largoV = hor ? W : H;
   const xs = (R && R.costillas && R.costillas.length ? R.costillas.map(c => c.x) : []).filter(x => x >= 0 && x <= largo);
   let pos = xs.length >= 2 ? xs : Array.from({ length: 13 }, (_, i) => largo * i / 12);
-  if (pos.length > 60) pos = Array.from({ length: 60 }, (_, i) => pos[Math.round(i * (pos.length - 1) / 59)]);
+  const mc = Math.max(2, Math.round(maxClaves));
+  if (pos.length > mc) pos = Array.from({ length: mc }, (_, i) => pos[Math.round(i * (pos.length - 1) / (mc - 1))]);
   if (pos[0] > 0.5) pos.unshift(0); if (pos[pos.length - 1] < largo - 0.5) pos.push(largo);
   const M = clamp(Math.round(largoV / 12), 24, 90);
   const claves = pos.map(x => {
@@ -1336,13 +1337,17 @@ function remuestrearLazo(poly, M) {
   }
   return out;
 }
-function convertirFiguraEnPerfiles() {
+function convertirFiguraEnPerfiles(maxClaves = 60) {
   if (!figuraActiva() || !R) return 0;
   let cs = R.costillas.filter(c => c.ok && c.poly.length >= 3);
-  if (cs.length > 60) cs = Array.from({ length: 60 }, (_, i) => cs[Math.round(i * (cs.length - 1) / 59)]);
+  const mc = Math.max(2, Math.round(maxClaves));
+  if (cs.length > mc) cs = Array.from({ length: mc }, (_, i) => cs[Math.round(i * (cs.length - 1) / (mc - 1))]);
   if (cs.length < 2) return 0;
   const M = 64;
-  P.claves = cs.map(c => ({ x: Math.round(c.x * 10) / 10, pts: remuestrearLazo(c.poly, M) }));
+  // el mueble pasa a ir de la primera a la última costilla que existía (las de los extremos que se quitaron no vuelven)
+  const e = grosor(), x0 = Math.max(0, cs[0].x - e / 2), x1 = cs[cs.length - 1].x + e / 2;
+  P.claves = cs.map(c => ({ x: Math.round((c.x - x0) * 10) / 10, pts: remuestrearLazo(c.poly, M) }));
+  P.largo = Math.round((x1 - x0) * 10) / 10;
   P.esquinas = new Array(M).fill(false);
   P.plantilla = 'libre'; P.params = { largo: P.largo, fondo: Math.round(mallaFigura().ancho), alto: Math.round(mallaFigura().alto) };
   P.editado = true; P.figura.activa = false; P.figura.malla = null;
@@ -1354,6 +1359,32 @@ function cargarFiguraTriangulos(tri, nombre, ejemplo) {
   if (!tri.length) throw new Error('No se han encontrado triángulos en «' + nombre + '»');
   const m = guardarMallaFigura(tri, nombre, ejemplo); P.figura.activa = true;
   return m;
+}
+
+/* ---------- simplificar los perfiles clave: quitar puntos a la vez en todas las claves ----------
+   Todas las claves tienen los mismos puntos (y las mismas esquinas), así que se quita el mismo punto
+   en todas: cada vez el que menos cambia la forma (la mayor separación de ese punto a la recta entre
+   sus vecinos, mirando todas las claves). Las esquinas no se quitan. */
+function simplificarPerfiles(n) {
+  const K = P.claves; if (!K.length) return 0;
+  let idx = K[0].pts.map((_, i) => i);
+  const esq = i => !!P.esquinas[i], minimo = Math.max(3, idx.filter(esq).length + 2);
+  n = Math.max(minimo, Math.round(n));
+  const dSeg = (p, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy; let t = L ? ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L : 0; t = clamp(t, 0, 1); return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy); };
+  while (idx.length > n) {
+    let mej = -1, md = Infinity;
+    for (let j = 0; j < idx.length; j++) {
+      if (esq(idx[j])) continue;
+      const a = idx[(j - 1 + idx.length) % idx.length], i = idx[j], b = idx[(j + 1) % idx.length];
+      let d = 0; for (const k of K) d = Math.max(d, dSeg(k.pts[i], k.pts[a], k.pts[b]));
+      if (d < md) { md = d; mej = j; }
+    }
+    if (mej < 0) break;
+    idx.splice(mej, 1);
+  }
+  K.forEach(k => { k.pts = idx.map(i => k.pts[i]); });
+  P.esquinas = idx.map(i => !!P.esquinas[i]);
+  return idx.length;
 }
 
 /* ===================== PLANTILLAS PARAMÉTRICAS =====================
@@ -2610,22 +2641,8 @@ function iniciarPanel() {
     f.click();
   };
   $('#bFigEjemplo').onclick = () => dialogoModelos(true);
-  $('#bConvertirPerfiles').onclick = () => {
-    if (figuraActiva()) {
-      if (!confirm(`Se va a convertir la figura en perfiles clave (uno por costilla, como mucho 60), para que puedas mover, añadir o quitar puntos y perfiles a mano. La forma pasa a «Plantilla: Forma libre».\n\n⚠ Este cambio no se puede revertir: el modelo 3D se quita del proyecto y ya no podrás cambiar su alto, sus cortes o su giro (solo con ↶ Deshacer, antes de cerrar). Si quieres conservarlo, guarda antes una copia del proyecto.\n\n¿Convertir?`)) return;
-      const n = convertirFiguraEnPerfiles(); if (!n) return;
-      UI.clave = Math.floor(n / 2); UI.punto = -1;
-      R = calcular(); ponerControles(); cambio(`Convertido en ${n} perfiles editables`); encuadrarSiHaceFalta(); encuadrarPerfil(); camara('tres4');
-      aviso(`Convertido en ${n} perfiles clave. Ya puedes editar los puntos en la vista del perfil.`, 5000);
-      return;
-    }
-    const que = { texto: 'el texto', modelo: 'el modelo 3D', imagen: 'la imagen' }[Rl().fuente] || 'el relieve';
-    if (!confirm(`Se va a convertir ${que} en perfiles clave (un perfil en cada lama), para que puedas mover, añadir o quitar puntos y perfiles a mano. La forma pasa a «Panel de pared: Plantilla».\n\n⚠ Este cambio no se puede revertir: ya no podrás volver a cambiar ${que}, ni las medidas, el relieve o el suavizado (solo con ↶ Deshacer, antes de cerrar). Si quieres conservarlo, guarda antes una copia del proyecto.\n\n¿Convertir?`)) return;
-    const n = convertirRelieveEnPerfiles(); if (!n) return;
-    UI.clave = Math.floor(n / 2); UI.punto = -1;
-    ponerControles(); cambio(`Convertido en ${n} perfiles editables`); encuadrarSiHaceFalta(); camara('tres4');
-    aviso(`Convertido en ${n} perfiles clave. Ya puedes editar los puntos en la vista del perfil.`, 5000);
-  };
+  $('#bConvertirPerfiles').onclick = dialogoConvertir;
+  $('#bSimplificar').onclick = dialogoSimplificar;
   $$('.bLetra').forEach(bt => bt.onclick = () => {
     const destino = bt.closest('#caCampos') ? 'capa' : 'texto', f = $('#fLetra'); f.value = '';
     f.onchange = () => {
@@ -2751,7 +2768,7 @@ function mostrarSecciones(forzarFigura) {
   $('#filaNum').classList.toggle('oculto', rad || P.costillas.modo !== 'numero');
   $('#kPosTit').textContent = rad ? 'Posición (°)' : 'Posición (mm)';
   // relieve (paneles de pared)
-  const rel = relieveActivo(), fig = figuraActiva() || (forzarFigura && t !== 'pared' && t !== 'radial'), calc = rel || fig, Rl = P.relieve;
+  const rel = relieveActivo(), fig = figuraActiva() || (!!forzarFigura && t !== 'pared' && t !== 'radial'), calc = !!(rel || fig), Rl = P.relieve;
   $('#filaOrigen').classList.toggle('oculto', t === 'radial');
   [...$('#sOrigen').options].forEach(o => { o.hidden = t === 'pared' ? o.value === 'figura' : !['plantilla', 'figura'].includes(o.value); });
   $('#filaPlantilla').classList.toggle('oculto', calc); $('#params').classList.toggle('oculto', calc); $('#descPlantilla').classList.toggle('oculto', calc);
@@ -2884,6 +2901,44 @@ function refrescarListas() {
 function calcularCompra() {
   const a = P.maqueta.activa; P.maqueta.activa = false;
   try { return calcularCompraFab(); } finally { P.maqueta.activa = a; }
+}
+
+// convertir texto, modelo, imagen o figura en perfiles clave, eligiendo cuántos perfiles y cuántos puntos
+function dialogoConvertir() {
+  const fig = figuraActiva(), que = fig ? 'la figura' : ({ texto: 'el texto', modelo: 'el modelo 3D', imagen: 'la imagen' }[P.relieve.fuente] || 'el relieve');
+  const nCost = R ? R.costillas.filter(c => c.ok).length : 2, maxK = Math.max(2, Math.min(60, nCost));
+  modal('✏ Convertir en perfiles editables', `
+    <p>Se va a convertir ${que} en <b>perfiles clave</b>, para que puedas mover, añadir o quitar puntos y perfiles a mano.</p>
+    <label class="fila" title="Uno por ${fig ? 'costilla' : 'lama'} reproduce la forma exacta; con menos, las de en medio se calculan mezclando">Perfiles clave <input type="number" id="cvK" min="2" max="${maxK}" step="1" value="${maxK}"></label>
+    <p class="nota">Hay ${nCost} ${fig ? 'costillas' : 'lamas'}: con ${maxK} perfiles, uno en cada una (como mucho 60). Con menos perfiles es más fácil de editar; las piezas de en medio se calculan mezclando los de los lados.</p>
+    <label class="fila" title="Menos puntos = más fácil de editar, pero la forma se suaviza">Puntos por perfil <input type="number" id="cvN" min="6" max="90" step="1" value="${fig ? 20 : 16}"></label>
+    <p class="nota">Con 12 a 24 puntos suele bastar. Se quitan primero los puntos que menos cambian la forma. Después puedes simplificar más con «✂ Simplificar puntos».</p>
+    <div style="margin-top:8px;padding:8px 10px;border-left:4px solid #d9822b;background:rgba(217,130,43,.12);border-radius:4px">⚠ <b>Este cambio no se puede revertir</b>: ya no podrás volver a ${que} ni cambiar sus medidas (solo con ↶ Deshacer, antes de cerrar). Si quieres conservarlo, guarda antes una copia del proyecto.</div>`,
+    [['✏ Convertir', () => {
+      const k = clamp(Math.round(+$('#cvK').value || maxK), 2, maxK), np = clamp(Math.round(+$('#cvN').value || 20), 6, 90);
+      cerrarModal();
+      const n = fig ? convertirFiguraEnPerfiles(k) : convertirRelieveEnPerfiles(k); if (!n) return;
+      const pts = simplificarPerfiles(np);
+      UI.clave = Math.floor(n / 2); UI.punto = -1;
+      R = calcular();
+      if (P.tipo === 'costillas' && R.varillas && R.varillas.some(v => v.fallan && v.fallan.length)) autoVarillas(P.varillas.autoN);   // las varillas que ya no caben se recolocan
+      ponerControles(); cambio(`Convertido en ${n} perfiles de ${pts} puntos`); encuadrarSiHaceFalta(); encuadrarPerfil(); camara('tres4');
+      aviso(`Convertido en ${n} perfiles clave de ${pts} puntos. Ya puedes editar los puntos en la vista del perfil.`, 5000);
+    }, true]]);
+}
+// quitar puntos a todos los perfiles clave a la vez
+function dialogoSimplificar() {
+  if (formaCalculada() || !P.claves.length) return;
+  const n0 = P.claves[0].pts.length, min = Math.max(3, P.esquinas.filter(Boolean).length + 2);
+  modal('✂ Simplificar puntos', `
+    <p>Los perfiles clave tienen ahora <b>${n0} puntos</b> cada uno. Elige con cuántos quedarse: se quitan a la vez en todos los perfiles, primero los que menos cambian la forma. Las esquinas no se quitan.</p>
+    <label class="fila">Puntos por perfil <input type="number" id="smN" min="${min}" max="${n0}" step="1" value="${Math.max(min, Math.round(n0 / 2))}"></label>
+    <p class="nota">Se puede deshacer con ↶.</p>`,
+    [['✂ Simplificar', () => {
+      const n = simplificarPerfiles(+$('#smN').value || n0); cerrarModal(); UI.punto = -1;
+      R = calcular();
+      if (P.tipo === 'costillas' && R.varillas && R.varillas.some(v => v.fallan && v.fallan.length)) autoVarillas(P.varillas.autoN); ponerControles(); cambio(`Perfiles de ${n} puntos`); aviso(`Perfiles simplificados: ${n} puntos cada uno.`);
+    }, true]]);
 }
 
 /* ===================== FABRICACIÓN: TABLEROS, DXF, SVG, DESPIECE ===================== */
