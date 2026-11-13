@@ -168,8 +168,8 @@ function dibujarPerfil(ctx, V) {
     ctx.beginPath(); ctx.arc(x, y, Math.max(3, r * V.sc), 0, PI2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = col; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'left'; ctx.fillText('V' + (i + 1), x + Math.max(5, r * V.sc) + 3, y - 4);
   });
-  // puntos de control
-  k.pts.forEach((p, i) => {
+  // puntos de control (no con una figura: la forma sale del modelo)
+  if (!fig) k.pts.forEach((p, i) => {
     const [x, y] = V.aPantalla(p[0], p[1]), sel = i === UI.punto;
     ctx.fillStyle = sel ? acento : cssVar('--panel'); ctx.strokeStyle = acento; ctx.lineWidth = 1.8;
     ctx.beginPath();
