@@ -7,6 +7,7 @@
 - **Letras propias** (.ttf, .otf, .woff): se guardan dentro del proyecto.
 - **Luz rasante** en la vista 3D, con su dirección.
 - Los modelos y las imágenes de ejemplo **solo se cargan cuando se usan**: el programa abre más rápido.
+- Con **espiga / redondo de madera**, la espiga y los separadores se ven de madera en el 3D (antes se quedaban de metal).
 - Las varillas van de la primera a la última costilla que existe.
 - **Origen de la forma** en los paneles de pared: plantilla, **texto en relieve** o **modelo 3D (STL / OBJ)**.
 - **Texto en relieve** para rótulos y nombres: letra, tamaño, negrita, varias líneas, suavizado de los bordes y onda de fondo.

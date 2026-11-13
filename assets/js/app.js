@@ -2269,7 +2269,9 @@ function construirVarillas3D() {
     G.matSep = new T.MeshStandardMaterial({ color: tv.metal ? '#9ea3a8' : '#c9a36d', metalness: tv.metal ? .8 : 0, roughness: .4 });
     G.matTu = new T.MeshStandardMaterial({ color: '#8d9399', metalness: .9, roughness: .3 });
   }
-  G.matVar.color.set(tv.hex); G.matVar.metalness = tv.metal ? .85 : 0;
+  // los materiales se crean una vez: hay que ponerles el color y el brillo del tipo de varilla cada vez
+  G.matVar.color.set(tv.hex); G.matVar.metalness = tv.metal ? .85 : 0; G.matVar.roughness = tv.metal ? .35 : .7;
+  G.matSep.color.set(tv.metal ? '#9ea3a8' : '#c9a36d'); G.matSep.metalness = tv.metal ? .8 : 0; G.matSep.roughness = tv.metal ? .4 : .75;
   const add = m => { m.userData.var = true; G.modelo.add(m); G.varillas.push(m); };
   R.varillas.forEach(rv => {
     if (!rv.usada) return;
