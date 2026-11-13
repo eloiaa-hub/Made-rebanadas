@@ -59,7 +59,7 @@ function iniciar3D() {
     ray.setFromCamera(new T.Vector2((ev.clientX - rc.left) / rc.width * 2 - 1, -(ev.clientY - rc.top) / rc.height * 2 + 1), G.cam);
     ray.params.Line.threshold = Math.max(4, Math.max(...(G.dims || [500])) * 0.006);
     const hk = (G.claves3d || []).length ? ray.intersectObjects(G.claves3d, false)[0] : null;
-    if (hk) { UI.clave = hk.object.userData.clave; UI.punto = -1; refrescarClaves(); VP.pintar(); construirClaves3D(); $('#estado').textContent = 'Perfil clave ' + (UI.clave + 1); return; }
+    if (hk) { UI.clave = hk.object.userData.clave; UI.punto = -1; refrescarClaves(); VP.pintar(); construirClaves3D(); costillaDeClave(); $('#estado').textContent = 'Perfil clave ' + (UI.clave + 1); return; }
     const hit = ray.intersectObjects([...G.costillas, ...G.largueros].filter(Boolean), false)[0];
     if (hit) selCostilla(hit.object.userData.i);
   });

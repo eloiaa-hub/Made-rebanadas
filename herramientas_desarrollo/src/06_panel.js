@@ -383,6 +383,12 @@ function ponerControles() {
   construirParams();
 }
 
+function costillaDeClave() {
+  if (!R || formaCalculada() || P.tipo === 'radial') return;
+  const k = clavesOrdenadas()[UI.clave]; if (!k) return;
+  let mej = -1, md = Infinity; R.costillas.forEach((c, j) => { if (!c.ok) return; const d = Math.abs(c.x - k.x); if (d < md) { md = d; mej = j; } });
+  if (mej >= 0 && md <= Math.max(grosor(), (R.sep || 0) / 2) && mej !== UI.costilla) { UI.costilla = mej; refrescarCostilla(); encuadrarCostilla(); resaltar3D(); const li = $('#listaCost').children[mej]; if (li) li.scrollIntoView({ block: 'nearest' }); }
+}
 function refrescarClaves() {
   const C = clavesOrdenadas(); UI.clave = clamp(UI.clave, 0, C.length - 1);
   const s = $('#sClave'); s.innerHTML = '';
@@ -397,7 +403,7 @@ function refrescarClaves() {
   C.forEach((o, i) => {
     const li = document.createElement('li'); li.className = i === UI.clave ? 'sel' : '';
     li.innerHTML = `<span class="icono">◆</span><span class="nom">Perfil clave ${i + 1}</span><span class="pos">${P.tipo === 'radial' ? '' : 'x '}${textoPos(o.x)}</span>`;
-    li.onclick = () => { UI.clave = i; UI.punto = -1; refrescarClaves(); VP.pintar(); };
+    li.onclick = () => { UI.clave = i; UI.punto = -1; refrescarClaves(); VP.pintar(); costillaDeClave(); };
     ul.appendChild(li);
   });
   $('#avisoEditado').classList.toggle('oculto', !P.editado);

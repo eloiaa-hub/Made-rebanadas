@@ -1970,7 +1970,7 @@ function iniciarEditor() {
   });
   $('#bEsquina').onclick = () => alternarEsquina(UI.punto);
   $('#bEncuadrarPerfil').onclick = () => encuadrarPerfil();
-  $('#sClave').onchange = () => { UI.clave = +$('#sClave').value; UI.punto = -1; refrescarClaves(); VP.pintar(); };
+  $('#sClave').onchange = () => { UI.clave = +$('#sClave').value; UI.punto = -1; refrescarClaves(); VP.pintar(); costillaDeClave(); };
   $('#bCostAnt').onclick = () => selCostilla(UI.costilla - 1);
   $('#bCostSig').onclick = () => selCostilla(UI.costilla + 1);
   $('#piePerfil').innerHTML = ayudaPerfil();
@@ -2026,6 +2026,13 @@ function dibujarCostilla(ctx, V) {
 function selCostilla(i, encuadrar) {
   if (!R) return;
   UI.costilla = clamp(i, 0, nPiezas() - 1);
+  // si en esa costilla hay un perfil clave, se selecciona también (para editarlo arriba)
+  const c = piezaSel();
+  if (c && UI.costilla < R.n && !formaCalculada() && P.tipo !== 'radial') {
+    const C = clavesOrdenadas(), tol = Math.max(grosor(), (R.sep || 0) / 2);
+    let mej = -1, md = Infinity; C.forEach((k, j) => { const d = Math.abs(k.x - c.x); if (d < md) { md = d; mej = j; } });
+    if (mej >= 0 && md <= tol && mej !== UI.clave) { UI.clave = mej; UI.punto = -1; refrescarClaves(); construirClaves3D(); }
+  }
   refrescarCostilla();
   if (encuadrar !== false) encuadrarCostilla();
   VP.pintar(); resaltar3D();
@@ -2105,7 +2112,7 @@ function iniciar3D() {
     ray.setFromCamera(new T.Vector2((ev.clientX - rc.left) / rc.width * 2 - 1, -(ev.clientY - rc.top) / rc.height * 2 + 1), G.cam);
     ray.params.Line.threshold = Math.max(4, Math.max(...(G.dims || [500])) * 0.006);
     const hk = (G.claves3d || []).length ? ray.intersectObjects(G.claves3d, false)[0] : null;
-    if (hk) { UI.clave = hk.object.userData.clave; UI.punto = -1; refrescarClaves(); VP.pintar(); construirClaves3D(); $('#estado').textContent = 'Perfil clave ' + (UI.clave + 1); return; }
+    if (hk) { UI.clave = hk.object.userData.clave; UI.punto = -1; refrescarClaves(); VP.pintar(); construirClaves3D(); costillaDeClave(); $('#estado').textContent = 'Perfil clave ' + (UI.clave + 1); return; }
     const hit = ray.intersectObjects([...G.costillas, ...G.largueros].filter(Boolean), false)[0];
     if (hit) selCostilla(hit.object.userData.i);
   });
@@ -2762,6 +2769,12 @@ function ponerControles() {
   construirParams();
 }
 
+function costillaDeClave() {
+  if (!R || formaCalculada() || P.tipo === 'radial') return;
+  const k = clavesOrdenadas()[UI.clave]; if (!k) return;
+  let mej = -1, md = Infinity; R.costillas.forEach((c, j) => { if (!c.ok) return; const d = Math.abs(c.x - k.x); if (d < md) { md = d; mej = j; } });
+  if (mej >= 0 && md <= Math.max(grosor(), (R.sep || 0) / 2) && mej !== UI.costilla) { UI.costilla = mej; refrescarCostilla(); encuadrarCostilla(); resaltar3D(); const li = $('#listaCost').children[mej]; if (li) li.scrollIntoView({ block: 'nearest' }); }
+}
 function refrescarClaves() {
   const C = clavesOrdenadas(); UI.clave = clamp(UI.clave, 0, C.length - 1);
   const s = $('#sClave'); s.innerHTML = '';
@@ -2776,7 +2789,7 @@ function refrescarClaves() {
   C.forEach((o, i) => {
     const li = document.createElement('li'); li.className = i === UI.clave ? 'sel' : '';
     li.innerHTML = `<span class="icono">◆</span><span class="nom">Perfil clave ${i + 1}</span><span class="pos">${P.tipo === 'radial' ? '' : 'x '}${textoPos(o.x)}</span>`;
-    li.onclick = () => { UI.clave = i; UI.punto = -1; refrescarClaves(); VP.pintar(); };
+    li.onclick = () => { UI.clave = i; UI.punto = -1; refrescarClaves(); VP.pintar(); costillaDeClave(); };
     ul.appendChild(li);
   });
   $('#avisoEditado').classList.toggle('oculto', !P.editado);
@@ -4164,8 +4177,8 @@ function iniciar() {
     else if (ev.key.toLowerCase() === 'f') { camara('tres4'); encuadrarPerfil(); encuadrarCostilla(); }
     else if (ev.key === 'ArrowLeft') selCostilla(UI.costilla - 1);
     else if (ev.key === 'ArrowRight') selCostilla(UI.costilla + 1);
-    else if (ev.key === 'PageUp') { UI.clave = Math.max(0, UI.clave - 1); UI.punto = -1; refrescarClaves(); VP.pintar(); }
-    else if (ev.key === 'PageDown') { UI.clave = Math.min(P.claves.length - 1, UI.clave + 1); UI.punto = -1; refrescarClaves(); VP.pintar(); }
+    else if (ev.key === 'PageUp') { UI.clave = Math.max(0, UI.clave - 1); UI.punto = -1; refrescarClaves(); VP.pintar(); construirClaves3D(); costillaDeClave(); }
+    else if (ev.key === 'PageDown') { UI.clave = Math.min(P.claves.length - 1, UI.clave + 1); UI.punto = -1; refrescarClaves(); VP.pintar(); construirClaves3D(); costillaDeClave(); }
   });
   window.addEventListener('beforeunload', ev => { if (UI.sucio) { ev.preventDefault(); ev.returnValue = ''; } });
   // espera a que las vistas tengan tamaño

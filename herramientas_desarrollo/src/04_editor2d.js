@@ -291,7 +291,7 @@ function iniciarEditor() {
   });
   $('#bEsquina').onclick = () => alternarEsquina(UI.punto);
   $('#bEncuadrarPerfil').onclick = () => encuadrarPerfil();
-  $('#sClave').onchange = () => { UI.clave = +$('#sClave').value; UI.punto = -1; refrescarClaves(); VP.pintar(); };
+  $('#sClave').onchange = () => { UI.clave = +$('#sClave').value; UI.punto = -1; refrescarClaves(); VP.pintar(); costillaDeClave(); };
   $('#bCostAnt').onclick = () => selCostilla(UI.costilla - 1);
   $('#bCostSig').onclick = () => selCostilla(UI.costilla + 1);
   $('#piePerfil').innerHTML = ayudaPerfil();
@@ -347,6 +347,13 @@ function dibujarCostilla(ctx, V) {
 function selCostilla(i, encuadrar) {
   if (!R) return;
   UI.costilla = clamp(i, 0, nPiezas() - 1);
+  // si en esa costilla hay un perfil clave, se selecciona también (para editarlo arriba)
+  const c = piezaSel();
+  if (c && UI.costilla < R.n && !formaCalculada() && P.tipo !== 'radial') {
+    const C = clavesOrdenadas(), tol = Math.max(grosor(), (R.sep || 0) / 2);
+    let mej = -1, md = Infinity; C.forEach((k, j) => { const d = Math.abs(k.x - c.x); if (d < md) { md = d; mej = j; } });
+    if (mej >= 0 && md <= tol && mej !== UI.clave) { UI.clave = mej; UI.punto = -1; refrescarClaves(); construirClaves3D(); }
+  }
   refrescarCostilla();
   if (encuadrar !== false) encuadrarCostilla();
   VP.pintar(); resaltar3D();
