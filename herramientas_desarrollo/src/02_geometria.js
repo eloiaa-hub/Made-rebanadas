@@ -241,8 +241,9 @@ function avisosDe(res, need) {
   if (!V.lista.length) add('atencion', 'No hay varillas: pulsa ✨ Auto o ＋ Varilla para unir las costillas.');
   res.varillas.forEach(r => {
     const nom = 'Varilla ' + (r.k + 1);
-    if (!r.usada) { add('error', `${nom}: no cabe en ninguna costilla (necesita ${fmt(2 * need, 0)} mm de madera alrededor).`); return; }
-    if (r.fallan.length) add('error', `${nom}: no cabe con ${fmt(V.margen, 0)} mm de madera al borde en ${cstLa(r.fallan)}.`, r.fallan[0]);
+    const pista = usaHuecos() ? ' Si es por un hueco, muévelo o pulsa ✨ Auto para recolocar las varillas.' : '';
+    if (!r.usada) { add('error', `${nom}: no cabe en ninguna costilla (necesita ${fmt(2 * need, 0)} mm de madera alrededor).${pista}`); return; }
+    if (r.fallan.length) add('error', `${nom}: no cabe con ${fmt(V.margen, 0)} mm de madera al borde en ${cstLa(r.fallan)}.${pista}`, r.fallan[0]);
   });
   // varillas demasiado juntas
   for (let i = 0; i < V.lista.length; i++) for (let j = i + 1; j < V.lista.length; j++) {
@@ -334,15 +335,27 @@ function autoVarillas(n) {
 }
 
 // punto interior bien separado del borde y de los agujeros (para grabar el número)
+// sitio para el número de la pieza: el punto más alejado del borde, de los agujeros y de los huecos.
+// Rejilla gruesa (unos 500 puntos, aunque la pieza sea muy alargada) y luego se afina alrededor del mejor.
+// Se guarda en la pieza (cambia solo si cambian las varillas).
 function puntoEtiqueta(c) {
-  if (!c.ok) return [0, 0];
-  const b = c.caja, paso = Math.max(2, Math.min(b.w, b.h) / 30), r = radioAgujero();
-  let mejor = [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2], md = -Infinity;
-  for (let y = b.y0 + paso / 2; y < b.y1; y += paso) for (let x = b.x0 + paso / 2; x < b.x1; x += paso) {
-    let d = distBorde(c.poly, x, y); if (d <= 0) continue;
-    if (c.int && c.int.length) { if (c.int.some(hh => dentro(hh, x, y))) continue; c.int.forEach(hh => { d = Math.min(d, -distBorde(hh, x, y)); }); }
+  if (!c.ok || !c.poly || c.poly.length < 3) return [0, 0];
+  const r = radioAgujero(), clave = c.agujeros.map(k => P.varillas.lista[k].join(',')).join(';') + '|' + r;
+  if (c._etq && c._etq.clave === clave && c._etq.poly === c.poly) return c._etq.p;
+  const b = c.caja, val = (x, y) => {
+    let d = distBorde(c.poly, x, y); if (d <= 0) return -Infinity;
+    if (c.int && c.int.length) { if (c.int.some(hh => dentro(hh, x, y))) return -Infinity; c.int.forEach(hh => { d = Math.min(d, -distBorde(hh, x, y)); }); }
     for (const k of c.agujeros) d = Math.min(d, Math.hypot(x - P.varillas.lista[k][0], y - P.varillas.lista[k][1]) - r);
-    if (d > md) { md = d; mejor = [x, y]; }
+    return d;
+  };
+  let paso = Math.max(1, Math.min(b.w, b.h) / 30, Math.sqrt(b.w * b.h / 500));
+  let mejor = [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2], md = -Infinity;
+  for (let y = b.y0 + paso / 2; y < b.y1; y += paso) for (let x = b.x0 + paso / 2; x < b.x1; x += paso) { const d = val(x, y); if (d > md) { md = d; mejor = [x, y]; } }
+  // afinar: 4 rondas de 5 × 5 alrededor del mejor, con paso cada vez más pequeño
+  for (let ronda = 0; ronda < 4 && md > -Infinity; ronda++) {
+    paso /= 2.5; const [cx, cy] = mejor;
+    for (let j = -2; j <= 2; j++) for (let i = -2; i <= 2; i++) { const x = cx + i * paso, y = cy + j * paso, d = val(x, y); if (d > md) { md = d; mejor = [x, y]; } }
   }
+  c._etq = { clave, poly: c.poly, p: mejor };
   return mejor;
 }

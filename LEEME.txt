@@ -17,4 +17,4 @@ Copia siempre la carpeta completa:
   ayuda/           manual
   herramientas_desarrollo/  solo para cambiar el programa (ver su LEEME.md)
 
-Licencias: programa EUPL-1.2 · manual CC BY-SA 4.0 · Three.js MIT
+Licencias: programa EUPL-1.2 · manual CC BY-SA 4.0 · Three.js MIT · Clipper Boost

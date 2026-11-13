@@ -35,6 +35,10 @@ No hacen falta para usar el programa: solo para cambiarlo.
 | `08_archivo.js` | Ventanas, deshacer, guardar, abrir, ejemplos |
 | `09_inicio.js` | Arranque, botones y teclado |
 
+## Pruebas y rendimiento
+
+`window.MadeRebanadas` expone `calcular()` y `construir3D()`, que devuelven lo que han tardado en ms. Las cachés que hay que vaciar si cambias su cálculo: `c._etq` (punto de la etiqueta de cada pieza, en `puntoEtiqueta`), `CACHE_FIG`, `CACHE_SEC` y `CACHE_POLI` (figuras, en `02e_figura.js`). Antes de publicar conviene cargar todos los ejemplos con planta en arco y en S, maqueta, un hueco, lamas horizontales y figura (eje z) y comprobar que no hay errores y que salen el DXF, el SVG, el 3D y el plano.
+
 ## Anidador
 
 `../assets/anidador/anidador.html` es el Anidador de la Suite CNC con un añadido al final: con `?desde=rebanadas` avisa `anidador-listo` al programa y recibe `rebanadas-piezas` (`piezas`: proyectos del Calcador, uno por costilla, con su contorno exterior y los agujeros como contornos interiores; `tablero`: largo, ancho, grosor, margen). Si se actualiza el Anidador, hay que volver a pegar ese bloque.

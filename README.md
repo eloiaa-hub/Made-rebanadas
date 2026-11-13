@@ -28,6 +28,7 @@ Funciona en el navegador (Chrome, Edge o Firefox), sin instalar nada y **sin con
 - **Costillas**: grosor del tablero, reparto por separación o por número, base aplanada y corte plano arriba.
 - **Varillas**: roscada, redondo de madera o tubo, con separadores; colocación automática y comprobación de la madera que queda al borde en cada costilla.
 - **Comprobaciones**: varillas que no caben o demasiado juntas, costillas sueltas o con una sola varilla, separadores que asoman.
+- **Ágil con muebles grandes**: los paneles de muchas lamas, las figuras y los huecos se recalculan al momento (probado con todos los ejemplos en todas sus variantes).
 - **3D**: maderas y cantos de contrachapado, varillas, tuercas y separadores, vista explosionada, volumen ideal e imagen PNG.
 - **CNC**: hueso de perro automático en ranuras y muescas, y contornos en rectas y arcos (G02/G03).
 - **Fabricar**: costillas colocadas en tableros con su número grabado; **DXF** (capas CORTE, TALADROS, GRABADO, TABLERO) y **SVG** en mm.

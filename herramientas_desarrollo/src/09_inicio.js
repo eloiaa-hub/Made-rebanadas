@@ -52,7 +52,7 @@ function iniciar() {
   requestAnimationFrame(() => { ajustar3D(); VP.ajustar(); VC.ajustar(); cargarProyecto(P, true); });
 }
 // para las pruebas automáticas
-window.MadeRebanadas = { get P() { return P; }, get R() { return R; }, cargar: o => cargarProyecto(validarProyecto(o)), dxf: () => dxf(), svg: () => svg(), plano: () => planoPDF(), malla3D: o => piezasMalla3D(o || {}), pieza: i => piezaCalcador([...R.costillas, ...R.otras][i]), geo: i => geoFab([...R.costillas, ...R.otras][i]), camara: t => camara(t), selCostilla: i => selCostilla(i),
+window.MadeRebanadas = { get P() { return P; }, get R() { return R; }, calcular: () => { const t = performance.now(); R = calcular(); return performance.now() - t; }, autoVar: () => autoVarillas(P.varillas.autoN), construir3D: () => { const t = performance.now(); construir3D(); return performance.now() - t; }, cargar: o => cargarProyecto(validarProyecto(o)), dxf: () => dxf(), svg: () => svg(), plano: () => planoPDF(), malla3D: o => piezasMalla3D(o || {}), pieza: i => piezaCalcador([...R.costillas, ...R.otras][i]), geo: i => geoFab([...R.costillas, ...R.otras][i]), camara: t => camara(t), selCostilla: i => selCostilla(i),
   pantallaPunto: i => { const k = claveActual().pts[i], r = $('#cPerfil').getBoundingClientRect(), q = VP.aPantalla(k[0], k[1]); return [r.left + q[0], r.top + q[1]]; },
   pantallaVarilla: i => { const k = P.varillas.lista[i], r = $('#cPerfil').getBoundingClientRect(), q = VP.aPantalla(k[0], k[1]); return [r.left + q[0], r.top + q[1]]; } };
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();

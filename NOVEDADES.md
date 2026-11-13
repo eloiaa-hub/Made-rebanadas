@@ -2,6 +2,9 @@
 
 ## v1.5
 
+- **Revisión general**: se han probado los 28 ejemplos con planta en arco y en S, maqueta, huecos, lamas horizontales y figuras de pie (124 combinaciones) sin fallos; el DXF, el SVG, el 3D, el Anidador y el plano salen bien en todas.
+- **Más rápido**: recalcular un panel de pared grande es unas 7 veces más rápido (la colocación de los números de pieza se calcula una vez por pieza y se guarda). Las figuras en retícula guardan sus cortes y se recalculan unas 4 veces más rápido.
+- Si una varilla no cabe y el proyecto tiene huecos, el aviso sugiere mover el hueco o pulsar ✨ Auto para recolocar las varillas.
 - Huecos: se pueden **girar** (campo Giro o asa ↻ en la vista) y **borrar** desde la lista (🗑), con el botón 🗑 Borrar o con Supr.
 - Tableros: **1220 × 1220** es medio tablero (de 2440 × 1220) y **1220 × 610**, un cuarto (antes se llamaba «medio» por error).
 - **Huecos** en paneles de pared, costillas y retícula: rectángulo, redondeado, arco, círculo o forma libre, que se dibujan y se arrastran en la nueva vista **▦ Huecos**.

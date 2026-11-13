@@ -106,7 +106,17 @@ function seccionFigura(x) {
 }
 // contorno de la costilla en x: el lazo mayor; si hay trozos sueltos y «unir» está activo,
 // se juntan con puentes (en una rejilla) y se saca un solo contorno
+const CACHE_POLI = { clave: '', mapa: new Map() };
 function poligonoFigura(x) {
+  // se guarda por posición (la retícula pide cientos de cortes al sacar los largueros)
+  mallaFigura();   // pone al día CACHE_FIG.clave si ha cambiado el alto, el giro o los cortes
+  const clave = CACHE_FIG.clave + '|' + (P.figura.unir !== false) + '|' + P.costillas.base + '|' + P.costillas.tope + '|' + P.costillas.topeAlt + '|' + grosor();
+  if (CACHE_POLI.clave !== clave) { CACHE_POLI.clave = clave; CACHE_POLI.mapa = new Map(); }
+  const kx = Math.round(x * 100) / 100;
+  if (!CACHE_POLI.mapa.has(kx)) CACHE_POLI.mapa.set(kx, poligonoFiguraSin(x));
+  return CACHE_POLI.mapa.get(kx).map(p => p.slice());
+}
+function poligonoFiguraSin(x) {
   const ls = seccionFigura(x); if (!ls.length || ls[0].area < 20) return [];
   const sig = ls.filter((l, i) => i === 0 || (l.area >= Math.max(30, ls[0].area * 0.01) && !dentroPoligono(ls[0].poly, l.poly[0][0], l.poly[0][1])));
   let poly = P.figura.unir !== false && sig.length > 1 ? unirTrozos(sig.map(l => l.poly)) : ls[0].poly;
