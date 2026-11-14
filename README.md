@@ -23,7 +23,7 @@ Funciona en el navegador (Chrome, Edge o Firefox), sin instalar nada y **sin con
 - **Huecos**: ventanas, rebajes, hornacinas, baldas y armarios dentro de las lamas, y túneles en los muebles de costillas (formas rectangulares, redondeadas, en arco, círculos o libres), o un contorno traído de un **DXF**). Los muebles de los huecos pueden llevar **otro grosor de tablero**, con sus tableros aparte.
 - **Figuras de pie desde un STL/OBJ**: el modelo cortado de verdad en costillas o en retícula (bustos, esculturas).
 - **Modelo 3D**: el mueble montado se guarda en STL u OBJ (para otros programas o impresión 3D).
-- **Arte mural, rótulos y estanterías**: relieve de pared a partir de un **texto** (nombres, logos) o de una **imagen en escala de grises**, o de una **figura STL/OBJ** (caras, labios, formas; trae cinco STL de ejemplo en `assets/modelos`, entre ellos un busto de mujer y Nefertiti), en lamas verticales u horizontales, y estantería de pared ondulada de lamas.
+- **Arte mural, rótulos y estanterías**: relieve de pared a partir de un **texto** (nombres, logos) o de una **imagen en escala de grises**, o de una **figura STL/OBJ** (caras, labios, formas; trae cuatro STL de ejemplo en `assets/modelos`, entre ellos un busto de mujer), en lamas verticales u horizontales, y estantería de pared ondulada de lamas.
 - **Perfiles clave en el 3D**: se seleccionan pinchándolos.
 - **Costillas**: grosor del tablero, reparto por separación o por número, base aplanada y corte plano arriba.
 - **Varillas**: roscada, redondo de madera o tubo, con separadores; colocación automática y comprobación de la madera que queda al borde en cada costilla.

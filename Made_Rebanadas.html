@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Made-rebanadas — Por Eloi A.A.</title>
-<link rel="stylesheet" href="assets/css/estilo.css">
+<link rel="stylesheet" href="assets/css/estilo.css?v=202611150047">
 </head>
 <body>
 <header class="barra">
@@ -46,6 +46,7 @@
           <select id="sOrigen"><option value="plantilla">Plantilla</option><option value="texto">Texto en relieve</option><option value="modelo">Modelo 3D (STL / OBJ)</option><option value="imagen">Imagen en grises</option><option value="figura">Modelo 3D (secciones)</option></select></label>
         <button id="bConvertirPerfiles" class="ancho oculto" style="margin:2px 0 8px" title="Pasa la forma a perfiles clave para retocar a mano los puntos de las piezas">✏ Convertir en perfiles editables…</button>
         <label class="fila" id="filaPlantilla">Plantilla <select id="sPlantilla"></select></label>
+        <button id="bPlantillaFotos" class="ancho" title="Las mismas plantillas, en cuadrícula y con una foto de cada una">🗔 Ver las plantillas con fotos…</button>
         <p class="nota" id="descPlantilla"></p>
         <div id="params"></div>
         <p class="nota aviso-edit oculto" id="avisoEditado">Has retocado los perfiles a mano: si cambias un parámetro, la forma se vuelve a generar.</p>
@@ -205,7 +206,7 @@
       <div class="sec-cuerpo">
         <p class="nota" id="fgInfo">Sin modelo. Carga un STL u OBJ: cada costilla será un corte de verdad del modelo.</p>
         <button id="bFigCargar" class="ancho" title="Cargar un modelo 3D (.stl o .obj) para cortarlo en costillas">📂 Cargar modelo 3D…</button>
-        <button id="bFigEjemplo" class="ancho" title="Busto de mujer, Nefertiti…">🗿 Modelos de ejemplo…</button>
+        <button id="bFigEjemplo" class="ancho" title="Busto de mujer, labios, ondas…">🗿 Modelos de ejemplo…</button>
         <label class="fila" title="Alto de la figura terminada">Alto de la figura (mm) <input type="number" id="fgAlto" min="100" step="10"></label>
         <label class="fila" title="Por dónde se corta el modelo">Cortes <select id="fgEje"><option value="x">De lado a lado (perfiles)</option><option value="z">De delante a atrás</option></select></label>
         <label class="fila" title="Gira el modelo alrededor del eje vertical antes de cortarlo">Giro <select id="fgGiro"><option value="0">0°</option><option value="45">45°</option><option value="90">90°</option><option value="135">135°</option><option value="180">180°</option><option value="270">270°</option></select></label>
@@ -403,15 +404,15 @@
 <input type="file" id="fLetra" class="oculto" accept=".ttf,.otf,.woff,.woff2">
 <div id="aviso" class="aviso"></div>
 
-<script src="assets/js/three-bundle.js?v=202611142003"></script>
-<script src="assets/texturas/texturas.js?v=202611142003"></script>
+<script src="assets/js/three-bundle.js?v=202611150047"></script>
+<script src="assets/texturas/texturas.js?v=202611150047"></script>
 <script src="assets/texturas/pbr/roble.js"></script>
 <script src="assets/texturas/pbr/nogal.js"></script>
 <script src="assets/texturas/pbr/fresno.js"></script>
 <script src="assets/texturas/pbr/haya.js"></script>
 <script src="assets/texturas/pbr/pino.js"></script>
-<script src="assets/ejemplos/ejemplos.js?v=202611142003"></script>
-<script src="assets/js/clipper.js?v=202611142003"></script>
-<script src="assets/js/app.js?v=202611142003"></script>
+<script src="assets/ejemplos/ejemplos.js?v=202611150047"></script>
+<script src="assets/js/clipper.js?v=202611150047"></script>
+<script src="assets/js/app.js?v=202611150047"></script>
 </body>
 </html>

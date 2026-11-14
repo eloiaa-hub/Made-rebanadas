@@ -17,7 +17,7 @@ No hacen falta para usar el programa: solo para cambiarlo.
 | `01_base.js` | Utilidades, materiales, estado del proyecto |
 | `02_geometria.js` | Curvas de los perfiles, mezcla entre perfiles clave, recortes, costillas, varillas, comprobaciones, colocación automática de varillas |
 | `02b_reticula.js` | Retícula entrelazada: largueros sacados del volumen, cruces y ranuras a media madera, comprobaciones |
-| `fuentes/` | Modelos de fuera ya reducidos y orientados (Y arriba, mirando a +Z): `busto_mujer.stl`, `nefertiti.stl`; `modelos.py` los incluye |
+| `fuentes/` | Modelos de fuera ya reducidos y orientados (Y arriba, mirando a +Z): `busto_mujer.stl`; `modelos.py` lo incluye |
 | `modelos.py` | Genera los STL y las imágenes en grises de ejemplo (`assets/modelos/modelos.js`, `assets/imagenes/imagenes.js`) (numpy y scikit-image) |
 | `02f_huecos.js` | Huecos: formas, restas con Clipper, trozos (12a, 12b), muebles insertados (tableros), rastreles cortados y avisos |
 | `02g_dxf.js` | Lectura de DXF de texto (LINE, ARC, CIRCLE, ELLIPSE, LWPOLYLINE y POLYLINE con bulge, SPLINE): contornos cerrados para huecos libres y perfiles clave |

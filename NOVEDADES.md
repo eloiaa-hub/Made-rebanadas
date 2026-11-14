@@ -2,6 +2,9 @@
 
 ## v1.5
 
+- Quitado el modelo y el ejemplo de **Nefertiti** (su escaneo es CC BY-NC-SA, que no permite vender lo hecho con él; los demás modelos siguen, todos de licencia libre).
+- La ventana 🗋 Mueble nuevo con fotos también se abre desde el panel izquierdo, con el botón **🗔 Ver las plantillas con fotos…** bajo el selector de plantilla.
+- Arreglado: la hoja de estilos no se recargaba al actualizar el programa (los textos de la ventana de plantillas podían salir montados); ahora lleva sello de versión como los scripts. Si lo ves raro, un último Ctrl + F5.
 - **Maderas con veta real en el 3D**: las caras de los cinco materiales de madera (abedul, chopo, pino, chapa de roble y de nogal, y el alistonado) usan ahora maderas escaneadas de Poly Haven (CC0) con color, relieve y rugosidad de verdad, recoloreadas al tono de cada material para que el 3D siga casando con los alzados y el plano. Los cantos (alma de contrachapado, MDF) siguen como estaban.
 - Las plantillas de partida dejan elegir **cuántos perfiles clave** quieres: «Panel de pared libre» (de 2 a 15; antes siempre 7), «Vacío: empezar de cero» (2 a 12) y «Vacío radial» (3 a 12). Después se pueden seguir añadiendo o quitando con **+ Clave / − Clave**.
 - Plantilla **«Vacío radial: cilindro»**: el «empezar de cero» de las lámparas y columnas. En los paneles de pared ese papel lo hace «Panel de pared libre».
@@ -45,7 +48,7 @@
 - **✏ Convertir en perfiles editables**: el texto, el modelo 3D o la imagen se pasan a perfiles clave (uno por lama) para retocar los puntos a mano. Avisa de que no se puede revertir.
 - Plantilla **Panel de pared libre**.
 - El material por defecto es **MDF crudo** (se ve mejor en pantalla).
-- **Modelos 3D de ejemplo** (STL en `assets/modelos` y botón «🗿 Modelos de ejemplo…»): busto de mujer, labios, ondas en el agua, anomalía (burbuja) y Nefertiti (escaneo del Neues Museum, CC BY-NC-SA).
+- **Modelos 3D de ejemplo** (STL en `assets/modelos` y botón «🗿 Modelos de ejemplo…»): busto de mujer, labios, ondas en el agua y anomalía (burbuja).
 - Se quita el enlace al **Calcador** (botón «➜ Calcador»): las piezas siguen saliendo en DXF y SVG con arcos, y en el Anidador.
 - Seis ejemplos nuevos: estantería ondulada, rótulo de texto, arte mural «ondas», retrato en lamas horizontales, labios y anomalía.
 

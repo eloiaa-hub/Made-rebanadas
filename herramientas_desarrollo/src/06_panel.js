@@ -57,6 +57,7 @@ function construirParams() {
 function encuadrarSiHaceFalta() { encuadrarPerfil(); encuadrarCostilla(); }
 
 function iniciarPanel() {
+  $('#bPlantillaFotos').onclick = () => dialogoNuevo();
   const sp = $('#sPlantilla');
   sp.onchange = () => {
     if (P.editado && !confirm('Se perderán los retoques hechos a mano en los perfiles. ¿Cambiar de plantilla?')) { sp.value = P.plantilla; return; }
@@ -328,7 +329,7 @@ function mostrarSecciones(forzarFigura) {
   const rel = relieveActivo(), fig = figuraActiva() || (!!forzarFigura && t !== 'pared' && t !== 'radial'), calc = !!(rel || fig), Rl = P.relieve;
   $('#filaOrigen').classList.toggle('oculto', t === 'radial');
   [...$('#sOrigen').options].forEach(o => { o.hidden = t === 'pared' ? o.value === 'figura' : !['plantilla', 'figura'].includes(o.value); });
-  $('#filaPlantilla').classList.toggle('oculto', calc); $('#params').classList.toggle('oculto', calc); $('#descPlantilla').classList.toggle('oculto', calc);
+  $('#filaPlantilla').classList.toggle('oculto', calc); $('#bPlantillaFotos').classList.toggle('oculto', calc); $('#params').classList.toggle('oculto', calc); $('#descPlantilla').classList.toggle('oculto', calc);
   $('#secRelieve').classList.toggle('oculto', !rel); $('#secFigura').classList.toggle('oculto', !fig); $('#bConvertirPerfiles').classList.toggle('oculto', !(rel || figuraActiva()));
   $('#relTexto').classList.toggle('oculto', Rl.fuente !== 'texto'); $('#relModelo').classList.toggle('oculto', Rl.fuente !== 'modelo'); $('#relImagen').classList.toggle('oculto', Rl.fuente !== 'imagen');
   $('#secClaves').classList.toggle('oculto', calc);

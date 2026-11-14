@@ -8,9 +8,3 @@ cara.stl («Busto de mujer»)
   Escultura «HeadSculptFem_001» (archivo .blend aportado por el autor del programa),
   reducida a unos 44 000 triángulos y orientada para Made-rebanadas.
   Antes de redistribuirlo o usarlo con fines comerciales, comprueba la licencia del original.
-
-nefertiti.stl («Nefertiti»)
-  Escaneo 3D del busto de Nefertiti, Neues Museum (Staatliche Museen zu Berlin),
-  publicado en 2019 tras la petición de Cosmo Wenman. Licencia: CC BY-NC-SA 4.0
-  (reconocimiento, no comercial, compartir igual). Reducido a 40 000 triángulos.
-  Uso no comercial: sirve para clase y pruebas; no para vender piezas hechas con él.

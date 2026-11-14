@@ -152,11 +152,6 @@ V, F = malla_altura(ondas, 320, 320, 5.5)
 M.append(guardar('ondas', V, F, 'Ondas en el agua', 'Dos gotas que hacen ondas concéntricas que se cruzan.', ancho=900, alto=900))
 V, F = malla_altura(burbuja, 320, 320, 5.5)
 M.append(guardar('burbuja', V, F, 'Anomalía (burbuja)', 'Una burbuja que empuja la superficie, con un surco alrededor.', ancho=900, alto=900))
-# modelos de fuera, ya reducidos y orientados (Y arriba, mirando a +Z), en herramientas_desarrollo/fuentes
-nef = os.path.join(AQUI, 'fuentes', 'nefertiti.stl')
-if os.path.exists(nef):
-    V, F = leer_stl(nef)
-    M.append(guardar('nefertiti', V, F, 'Nefertiti', 'Escaneo del busto del Neues Museum de Berlín, reducido a 40 000 triángulos.', ancho=520, alto=1000))
 with open(os.path.join(DEST, 'modelos.js'), 'w') as f:
     f.write('/* Modelos 3D de ejemplo de Made-rebanadas (generados con herramientas_desarrollo/modelos.py).\n   Los mismos modelos están en esta carpeta como .stl. */\nwindow.MADE_MODELOS = ' + json.dumps([{k: v for k, v in m.items() if not k.startswith('_')} for m in M], ensure_ascii=False) + ';\n')
 for m in M: print(m['id'], m['triangulos'], os.path.getsize(os.path.join(DEST, m['archivo'])))
