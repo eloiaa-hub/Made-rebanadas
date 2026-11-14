@@ -2,6 +2,7 @@
 
 ## v1.5
 
+- **Maderas con veta real en el 3D**: las caras de los cinco materiales de madera (abedul, chopo, pino, chapa de roble y de nogal, y el alistonado) usan ahora maderas escaneadas de Poly Haven (CC0) con color, relieve y rugosidad de verdad, recoloreadas al tono de cada material para que el 3D siga casando con los alzados y el plano. Los cantos (alma de contrachapado, MDF) siguen como estaban.
 - Las plantillas de partida dejan elegir **cuántos perfiles clave** quieres: «Panel de pared libre» (de 2 a 15; antes siempre 7), «Vacío: empezar de cero» (2 a 12) y «Vacío radial» (3 a 12). Después se pueden seguir añadiendo o quitando con **+ Clave / − Clave**.
 - Plantilla **«Vacío radial: cilindro»**: el «empezar de cero» de las lámparas y columnas. En los paneles de pared ese papel lo hace «Panel de pared libre».
 - Arreglado: al elegir **Lámpara de lóbulos** o **Columna** en la ventana 🗋 Mueble nuevo, el mueble se creaba como costillas en vez de radial. Ahora además sale con tablero de 6 mm, 12 costillas y un tubo en el que caben, como al cambiar el tipo con el selector.

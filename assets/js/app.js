@@ -2950,6 +2950,13 @@ function textura(clave, mm) {
   tx.repeat.set(1 / mm, 1 / mm); tx.anisotropy = 8;
   return G.cacheTex[ck] = tx;
 }
+function texturaSrc(src, ck, mm, datos) { // datos: relieve o rugosidad, sin espacio de color
+  if (G.cacheTex[ck]) return G.cacheTex[ck];
+  const tx = new T.TextureLoader().load(src, () => pedirRender());
+  if (!datos) tx.colorSpace = T.SRGBColorSpace;
+  tx.wrapS = tx.wrapT = T.RepeatWrapping; tx.repeat.set(1 / mm, 1 / mm); tx.anisotropy = 8;
+  return G.cacheTex[ck] = tx;
+}
 function materialesTablero() {
   const id = P.costillas.material, m = MATERIALES[id] || MATERIALES.abedul;
   const ck = id + (m.color ? P.costillas.color : ''); if (G.cacheMat[ck]) return G.cacheMat[ck];
@@ -2958,8 +2965,11 @@ function materialesTablero() {
     cara = new T.MeshStandardMaterial({ color: P.costillas.color, roughness: .5 });
     canto = cara;
   } else {
-    const mmCara = m.mm || 800, mmCanto = m.canto === 'alma_contrachapado' ? 48 : (m.mm || 800);
-    cara = new T.MeshStandardMaterial({ map: textura(m.cara, mmCara), roughness: .62 });
+    const B = (window.TEXTURAS_PBR || {})[m.cara];
+    const mmCara = B ? B.cm * 10 : (m.mm || 800), mmCanto = m.canto === 'alma_contrachapado' ? 48 : (m.mm || 800);
+    cara = B
+      ? new T.MeshStandardMaterial({ map: texturaSrc(B.color, m.cara + ':c', mmCara), normalMap: texturaSrc(B.normal, m.cara + ':n', mmCara, true), roughnessMap: texturaSrc(B.rough, m.cara + ':r', mmCara, true), roughness: 1.05 })
+      : new T.MeshStandardMaterial({ map: textura(m.cara, mmCara), roughness: .62 });
     canto = new T.MeshStandardMaterial({ map: textura(m.canto, mmCanto), roughness: .8 });
   }
   return G.cacheMat[ck] = [cara, canto];

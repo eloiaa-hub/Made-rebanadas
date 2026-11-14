@@ -8,6 +8,7 @@ No hacen falta para usar el programa: solo para cambiarlo.
 | `construir.bat` / `construir.sh` | Une las partes en `../assets/js/app.js` (Windows / Linux o Mac) |
 | `entry.js` + `package.json` | Empaqueta Three.js y sus añadidos (OrbitControls, RoomEnvironment…) en `../assets/js/three-bundle.js`, sin módulos: `npm install` y `npm run three` |
 | `texturas.py` | Genera las maderas y las almas de tablero (`python texturas.py ../assets/texturas`; necesita numpy, scipy y Pillow). Son las mismas que usa Boceto a Render 3D |
+| `../assets/texturas/pbr/` | Maderas escaneadas (Poly Haven, CC0) de las caras del 3D: color 2048 px recoloreado al tono de la biblioteca, relieve y rugosidad 1024 px. Vienen del conjunto pbr de Boceto a Render 3D (su `recolorear_maderas.py` hace el recoloreado); el LEEME de la carpeta dice el origen de cada una |
 
 ## Partes del código
 

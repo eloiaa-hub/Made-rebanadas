@@ -9,7 +9,7 @@ Manual: ayuda/manual.html y ayuda/manual.pdf
 Copia siempre la carpeta completa:
   assets/js        programa (app.js) y Three.js empaquetado sin módulos
   assets/css       estilos
-  assets/texturas  maderas y almas de tablero (texturas.js)
+  assets/texturas  maderas y almas de tablero (texturas.js) y maderas escaneadas (pbr/)
   assets/ejemplos  muebles de ejemplo (ejemplos.js)
   assets/miniaturas  fotos pequeñas de las plantillas (ventana Mueble nuevo)
   assets/modelos   modelos 3D de ejemplo para el relieve (.stl)
@@ -18,4 +18,4 @@ Copia siempre la carpeta completa:
   ayuda/           manual
   herramientas_desarrollo/  solo para cambiar el programa (ver su LEEME.md)
 
-Licencias: programa EUPL-1.2 · manual CC BY-SA 4.0 · Three.js MIT · Clipper Boost
+Licencias: programa EUPL-1.2 · manual CC BY-SA 4.0 · Three.js MIT · Clipper Boost · maderas escaneadas de Poly Haven CC0

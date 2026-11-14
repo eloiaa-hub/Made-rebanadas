@@ -1,0 +1,19 @@
+Maderas escaneadas del 3D de Made-rebanadas
+===========================================
+
+Cada archivo .js lleva una madera con tres mapas embebidos (para que funcione al abrir el
+HTML con doble clic): color (2048 px), relieve o normal (1024 px) y rugosidad (1024 px).
+Son las caras de los materiales de tablero; los cantos (alma de contrachapado, MDF) siguen
+siendo los generados de texturas.js.
+
+Origen: Poly Haven (https://polyhaven.com), licencia CC0 1.0 (dominio público). Son las
+mismas texturas que usa Boceto a Render 3D, con el color recoloreado al tono de cada
+madera de la biblioteca (igualación de histograma) para que el 3D case con los alzados y
+el plano; el relieve y la rugosidad son los del escaneado original.
+
+Archivo      Textura original
+roble.js     oak_veneer_01
+nogal.js     black_walnut_veneer_02
+fresno.js    oak_veneer_01
+haya.js      white_maple_veneer
+pino.js      coated_pine

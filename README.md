@@ -29,7 +29,7 @@ Funciona en el navegador (Chrome, Edge o Firefox), sin instalar nada y **sin con
 - **Varillas**: roscada, redondo de madera o tubo, con separadores; colocación automática y comprobación de la madera que queda al borde en cada costilla.
 - **Comprobaciones**: varillas que no caben o demasiado juntas, costillas sueltas o con una sola varilla, separadores que asoman.
 - **Ágil con muebles grandes**: los paneles de muchas lamas, las figuras y los huecos se recalculan al momento (probado con todos los ejemplos en todas sus variantes).
-- **3D**: maderas y cantos de contrachapado, varillas, tuercas y separadores, vista explosionada, volumen ideal e imagen PNG.
+- **3D**: maderas con veta real (escaneados CC0 de Poly Haven, con relieve y rugosidad) y cantos de contrachapado, varillas, tuercas y separadores, vista explosionada, volumen ideal e imagen PNG.
 - **CNC**: hueso de perro automático en ranuras y muescas, y contornos en rectas y arcos (G02/G03).
 - **Fabricar**: costillas colocadas en tableros con su número grabado; **DXF** (capas CORTE, TALADROS, GRABADO, TABLERO) y **SVG** en mm, con la **veta** marcada pieza a pieza si el tablero la tiene.
 - **Despiece y lista de compra** en CSV, y **CSV de cortes** con el formato del Anidador.
