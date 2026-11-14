@@ -2,6 +2,9 @@
 
 ## v1.5
 
+- **Huecos y perfiles desde un DXF**: dibuja un contorno cerrado en LibreCAD, QCAD, Inkscape o AutoCAD y tráelo con **📐 DXF…** (apartado Huecos) como forma libre, o con **📐 Perfil desde un DXF…** (Perfiles clave) como perfil del mueble, en uno o en todos los perfiles. Lee líneas, arcos, círculos, elipses, polilíneas y splines; junta los trazos por sus extremos y clava un punto en cada esquina viva.
+- **Veta del tablero** en Fabricar: con «A lo largo», cada pieza lleva unas rayitas con su veta y no se gira sola; clic en una pieza para cambiarla (↔ a lo ancho → ↕ a lo alto → libre). La respetan la colocación, el DXF, el SVG, el plano, el CSV de cortes y el Anidador (las piezas llegan marcadas y las de «a lo alto», ya giradas).
+- **Grosor propio de los muebles de los huecos**: lamas de 12 con caja o armario de 18, por ejemplo. Sus piezas van en tableros aparte en Fabricar (con el grosor en el rótulo, también en el DXF y el SVG), con su línea en la lista de compra, su grosor en el despiece y en la hoja 3c del plano.
 - **Revisión general**: se han probado los 28 ejemplos con planta en arco y en S, maqueta, huecos, lamas horizontales y figuras de pie (124 combinaciones) sin fallos; el DXF, el SVG, el 3D, el Anidador y el plano salen bien en todas.
 - **Más rápido**: recalcular un panel de pared grande es unas 7 veces más rápido (la colocación de los números de pieza se calcula una vez por pieza y se guarda). Las figuras en retícula guardan sus cortes y se recalculan unas 4 veces más rápido.
 - Si una varilla no cabe y el proyecto tiene huecos, el aviso sugiere mover el hueco o pulsar ✨ Auto para recolocar las varillas.

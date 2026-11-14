@@ -149,6 +149,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <tr><td>Añadir un punto</td><td><b>Doble clic sobre la línea</b> del perfil. Se añade en todos los perfiles clave, en el mismo sitio de la curva.</td></tr>
   <tr><td>Esquina o curva</td><td><b>Doble clic sobre el punto</b>, tecla <kbd>E</kbd> o botón <b>◇ Esquina</b>.</td></tr>
   <tr><td>Borrar un punto</td><td><b>Clic derecho</b> sobre él, o selecciónalo y pulsa <kbd>Supr</kbd> (mínimo 3 puntos).</td></tr>
+  <tr><td>Traer un perfil de un DXF</td><td><b>📐 Perfil desde un DXF…</b> (panel derecho): lee un contorno cerrado dibujado en LibreCAD, Inkscape o el CAD de clase y lo pone en el perfil seleccionado o en todos. El contorno se reparte en los puntos que ya tienen los perfiles; en cada esquina viva cae un punto (y se marca como esquina si va a todos). Las medidas pueden ser las del DXF o escalarse al alto del perfil de ahora.</td></tr>
   <tr><td>Moverte por el dibujo</td><td>Arrastra en vacío para desplazar y usa la rueda para acercar. <b>⤢</b> o <kbd>F</kbd> encuadra.</td></tr>
 </table>
 <figure><img src="img/claves3d.jpg" alt="Perfiles clave en el 3D"><figcaption>En la vista 3D, los perfiles clave son líneas azules: pincha una para editarla (se pone naranja). La casilla <b>Perfiles</b> de la vista 3D las muestra u oculta.</figcaption></figure>
@@ -448,14 +449,14 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <img src="img/huecos_panel.png" alt="Apartado Huecos" class="estrecha">
   <div>
     <ul>
-      <li>En el apartado <b>Huecos</b> (panel izquierdo) se añade uno con su forma: <b>▭ Rectángulo</b>, <b>▢ Redondeado</b>, <b>⌒ Arco</b> (medio punto arriba), <b>◯ Círculo u óvalo</b> o <b>✎ Libre</b>.</li>
+      <li>En el apartado <b>Huecos</b> (panel izquierdo) se añade uno con su forma: <b>▭ Rectángulo</b>, <b>▢ Redondeado</b>, <b>⌒ Arco</b> (medio punto arriba), <b>◯ Círculo u óvalo</b>, <b>✎ Libre</b> o <b>📐 DXF…</b> (un contorno dibujado en otro programa; ver más abajo).</li>
       <li>Al añadir el primero se abre la vista <b>▦ Huecos</b> (en el sitio del editor de perfil; el mismo botón vuelve al perfil).</li>
       <li>Cada hueco tiene su <b>posición</b> (X, Y de la esquina de abajo a la izquierda), <b>ancho</b>, <b>alto</b>, <b>giro</b> (grados, alrededor de su centro) y, si es redondeado, <b>radio</b>. Se puede <b>apagar</b> sin borrarlo, <b>duplicar</b> o <b>borrar</b> (🗑 en la lista, el botón 🗑 Borrar o <kbd>Supr</kbd> en la vista ▦ Huecos; se recupera con ↶).</li>
       <li><b>Tipo de hueco</b>:
         <ul>
           <li><b>Pasante</b>: se quita todo (se ve la pared, o se abre un túnel en el mueble).</li>
           <li><b>Rebaje</b> (solo pared): las lamas se recortan a una <b>profundidad desde la pared</b>, para apoyar algo plano.</li>
-          <li><b>Con mueble dentro</b>: además se dibujan y se fabrican los tableros de una <b>balda</b>, una <b>caja (hornacina)</b> o, en la pared, un <b>armario con puerta</b>. La <b>holgura</b> separa el mueble de las lamas.</li>
+          <li><b>Con mueble dentro</b>: además se dibujan y se fabrican los tableros de una <b>balda</b>, una <b>caja (hornacina)</b> o, en la pared, un <b>armario con puerta</b>. La <b>holgura</b> separa el mueble de las lamas. <b>Grosor de sus tableros</b>: en blanco, el mismo que las lamas; con un número (18, por ejemplo), el mueble se hace con tablero de ese grosor.</li>
         </ul>
       </li>
       <li>En costillas y retícula el hueco se dibuja en el perfil y es un <b>túnel</b> que va <b>desde x</b> <b>hasta x</b> a lo largo del mueble.</li>
@@ -479,12 +480,14 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <figure><img src="img/huecos_pared.jpg" alt="Pared con hornacinas"><figcaption>Ejemplo «Pared con hornacinas y armario»: ventana redondeada a la pared, hornacina y armario con puerta.</figcaption></figure>
   <figure><img src="img/huecos_banco.jpg" alt="Banco con revistero"><figcaption>Ejemplo «Banco con revistero»: un túnel a lo largo, forrado por dentro.</figcaption></figure>
 </div>
+<h3>Traer un hueco desde un DXF</h3>
+<p>Con <b>📐 DXF…</b> puedes dibujar la forma del hueco en <b>LibreCAD, QCAD, Inkscape, AutoCAD</b> o el CAD de clase y traerla como <b>forma libre</b>. El programa lee DXF <b>de texto</b> (R12 o 2000) con líneas, arcos, círculos, elipses, polilíneas (con arcos) y splines, en mm; junta los trazos sueltos por sus extremos y usa el <b>contorno cerrado</b> más grande. Antes de crearlo eliges el tamaño (el del DXF o ajustado a un ancho) y cuántos puntos dejar. Después se mueve, se estira y se gira como cualquier forma libre. Los <b>bloques (INSERT)</b> no se leen: explótalos antes de guardar; si el DXF solo tiene trazos abiertos, ciérralos en el CAD.</p>
 <h3>Lo que hace el programa con las piezas</h3>
 <ul>
   <li>Una lama o costilla cortada por un hueco puede quedar en <b>varios trozos</b>: se numeran <b>12a, 12b…</b> y salen así en el DXF, el SVG, el Anidador, el despiece y el plano. Si el hueco queda por dentro, la pieza lleva un <b>agujero</b> (se corta primero el de dentro y luego el contorno).</li>
   <li>Los <b>rastreles</b> se cortan donde hay un hueco pasante o con mueble.</li>
   <li><b>Armario con puerta de lamas</b>: los trozos de lama que caen delante de la puerta van <b>pegados a la puerta</b> («(puerta)» en el nombre) y la puerta queda escondida en el panel. Para que haya lamas delante, el <b>fondo del armario</b> tiene que ser menor que lo que salen las lamas.</li>
-  <li>Los tableros de los muebles tienen el <b>mismo grosor</b> que las lamas o costillas y salen en la hoja <b>3c</b> del plano, con la lista de huecos.</li>
+  <li>Los tableros de los muebles salen en la hoja <b>3c</b> del plano, con la lista de huecos. Por defecto tienen el <b>mismo grosor</b> que las lamas o costillas; si a un mueble le pones otro (lamas de 12 con caja de 18, por ejemplo), sus piezas van a <b>tableros aparte</b> en Fabricar, en el despiece y en la lista de compra, con su grosor en cada hoja.</li>
 </ul>
 <div class="caja taller"><b>Comprobaciones:</b> el programa avisa si un trozo de lama no llega a ningún rastrel ni a un mueble (quedaría suelto), si un trozo de costilla no tiene dos varillas, si un rebaje es tan poco profundo que la muesca del rastrel se come la lama, o si quedan trozos muy pequeños. Casi siempre se arregla moviendo un poco el hueco, poniendo un rastrel más o haciéndolo con mueble.</div>
 <figure><img src="img/huecos_costilla.png" alt="Costilla con túnel" style="max-width:380px"><figcaption>Una costilla del banco con el túnel por dentro.</figcaption></figure>
@@ -539,6 +542,8 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <li><b>Tablero</b>: medidas habituales (2440 × 1220, 2500 × 1250, 1525 × 1525 de abedul báltico…) u otras.</li>
   <li><b>Margen al borde</b> y <b>separación entre piezas</b>: deja al menos el diámetro de la fresa más unos milímetros.</li>
   <li><b>Permitir girar 90°</b>: aprovecha mejor el tablero, pero la veta de la cara queda girada en esas piezas.</li>
+  <li><b>Veta del tablero</b>: con <b>«A lo largo»</b>, cada pieza lleva unas <b>rayitas</b> con su dirección de veta y no se gira sola. <b>Clic en una pieza</b> de la vista para cambiarla: <b>↔ a lo ancho</b> de la pieza (como está dibujada) → <b>↕ a lo alto</b> (se coloca girada 90°) → <b>libre</b> (puede girar). La elección se guarda en el proyecto y la respetan la colocación, el DXF, el SVG, el plano, el CSV de cortes y el Anidador.</li>
+  <li>Si algún mueble de un hueco lleva <b>otro grosor</b>, sus piezas van en <b>tableros aparte</b>, con el grosor en el rótulo de cada tablero (también en el DXF, el SVG y el plano) y su línea propia en la lista de compra.</li>
   <li><b>Grabar el número</b> de cada costilla, para montarlas en orden.</li>
   <li><b>En fila (sin tablero)</b>: todas las costillas seguidas, para colocarlas tú en otro programa.</li>
 </ul>
@@ -604,7 +609,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 
 <h2 id="anidador">22. Anidador de tableros</h2>
 <figure><img src="img/anidador.jpg" alt="Anidador dentro de Made-rebanadas"><figcaption>El Anidador dentro de Made-rebanadas, con las costillas de una maqueta 1:5 colocadas por su forma real.</figcaption></figure>
-<p><b>🧩 Anidador</b> (en la barra o en la ventana Fabricar) abre el <b>Anidador de tableros</b> de la Suite CNC dentro del programa. Le llegan solas todas las costillas, cada una con su contorno exterior y los agujeros de las varillas, y las medidas, el grosor y el margen del tablero de Fabricar. Coloca las piezas <b>por su forma real</b>: encaja unas en los huecos de otras y aprovecha mucho mejor el tablero que la colocación de Fabricar.</p>
+<p><b>🧩 Anidador</b> (en la barra o en la ventana Fabricar) abre el <b>Anidador de tableros</b> de la Suite CNC dentro del programa. Le llegan solas todas las costillas, cada una con su contorno exterior y los agujeros de las varillas, y las medidas, el grosor, el margen y la <b>veta</b> del tablero de Fabricar: las piezas con veta llegan marcadas (columna <b>Veta</b>) y el Anidador no las gira (las de «a lo alto» llegan ya giradas 90°). Si un mueble de un hueco lleva otro grosor, anida sus piezas aparte (quítales la cantidad a unas u otras, o haz dos pasadas). Coloca las piezas <b>por su forma real</b>: encaja unas en los huecos de otras y aprovecha mucho mejor el tablero que la colocación de Fabricar.</p>
 <ul>
   <li>Elige la <b>fresa</b> y la <b>holgura</b>: la separación entre piezas es su suma.</li>
   <li>Puedes mover, girar o fijar (📌) piezas a mano, y cambiar el tablero.</li>

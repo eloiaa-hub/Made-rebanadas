@@ -1565,7 +1565,7 @@ if (DESDE_REBANADAS) {
       const nuevas = [];
       (d.piezas || []).forEach(j => { const p = piezaDeJSON(j, (j.nombre || 'Costilla') + '.json'); p.cant = Math.max(1, +j.cantidad || 1); p.veta = !!j.veta; p.color = colorNuevo(nuevas); nuevas.push(p); });
       piezas = nuevas;
-      if (d.tablero) restaurarTablero(d.tablero);
+      if (d.tablero) { restaurarTablero(d.tablero); if (typeof d.tablero.veta === 'boolean') $('tVeta').checked = d.tablero.veta; }
       todo();
       snack(`${nuevas.length} costillas de «${d.nombre || 'Made-rebanadas'}»`);
     } catch (err) { snack(err.message || 'No se pudieron recibir las costillas'); }

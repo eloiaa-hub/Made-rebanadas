@@ -18,7 +18,7 @@ function huecoNuevo(forma) {
   const w = fr ? Math.round(Math.min(600, W * 0.3) / 10) * 10 : Math.round(caja.w * 0.35 / 10) * 10, h = fr ? Math.round(Math.min(500, H * 0.35) / 10) * 10 : Math.round(caja.h * 0.3 / 10) * 10;
   const x = fr ? Math.round((W - w) / 20) * 10 : Math.round((caja.x0 + (caja.w - w) / 2) / 10) * 10, y = fr ? Math.round((H - h) / 20) * 10 : Math.round((caja.y0 + (caja.h - h) / 2) / 10) * 10;
   const hu = { id: 'h' + Date.now().toString(36) + (sigHueco++), activo: true, forma, giro: 0, x, y, ancho: w, alto: h, radio: Math.round(Math.min(w, h) / 5), pts: null,
-    modo: 'pasante', prof: 40, holgura: 2, desde: 0, hasta: Math.round(P.largo), mueble: { tipo: 'caja', fondo: fr ? 150 : 0, trasera: true, puerta: 'lisa', holguraPuerta: 3 } };
+    modo: 'pasante', prof: 40, holgura: 2, desde: 0, hasta: Math.round(P.largo), mueble: { tipo: 'caja', fondo: fr ? 150 : 0, trasera: true, puerta: 'lisa', holguraPuerta: 3, grosor: 0 } };
   if (forma === 'libre') hu.pts = [[x, y], [x + w, y], [x + w * 0.85, y + h], [x + w * 0.15, y + h * 0.8]];
   return hu;
 }
@@ -84,6 +84,7 @@ function tramosEnFranja(forma, eje, c0, c1) {
   // (otro solo documenta qué eje es la franja)
 }
 // el túnel, dentro del largo del mueble (y como mínimo un poco más que el grosor)
+const grosorMueble = h => (h.mueble && h.mueble.grosor) || grosor();
 function tramoX(h) { const L = P.largo, e = grosor(); return [clamp(Math.min(h.desde, h.hasta), -e, L + e), clamp(Math.max(h.desde, h.hasta), -e, L + e)]; }
 const lamasH = () => P.tipo === 'pared' && P.relieve && P.relieve.orient === 'h';
 
@@ -103,7 +104,7 @@ function recortesDe(p) {
       if (muebleH && h.mueble.tipo === 'armario' && h.mueble.puerta === 'lamas') {
         const red = engordar(formaHueco(h), -Math.max(1, h.mueble.holguraPuerta || 3));
         const t2 = tramosEnFranja(red, eje, p.x - e / 2, p.x + e / 2);
-        const uP = Math.max(0, h.mueble.fondo || 0) + grosor();   // por delante de la puerta
+        const uP = Math.max(0, h.mueble.fondo || 0) + grosorMueble(h);   // por delante de la puerta
         t2.forEach(([a, b]) => extra.push({ hueco: ih, poly: [[uP, a], [1e5, a], [1e5, b], [uP, b]] }));
       }
     } else if (p.z) {
@@ -189,14 +190,14 @@ function parteConPunto(c, x, y, need) {
    Cada tablero es una caja alineada con los ejes del mueble (x a lo largo, u fondo, v alto). */
 function aXUV(X, Y) { return lamasH() ? [Y, X] : [X, Y]; }       // del frente del panel a (x, v)
 function construirModulos(res) {
-  const e = grosor();
   huecosActivos().forEach((h, ih) => {
     if (h.modo !== 'mueble') return;
+    const e = grosorMueble(h);   // el mueble puede llevar su propio grosor de tablero
     const M = h.mueble, cb = cajaHueco(h), nomH = 'Hueco ' + (P.huecos.indexOf(h) + 1), tabla = [];
     const add = (nombre, x0, x1, u0, u1, v0, v1) => {
       const d = [Math.abs(x1 - x0), Math.abs(u1 - u0), Math.abs(v1 - v0)];
       if (Math.min(...d) < 0.5 || d.filter(z => z > e * 1.5).length < 2) return;
-      tabla.push({ modulo: true, hueco: ih, nombre: nomH + ' · ' + nombre, x: (x0 + x1) / 2, caja3: [Math.min(x0, x1), Math.max(x0, x1), Math.min(u0, u1), Math.max(u0, u1), Math.min(v0, v1), Math.max(v0, v1)], ok: true, agujeros: [], ranuras: [], huecos: [], int: [] });
+      tabla.push({ modulo: true, hueco: ih, grosorPieza: e, nombre: nomH + ' · ' + nombre, x: (x0 + x1) / 2, caja3: [Math.min(x0, x1), Math.max(x0, x1), Math.min(u0, u1), Math.max(u0, u1), Math.min(v0, v1), Math.max(v0, v1)], ok: true, agujeros: [], ranuras: [], huecos: [], int: [] });
     };
     if (P.tipo === 'pared') {
       const F = Math.max(e * 2, M.fondo || 150);

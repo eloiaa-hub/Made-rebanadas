@@ -162,6 +162,7 @@
           <button data-hnuevo="arco" title="Rectángulo con arco de medio punto arriba">⌒ Arco</button>
           <button data-hnuevo="circulo" title="Círculo u óvalo">◯ Círculo</button>
           <button data-hnuevo="libre" title="Forma libre: mueve los vértices en la vista; doble clic en un lado añade uno">✎ Libre</button>
+          <button id="bHuecoDXF" title="Trae un contorno cerrado dibujado en LibreCAD, Inkscape u otro CAD (DXF de texto) como hueco de forma libre">📐 DXF…</button>
         </div>
         <ul id="listaHuecos" class="lista corta"></ul>
         <div id="hcCampos" class="oculto">
@@ -185,6 +186,7 @@
             <label class="fila">Mueble <select id="hcMueble"><option value="balda">Balda</option><option value="caja">Caja (hornacina)</option><option value="armario">Armario con puerta</option></select></label>
             <label class="fila" id="filaHcFondo" title="Fondo del mueble desde la pared">Fondo del mueble (mm) <input type="number" id="hcFondo" min="0" step="5"></label>
             <label class="fila chk" id="filaHcTrasera"><input type="checkbox" id="hcTrasera"> Con trasera</label>
+            <label class="fila" title="Grosor del tablero de este mueble; 0 o vacío: el mismo que las lamas o costillas. Sale con su tablero aparte en el despiece y en Fabricar">Grosor de sus tableros (mm) <input type="number" id="hcGrosorM" min="0" step="1" placeholder="igual"></label>
             <div id="filaHcPuerta">
               <label class="fila" title="Puerta lisa, o puerta que lleva delante sus trozos de lama (queda escondida en el panel)">Puerta <select id="hcPuerta"><option value="lisa">Lisa</option><option value="lamas">Con las lamas (escondida)</option></select></label>
               <label class="fila">Holgura de la puerta (mm) <input type="number" id="hcHolPuerta" min="0" step="0.5"></label>
@@ -352,6 +354,7 @@
           <button id="bClaveMenos" class="peligro" title="Quitar este perfil clave">🗑 Quitar</button>
         </div>
         <button id="bSimplificar" class="ancho" title="Quita puntos a todos los perfiles clave a la vez, primero los que menos cambian la forma">✂ Simplificar puntos…</button>
+        <button id="bPerfilDXF" class="ancho" title="Trae un contorno cerrado dibujado en LibreCAD, Inkscape u otro CAD (DXF de texto) como perfil clave">📐 Perfil desde un DXF…</button>
         <label class="fila chk"><input type="checkbox" id="kTodas"> Al mover un punto, moverlo en todas las claves</label>
         <label class="fila">Rejilla al mover
           <select id="kRejilla"><option value="0">Sin ajuste</option><option value="1">1 mm</option><option value="5" selected>5 mm</option><option value="10">10 mm</option></select></label>
@@ -395,14 +398,15 @@
 
 <input type="file" id="fArchivo" class="oculto" accept=".json,application/json">
 <input type="file" id="fModelo" class="oculto" accept=".stl,.obj">
+<input type="file" id="fDXF" class="oculto" accept=".dxf">
 <input type="file" id="fImagen" class="oculto" accept="image/*">
 <input type="file" id="fLetra" class="oculto" accept=".ttf,.otf,.woff,.woff2">
 <div id="aviso" class="aviso"></div>
 
-<script src="assets/js/three-bundle.js?v=202611140042"></script>
-<script src="assets/texturas/texturas.js?v=202611140042"></script>
-<script src="assets/ejemplos/ejemplos.js?v=202611140042"></script>
-<script src="assets/js/clipper.js?v=202611140042"></script>
-<script src="assets/js/app.js?v=202611140042"></script>
+<script src="assets/js/three-bundle.js?v=202611141011"></script>
+<script src="assets/texturas/texturas.js?v=202611141011"></script>
+<script src="assets/ejemplos/ejemplos.js?v=202611141011"></script>
+<script src="assets/js/clipper.js?v=202611141011"></script>
+<script src="assets/js/app.js?v=202611141011"></script>
 </body>
 </html>

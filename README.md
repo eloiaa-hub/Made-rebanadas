@@ -18,9 +18,9 @@ Funciona en el navegador (Chrome, Edge o Firefox), sin instalar nada y **sin con
 ## Qué hace
 
 - **Forma paramétrica**: plantillas de banco ondulado, tumbona, pouf / taburete, mesa baja «ola», estantería «duna» y forma libre, con sus medidas en deslizadores.
-- **Perfiles clave**: la forma se define con unos pocos perfiles a lo largo del mueble; cada costilla es la mezcla suave de los perfiles que tiene a los lados. Se editan a mano (puntos de curva o de esquina).
+- **Perfiles clave**: la forma se define con unos pocos perfiles a lo largo del mueble; cada costilla es la mezcla suave de los perfiles que tiene a los lados. Se editan a mano (puntos de curva o de esquina)) o se traen de un **DXF** dibujado en otro programa.
 - **Cuatro tipos**: costillas unidas con varillas (en planta recta, en **arco** o **en S**), **retícula entrelazada** a media madera, **radiales** (lámparas y columnas alrededor de un tubo, con discos de unión) y **paneles de pared** (lamas sobre rastreles).
-- **Huecos**: ventanas, rebajes, hornacinas, baldas y armarios dentro de las lamas, y túneles en los muebles de costillas (formas rectangulares, redondeadas, en arco, círculos o libres).
+- **Huecos**: ventanas, rebajes, hornacinas, baldas y armarios dentro de las lamas, y túneles en los muebles de costillas (formas rectangulares, redondeadas, en arco, círculos o libres), o un contorno traído de un **DXF**). Los muebles de los huecos pueden llevar **otro grosor de tablero**, con sus tableros aparte.
 - **Figuras de pie desde un STL/OBJ**: el modelo cortado de verdad en costillas o en retícula (bustos, esculturas).
 - **Modelo 3D**: el mueble montado se guarda en STL u OBJ (para otros programas o impresión 3D).
 - **Arte mural, rótulos y estanterías**: relieve de pared a partir de un **texto** (nombres, logos) o de una **imagen en escala de grises**, o de una **figura STL/OBJ** (caras, labios, formas; trae cinco STL de ejemplo en `assets/modelos`, entre ellos un busto de mujer y Nefertiti), en lamas verticales u horizontales, y estantería de pared ondulada de lamas.
@@ -31,7 +31,7 @@ Funciona en el navegador (Chrome, Edge o Firefox), sin instalar nada y **sin con
 - **Ágil con muebles grandes**: los paneles de muchas lamas, las figuras y los huecos se recalculan al momento (probado con todos los ejemplos en todas sus variantes).
 - **3D**: maderas y cantos de contrachapado, varillas, tuercas y separadores, vista explosionada, volumen ideal e imagen PNG.
 - **CNC**: hueso de perro automático en ranuras y muescas, y contornos en rectas y arcos (G02/G03).
-- **Fabricar**: costillas colocadas en tableros con su número grabado; **DXF** (capas CORTE, TALADROS, GRABADO, TABLERO) y **SVG** en mm.
+- **Fabricar**: costillas colocadas en tableros con su número grabado; **DXF** (capas CORTE, TALADROS, GRABADO, TABLERO) y **SVG** en mm, con la **veta** marcada pieza a pieza si el tablero la tiene.
 - **Despiece y lista de compra** en CSV, y **CSV de cortes** con el formato del Anidador.
 - **Maqueta a escala** (1:2 a 1:20) para cortarla antes en la láser.
 - **Plano de montaje en PDF**: conjunto, orden de montaje, varillas, costillas acotadas, tableros y pasos.

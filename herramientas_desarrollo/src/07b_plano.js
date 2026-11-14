@@ -270,8 +270,9 @@ function planoPDF() {
       const [x0, x1] = P.tipo === 'pared' ? [0, 0] : tramoX(h);
       filas.push([`Hueco H${n}`, `${{ rect: 'rectángulo', redondeado: 'redondeado', arco: 'arco', circulo: 'círculo', libre: 'forma libre' }[h.forma]} ${fmt(cb.w * k)} × ${fmt(cb.h * k)} mm en (${fmt(cb.x0 * k)}, ${fmt(cb.y0 * k)})${P.tipo === 'pared' ? '' : ` · de x = ${fmt(x0 * k)} a ${fmt(x1 * k)} mm`} · ${mod}`]); });
     if (mods.length) {
-      filas.push({ titulo: `Tableros de los muebles: ${fmt(grosor() * k, 1)} mm (el mismo grosor que las ${P.tipo === 'pared' ? 'lamas' : 'costillas'})` });
-      mods.forEach(m => filas.push([`${m.etq} · ${m.nombre}`, `${fmt(m.medidas[0] * k)} × ${fmt(m.medidas[1] * k)} mm`]));
+      const gsM = [...new Set(mods.map(m => m.grosorPieza || grosor()))], propio = gsM.some(e => Math.abs(e - grosor()) > 0.01);
+      filas.push({ titulo: propio ? `Tableros de los muebles (cada uno con su grosor; el que no lleva el de las ${P.tipo === 'pared' ? 'lamas' : 'costillas'} va en tablero aparte)` : `Tableros de los muebles: ${fmt(grosor() * k, 1)} mm (el mismo grosor que las ${P.tipo === 'pared' ? 'lamas' : 'costillas'})` });
+      mods.forEach(m => filas.push([`${m.etq} · ${m.nombre}`, `${fmt(m.medidas[0] * k)} × ${fmt(m.medidas[1] * k)} mm${propio ? ` · grosor ${fmt((m.grosorPieza || grosor()) * k, 1)} mm` : ''}`]));
     }
     tabla(M, M + 22, W - 2 * M, filas, { c1: 70 });
   }
@@ -280,12 +281,13 @@ function planoPDF() {
   if (f.modo !== 'fila' && col.tableros.length) {
     const porH = 4;
     for (let t0 = 0; t0 < col.tableros.length; t0 += porH) {
-      cabecera(`4. Corte: tableros de ${fmt(f.ancho)} × ${fmt(f.alto)} mm (${col.tableros.length} en total, aprovechamiento ${fmt(col.uso * 100)} %)`);
+      const variosG = (col.grosores || []).length > 1;
+      cabecera(`4. Corte: tableros de ${fmt(f.ancho)} × ${fmt(f.alto)} mm (${col.tableros.length} en total, aprovechamiento ${fmt(col.uso * 100)} %${vetaOn() ? ' · la veta, a lo largo del tablero' : ''})`);
       const tw = (W - 2 * M - 10) / 2, th = (H - 2 * M - 30) / 2, s4 = Math.min(tw / f.ancho, (th - 6) / f.alto);
       col.tableros.slice(t0, t0 + porH).forEach((t, j) => {
         const bx = M + (j % 2) * (tw + 10), by = M + 24 + Math.floor(j / 2) * (th + 4);
         const BX = x => bx + x * s4, BY = yv => by + 5 + (f.alto - yv) * s4;
-        D.texto(bx, by + 2.5, `Tablero ${t0 + j + 1}: ${t.piezas.length} piezas`, { pt: 8.5, b: true });
+        D.texto(bx, by + 2.5, `Tablero ${t0 + j + 1}: ${t.piezas.length} piezas` + (variosG ? ` · grosor ${fmt(t.grosor, 1)} mm` : ''), { pt: 8.5, b: true });
         D.relleno([244, 235, 218]).trazo([168, 139, 92]).grosor(0.3).rect(BX(0), BY(f.alto), f.ancho * s4, f.alto * s4, 'b');
         t.piezas.forEach(pz => {
           D.relleno([226, 205, 172]).trazo(madera).grosor(0.2).poli(simplificaCerrado(pz.g.poly, 0.3 * (maq ? 0.2 : 1)).map(p => { const q = aTablero(pz, p); return [BX(q[0]), BY(q[1])]; }), true, 'b');

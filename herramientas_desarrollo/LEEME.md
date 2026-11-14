@@ -19,6 +19,7 @@ No hacen falta para usar el programa: solo para cambiarlo.
 | `fuentes/` | Modelos de fuera ya reducidos y orientados (Y arriba, mirando a +Z): `busto_mujer.stl`, `nefertiti.stl`; `modelos.py` los incluye |
 | `modelos.py` | Genera los STL y las imágenes en grises de ejemplo (`assets/modelos/modelos.js`, `assets/imagenes/imagenes.js`) (numpy y scikit-image) |
 | `02f_huecos.js` | Huecos: formas, restas con Clipper, trozos (12a, 12b), muebles insertados (tableros), rastreles cortados y avisos |
+| `02g_dxf.js` | Lectura de DXF de texto (LINE, ARC, CIRCLE, ELLIPSE, LWPOLYLINE y POLYLINE con bulge, SPLINE): contornos cerrados para huecos libres y perfiles clave |
 | `04b_huecos.js` | Vista ▦ Huecos (frente del panel o perfil) y apartado Huecos del panel |
 | `02e_figura.js` | Figuras de pie: malla guardada en el proyecto (int16/uint32 en base64), cortes por planos, unión de trozos con puentes (rejilla) y conversión a perfiles clave |
 | `02d_relieve.js` | Relieve de pared: mapa de alturas desde un texto (canvas) o un modelo STL/OBJ (z-buffer), perfil de cada lama, lamas horizontales |

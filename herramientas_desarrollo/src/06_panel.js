@@ -199,6 +199,7 @@ function iniciarPanel() {
   $('#bFigEjemplo').onclick = () => dialogoModelos(true);
   $('#bConvertirPerfiles').onclick = dialogoConvertir;
   $('#bSimplificar').onclick = dialogoSimplificar;
+  $('#bPerfilDXF').onclick = dialogoPerfilDXF;
   $$('.bLetra').forEach(bt => bt.onclick = () => {
     const destino = bt.closest('#caCampos') ? 'capa' : 'texto', f = $('#fLetra'); f.value = '';
     f.onchange = () => {

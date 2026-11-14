@@ -160,6 +160,7 @@ function iniciarHuecos() {
     if (!UI.vistaHuecos) verHuecos(true); else encuadrarHuecos();
   });
   $('#bHuecoQuitar').onclick = () => borrarHueco(UI.hueco);
+  $('#bHuecoDXF').onclick = dialogoHuecoDXF;
   $('#bHuecoCopia').onclick = () => { const h = huecoSel(); if (!h) return; const c2 = JSON.parse(JSON.stringify(h)); c2.id = 'h' + Date.now().toString(36); c2.x += 50; c2.y += 50; if (c2.pts) c2.pts = c2.pts.map(p => [p[0] + 50, p[1] + 50]); P.huecos.push(c2); UI.hueco = P.huecos.length - 1; cambio('Hueco duplicado'); };
   const campo = (sel, fn) => enlazar(sel, () => { const h = huecoSel(); if (!h) return; fn(h, $(sel)); cambio(); });
   campo('#hcForma', (h, el) => { const v = el.value; if (v === 'libre' && !h.pts) h.pts = formaHueco(h).filter((_, i, a) => a.length <= 8 || i % Math.ceil(a.length / 8) === 0); h.forma = v; });
@@ -178,6 +179,7 @@ function iniciarHuecos() {
   campo('#hcMueble', (h, el) => { h.mueble.tipo = el.value; });
   campo('#hcFondo', (h, el) => { h.mueble.fondo = Math.max(0, +el.value || 0); });
   campo('#hcTrasera', (h, el) => { h.mueble.trasera = el.checked; });
+  campo('#hcGrosorM', (h, el) => { h.mueble.grosor = clamp(+el.value || 0, 0, 100); });
   campo('#hcPuerta', (h, el) => { h.mueble.puerta = el.value; });
   campo('#hcHolPuerta', (h, el) => { h.mueble.holguraPuerta = Math.max(0, +el.value || 0); });
 }
@@ -198,6 +200,7 @@ function ponerCamposHueco() {
   [...$('#hcMueble').options].forEach(o => { o.hidden = !fr && o.value === 'armario'; });
   if (!fr && h.mueble.tipo === 'armario') h.mueble.tipo = 'caja';
   $('#hcMueble').value = h.mueble.tipo; $('#hcFondo').value = h.mueble.fondo; $('#filaHcFondo').classList.toggle('oculto', !fr);
+  $('#hcGrosorM').value = h.mueble.grosor || '';
   $('#hcTrasera').checked = !!h.mueble.trasera; $('#filaHcTrasera').classList.toggle('oculto', !fr || h.mueble.tipo === 'balda');
   $('#filaHcPuerta').classList.toggle('oculto', h.mueble.tipo !== 'armario'); $('#hcPuerta').value = h.mueble.puerta; $('#hcHolPuerta').value = h.mueble.holguraPuerta;
   $('#hcXTit').textContent = fr ? 'X desde la izquierda (mm)' : 'u: fondo (mm)'; $('#hcYTit').textContent = fr ? 'Y desde abajo (mm)' : 'v: altura (mm)';

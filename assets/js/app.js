@@ -94,7 +94,7 @@ function proyectoBase() {
     varillas: { tipo: 'roscada', diam: 10, holgura: 0.5, margen: 20, tramo: 'todas', separadores: true, sepD: 22, sobra: 12, autoN: 3, lista: [] },
     vista: { explosion: 0, fantasma: false, varillas: true, resalta: true, claves: true, rasante: false, rasAng: 30 },
     maqueta: { activa: false, escala: 5, grosor: 3, diam: 3, holgura: 0.2, fresa: 0 },
-    cnc: { fresa: 6, hueso: true, arcos: true, tolArco: 0.05 },
+    cnc: { fresa: 6, hueso: true, arcos: true, tolArco: 0.05, veta: 'no' },
     reticula: { num: 4, margen: 40, holgura: 0.3, xArriba: true, vuelo: 25 },
     planta: { forma: 'recta', radio: 2500, sentido: 1, amplitud: 150, ondas: 1 },
     radial: { tubo: 20, holguraTubo: 0.5, discos: 2, rDisco: 0, holgura: 0.3 },
@@ -1444,7 +1444,7 @@ function huecoNuevo(forma) {
   const w = fr ? Math.round(Math.min(600, W * 0.3) / 10) * 10 : Math.round(caja.w * 0.35 / 10) * 10, h = fr ? Math.round(Math.min(500, H * 0.35) / 10) * 10 : Math.round(caja.h * 0.3 / 10) * 10;
   const x = fr ? Math.round((W - w) / 20) * 10 : Math.round((caja.x0 + (caja.w - w) / 2) / 10) * 10, y = fr ? Math.round((H - h) / 20) * 10 : Math.round((caja.y0 + (caja.h - h) / 2) / 10) * 10;
   const hu = { id: 'h' + Date.now().toString(36) + (sigHueco++), activo: true, forma, giro: 0, x, y, ancho: w, alto: h, radio: Math.round(Math.min(w, h) / 5), pts: null,
-    modo: 'pasante', prof: 40, holgura: 2, desde: 0, hasta: Math.round(P.largo), mueble: { tipo: 'caja', fondo: fr ? 150 : 0, trasera: true, puerta: 'lisa', holguraPuerta: 3 } };
+    modo: 'pasante', prof: 40, holgura: 2, desde: 0, hasta: Math.round(P.largo), mueble: { tipo: 'caja', fondo: fr ? 150 : 0, trasera: true, puerta: 'lisa', holguraPuerta: 3, grosor: 0 } };
   if (forma === 'libre') hu.pts = [[x, y], [x + w, y], [x + w * 0.85, y + h], [x + w * 0.15, y + h * 0.8]];
   return hu;
 }
@@ -1510,6 +1510,7 @@ function tramosEnFranja(forma, eje, c0, c1) {
   // (otro solo documenta qué eje es la franja)
 }
 // el túnel, dentro del largo del mueble (y como mínimo un poco más que el grosor)
+const grosorMueble = h => (h.mueble && h.mueble.grosor) || grosor();
 function tramoX(h) { const L = P.largo, e = grosor(); return [clamp(Math.min(h.desde, h.hasta), -e, L + e), clamp(Math.max(h.desde, h.hasta), -e, L + e)]; }
 const lamasH = () => P.tipo === 'pared' && P.relieve && P.relieve.orient === 'h';
 
@@ -1529,7 +1530,7 @@ function recortesDe(p) {
       if (muebleH && h.mueble.tipo === 'armario' && h.mueble.puerta === 'lamas') {
         const red = engordar(formaHueco(h), -Math.max(1, h.mueble.holguraPuerta || 3));
         const t2 = tramosEnFranja(red, eje, p.x - e / 2, p.x + e / 2);
-        const uP = Math.max(0, h.mueble.fondo || 0) + grosor();   // por delante de la puerta
+        const uP = Math.max(0, h.mueble.fondo || 0) + grosorMueble(h);   // por delante de la puerta
         t2.forEach(([a, b]) => extra.push({ hueco: ih, poly: [[uP, a], [1e5, a], [1e5, b], [uP, b]] }));
       }
     } else if (p.z) {
@@ -1615,14 +1616,14 @@ function parteConPunto(c, x, y, need) {
    Cada tablero es una caja alineada con los ejes del mueble (x a lo largo, u fondo, v alto). */
 function aXUV(X, Y) { return lamasH() ? [Y, X] : [X, Y]; }       // del frente del panel a (x, v)
 function construirModulos(res) {
-  const e = grosor();
   huecosActivos().forEach((h, ih) => {
     if (h.modo !== 'mueble') return;
+    const e = grosorMueble(h);   // el mueble puede llevar su propio grosor de tablero
     const M = h.mueble, cb = cajaHueco(h), nomH = 'Hueco ' + (P.huecos.indexOf(h) + 1), tabla = [];
     const add = (nombre, x0, x1, u0, u1, v0, v1) => {
       const d = [Math.abs(x1 - x0), Math.abs(u1 - u0), Math.abs(v1 - v0)];
       if (Math.min(...d) < 0.5 || d.filter(z => z > e * 1.5).length < 2) return;
-      tabla.push({ modulo: true, hueco: ih, nombre: nomH + ' · ' + nombre, x: (x0 + x1) / 2, caja3: [Math.min(x0, x1), Math.max(x0, x1), Math.min(u0, u1), Math.max(u0, u1), Math.min(v0, v1), Math.max(v0, v1)], ok: true, agujeros: [], ranuras: [], huecos: [], int: [] });
+      tabla.push({ modulo: true, hueco: ih, grosorPieza: e, nombre: nomH + ' · ' + nombre, x: (x0 + x1) / 2, caja3: [Math.min(x0, x1), Math.max(x0, x1), Math.min(u0, u1), Math.max(u0, u1), Math.min(v0, v1), Math.max(v0, v1)], ok: true, agujeros: [], ranuras: [], huecos: [], int: [] });
     };
     if (P.tipo === 'pared') {
       const F = Math.max(e * 2, M.fondo || 150);
@@ -1715,6 +1716,265 @@ function tocaMueble(q) {
       return Math.abs(along1 - l0) <= hol + 1 || Math.abs(along0 - l1) <= hol + 1;
     }
     return true;
+  });
+}
+
+/* ===================== LEER UN DXF =====================
+   Lee un DXF de texto (LibreCAD, Inkscape, QCAD, AutoCAD…) y saca sus contornos cerrados,
+   para usarlos como forma libre de un hueco o como perfil clave.
+   Entiende LINE, ARC, CIRCLE, ELLIPSE, LWPOLYLINE y POLYLINE (con bulge) y SPLINE (NURBS).
+   Los bloques (INSERT) no se leen: hay que explotarlos antes de guardar. */
+
+function paresDXF(texto) {
+  const lineas = texto.split(/\r\n|\n|\r/), pares = [];
+  for (let i = 0; i + 1 < lineas.length; i += 2) {
+    const c = parseInt(lineas[i], 10);
+    if (!isNaN(c)) pares.push([c, lineas[i + 1].trim()]);
+  }
+  return pares;
+}
+// muestrea un arco de circunferencia (ángulos en radianes, a1 > a0 en antihorario)
+function arcoPts(cx, cy, r, a0, a1, conFin) {
+  const paso = clamp(2 * Math.acos(Math.max(0, 1 - 0.1 / Math.max(r, 0.1))), 0.06, 0.3);
+  const n = Math.max(2, Math.ceil(Math.abs(a1 - a0) / paso)), out = [];
+  for (let i = 0; i <= (conFin ? n : n - 1); i++) { const a = a0 + (a1 - a0) * i / n; out.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]); }
+  return out;
+}
+// tramo con bulge (b = tan(ángulo/4)) entre p y q, sin el punto final
+function bulgePts(p, q, b) {
+  if (!b) return [p];
+  const ang = 4 * Math.atan(b), d = Math.hypot(q[0] - p[0], q[1] - p[1]) / 2;
+  if (d < 1e-9) return [p];
+  const r = d / Math.sin(ang / 2), mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2;
+  const h = r * Math.cos(ang / 2), s = b > 0 ? 1 : -1;
+  const cx = mx - s * h * (q[1] - p[1]) / (2 * d), cy = my + s * h * (q[0] - p[0]) / (2 * d);
+  const a0 = Math.atan2(p[1] - cy, p[0] - cx);
+  return arcoPts(cx, cy, Math.abs(r), a0, a0 + ang, false);
+}
+// curva NURBS (de Boor): grado g, nudos U, controles C [[x,y]], pesos W
+function nurbsPts(g, U, C, W) {
+  if (C.length < g + 1 || U.length < C.length + g + 1) return C.slice();
+  const u0 = U[g], u1 = U[U.length - 1 - g], out = [], N = Math.max(16, C.length * 8);
+  for (let k = 0; k <= N; k++) {
+    const u = u0 + (u1 - u0) * k / N;
+    let s = g; while (s < U.length - g - 2 && u >= U[s + 1]) s++;
+    const d = [];
+    for (let j = 0; j <= g; j++) { const w = W[s - g + j] || 1; d.push([C[s - g + j][0] * w, C[s - g + j][1] * w, w]); }
+    for (let r = 1; r <= g; r++) for (let j = g; j >= r; j--) {
+      const i = s - g + j, den = U[i + g - r + 1] - U[i];
+      const a = den ? (u - U[i]) / den : 0;
+      d[j] = [d[j - 1][0] * (1 - a) + d[j][0] * a, d[j - 1][1] * (1 - a) + d[j][1] * a, d[j - 1][2] * (1 - a) + d[j][2] * a];
+    }
+    out.push([d[g][0] / d[g][2], d[g][1] / d[g][2]]);
+  }
+  return out;
+}
+/* lee el DXF y devuelve { lazos: [[x, y]…] cerrados (de mayor a menor área), abiertos, factor, aviso } */
+function leerDXF(texto) {
+  if (texto.slice(0, 22).includes('AutoCAD Binary')) throw new Error('Es un DXF binario: guárdalo como DXF de texto (ASCII), por ejemplo R12 o 2000.');
+  const pares = paresDXF(texto);
+  if (!pares.length) throw new Error('No parece un DXF de texto.');
+  let factor = 1, enEnts = false, i = 0, hayInsert = 0;
+  // $INSUNITS en HEADER: 1 pulgadas, 4 mm, 5 cm, 6 m (si no está, se toma mm)
+  for (let j = 0; j + 1 < pares.length; j++) if (pares[j][0] === 9 && pares[j][1] === '$INSUNITS') { const v = +pares[j + 1][1]; factor = { 1: 25.4, 2: 304.8, 4: 1, 5: 10, 6: 1000 }[v] || 1; break; }
+  const trazos = [];   // cada uno: { pts, cerrado }
+  while (i < pares.length) {
+    const [c, v] = pares[i];
+    if (c === 0 && v === 'SECTION' && pares[i + 1] && pares[i + 1][1] === 'ENTITIES') enEnts = true;
+    else if (c === 0 && v === 'ENDSEC') enEnts = false;
+    else if (enEnts && c === 0) {
+      // recoge los códigos de la entidad (los repetidos, en orden)
+      const ent = v, d = {}; let j = i + 1;
+      for (; j < pares.length && pares[j][0] !== 0; j++) { const [cc, vv] = pares[j]; (d[cc] = d[cc] || []).push(parseFloat(vv) || (cc < 10 ? vv : 0)); }
+      const n1 = cc => d[cc] ? +d[cc][0] : 0, rad = g => g * Math.PI / 180;
+      if (ent === 'LINE') trazos.push({ pts: [[n1(10), n1(20)], [n1(11), n1(21)]], cerrado: false });
+      else if (ent === 'ARC') { let a0 = rad(n1(50)), a1 = rad(n1(51)); while (a1 <= a0) a1 += 2 * Math.PI; trazos.push({ pts: arcoPts(n1(10), n1(20), n1(40), a0, a1, true), cerrado: false }); }
+      else if (ent === 'CIRCLE') trazos.push({ pts: arcoPts(n1(10), n1(20), n1(40), 0, 2 * Math.PI, false), cerrado: true });
+      else if (ent === 'ELLIPSE') {
+        const cx = n1(10), cy = n1(20), ax = n1(11), ay = n1(21), rr = n1(40) || 1;
+        let p0 = d[41] ? +d[41][0] : 0, p1 = d[42] ? +d[42][0] : 2 * Math.PI; while (p1 <= p0) p1 += 2 * Math.PI;
+        const cer = Math.abs(p1 - p0 - 2 * Math.PI) < 1e-6, N = 72, pts = [];
+        for (let k = 0; k <= (cer ? N - 1 : N); k++) { const t = p0 + (p1 - p0) * k / N, ct = Math.cos(t), st = Math.sin(t) * rr; pts.push([cx + ax * ct - ay * st, cy + ay * ct + ax * st]); }
+        trazos.push({ pts, cerrado: cer });
+      } else if (ent === 'LWPOLYLINE') {
+        const xs = d[10] || [], ys = d[20] || [], bs = d[42], cer = (n1(70) & 1) === 1, pts = [];
+        // el bulge solo acompaña a algunos vértices: hay que mirar el orden original
+        const bPorV = new Array(xs.length).fill(0);
+        if (bs) { let vi = -1, bi = 0; for (let k = i + 1; k < j; k++) { if (pares[k][0] === 10) vi++; if (pares[k][0] === 42) bPorV[vi] = +pares[k][1] || 0; } }
+        for (let k = 0; k < xs.length; k++) {
+          const p = [+xs[k], +ys[k]], q = k + 1 < xs.length ? [+xs[k + 1], +ys[k + 1]] : (cer ? [+xs[0], +ys[0]] : null);
+          if (q) bulgePts(p, q, bPorV[k]).forEach(z => pts.push(z)); else pts.push(p);
+        }
+        if (pts.length > 1) trazos.push({ pts, cerrado: cer });
+      } else if (ent === 'POLYLINE') {
+        // vértices en entidades VERTEX hasta SEQEND
+        const cer = (n1(70) & 1) === 1, vs = [];
+        let k = j;
+        while (k < pares.length && !(pares[k][0] === 0 && pares[k][1] === 'SEQEND')) {
+          if (pares[k][0] === 0 && pares[k][1] === 'VERTEX') {
+            const vd = {}; let m = k + 1;
+            for (; m < pares.length && pares[m][0] !== 0; m++) vd[pares[m][0]] = +pares[m][1] || 0;
+            if (!(vd[70] & 16)) vs.push({ p: [vd[10] || 0, vd[20] || 0], b: vd[42] || 0 });   // 16: vértice de control, no de la línea
+            k = m; continue;
+          }
+          k++;
+        }
+        const pts = [];
+        vs.forEach((v2, ki) => { const q = ki + 1 < vs.length ? vs[ki + 1].p : (cer ? vs[0].p : null); if (q) bulgePts(v2.p, q, v2.b).forEach(z => pts.push(z)); else pts.push(v2.p); });
+        if (pts.length > 1) trazos.push({ pts, cerrado: cer });
+        i = k; continue;
+      } else if (ent === 'SPLINE') {
+        const gr = n1(71) || 3, U = (d[40] || []).map(Number), C = (d[10] || []).map((x, k) => [+x, +(d[20] || [])[k] || 0]), W = (d[41] || []).map(Number);
+        const cer = (n1(70) & 1) === 1;
+        let pts;
+        if (C.length && U.length) pts = nurbsPts(gr, U, C, W);
+        else if (d[11]) pts = (d[11] || []).map((x, k) => [+x, +(d[21] || [])[k] || 0]);   // solo puntos de paso
+        else pts = C;
+        if (pts && pts.length > 1) { if (cer && Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]) < 1e-6) pts.pop(); trazos.push({ pts, cerrado: cer }); }
+      } else if (ent === 'INSERT') hayInsert++;
+      i = j; continue;
+    }
+    i++;
+  }
+  // encadena los trazos abiertos por sus extremos (con tolerancia)
+  const lazos = trazos.filter(t => t.cerrado).map(t => t.pts);
+  let abiertos = trazos.filter(t => !t.cerrado).map(t => t.pts.slice());
+  for (const tol of [0.01, 0.5]) {
+    let unido = true;
+    while (unido) {
+      unido = false;
+      for (let a = 0; a < abiertos.length && !unido; a++) {
+        const A = abiertos[a], fA = A[A.length - 1];
+        if (Math.hypot(fA[0] - A[0][0], fA[1] - A[0][1]) <= tol && A.length > 2) { lazos.push(A); abiertos.splice(a, 1); unido = true; break; }
+        for (let b2 = 0; b2 < abiertos.length && !unido; b2++) {
+          if (a === b2) continue;
+          const B = abiertos[b2], d00 = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]);
+          if (d00(fA, B[0]) <= tol) { abiertos[a] = A.concat(B.slice(1)); abiertos.splice(b2, 1); unido = true; }
+          else if (d00(fA, B[B.length - 1]) <= tol) { abiertos[a] = A.concat(B.slice(0, -1).reverse()); abiertos.splice(b2, 1); unido = true; }
+          else if (d00(A[0], B[B.length - 1]) <= tol) { abiertos[a] = B.concat(A.slice(1)); abiertos.splice(b2, 1); unido = true; }
+          else if (d00(A[0], B[0]) <= tol) { abiertos[a] = B.slice(1).reverse().concat(A); abiertos.splice(b2, 1); unido = true; }
+        }
+      }
+    }
+  }
+  // un trazo casi cerrado también vale
+  abiertos = abiertos.filter(A => { if (A.length > 2 && Math.hypot(A[0][0] - A[A.length - 1][0], A[0][1] - A[A.length - 1][1]) <= 1) { lazos.push(A); return false; } return true; });
+  const areaL = L => Math.abs(L.reduce((s, p, k) => { const q = L[(k + 1) % L.length]; return s + p[0] * q[1] - q[0] * p[1]; }, 0) / 2);
+  const limpios = lazos.map(L => L.filter((p, k) => { const q = L[(k - 1 + L.length) % L.length]; return Math.hypot(p[0] - q[0], p[1] - q[1]) > 1e-6; }))
+    .filter(L => L.length >= 3 && areaL(L) > 1e-4).sort((a, b) => areaL(b) - areaL(a));
+  limpios.forEach(L => L.forEach(p => { p[0] *= factor; p[1] *= factor; }));
+  let aviso2 = '';
+  if (hayInsert) aviso2 = `Tiene ${hayInsert} bloque${hayInsert > 1 ? 's' : ''} (INSERT) que no se leen: explótalos antes de guardar el DXF.`;
+  return { lazos: limpios, abiertos: abiertos.length, factor, aviso: aviso2 };
+}
+/* quita puntos de un lazo hasta dejar n, primero los que menos cambian la forma (área del triángulo) */
+function simplificarLazo(poly, n) {
+  const L = poly.map(p => p.slice());
+  const tri = (a, b, c) => Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1])) / 2;
+  while (L.length > Math.max(3, n)) {
+    let mejor = -1, min = Infinity;
+    for (let i2 = 0; i2 < L.length; i2++) { const a = L[(i2 - 1 + L.length) % L.length], c = L[(i2 + 1) % L.length], t = tri(a, L[i2], c); if (t < min) { min = t; mejor = i2; } }
+    L.splice(mejor, 1);
+  }
+  return L;
+}
+
+/* vértices del lazo con esquina viva (ángulo interior < maxAng), mirando vecinos a >= 0.8 mm */
+function esquinasLazo(L, maxAng = 135) {
+  const n = L.length, out = [], d2 = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]);
+  for (let i = 0; i < n; i++) {
+    let a = i, b = i;
+    do { a = (a - 1 + n) % n; } while (a !== i && d2(L[i], L[a]) < 0.8);
+    do { b = (b + 1) % n; } while (b !== i && d2(L[i], L[b]) < 0.8);
+    if (a === i || b === i) break;
+    const u = [L[a][0] - L[i][0], L[a][1] - L[i][1]], v = [L[b][0] - L[i][0], L[b][1] - L[i][1]];
+    const ang = Math.acos(clamp((u[0] * v[0] + u[1] * v[1]) / ((Math.hypot(u[0], u[1]) * Math.hypot(v[0], v[1])) || 1), -1, 1)) * 180 / Math.PI;
+    if (ang < maxAng) out.push(i);
+  }
+  return out;
+}
+
+/* ---- usar un DXF en el programa ---- */
+function pedirDXF(fn) {
+  const f = $('#fDXF'); f.value = '';
+  f.onchange = () => {
+    const a = f.files[0]; if (!a) return;
+    const rd = new FileReader();
+    rd.onload = () => {
+      try {
+        const r = leerDXF(rd.result);
+        if (!r.lazos.length) throw new Error('No hay ningún contorno cerrado en el DXF.' + (r.aviso ? ' ' + r.aviso : r.abiertos ? ` Hay ${r.abiertos} trazos abiertos: ciérralos (une sus extremos) en el CAD.` : ''));
+        fn(r, a.name);
+      } catch (e) { aviso('⚠ ' + esc(e.message), 7000); }
+    };
+    rd.readAsText(a);
+  };
+  f.click();
+}
+const cajaLazo = L => cajaDe(L);
+function dialogoHuecoDXF() {
+  pedirDXF((r, nombre) => {
+    const L0 = r.lazos[0], cb = cajaLazo(L0);
+    modal('📐 Hueco desde un DXF', `
+      <p class="nota"><b>${esc(nombre)}</b>: contorno de ${fmt(cb.w, 1)} × ${fmt(cb.h, 1)} mm con ${L0.length.toLocaleString('es-ES')} puntos${r.lazos.length > 1 ? ` (hay ${r.lazos.length} contornos cerrados: se usa el mayor)` : ''}.${r.aviso ? `<br>⚠ ${esc(r.aviso)}` : ''}</p>
+      <label class="fila">Tamaño <select id="dxTam"><option value="real">El del DXF (mm reales)</option><option value="ancho">Ajustar el ancho a…</option></select></label>
+      <label class="fila oculto" id="filaDxAncho">Ancho (mm) <input type="number" id="dxAncho" value="${Math.min(600, Math.round(cb.w))}" min="10" step="10"></label>
+      <label class="fila" title="Si el contorno tiene muchos puntos, se quitan primero los que menos cambian la forma">Dejar como mucho (puntos) <input type="number" id="dxPts" value="${Math.min(120, L0.length)}" min="4" max="2000" step="10"></label>
+      <p class="nota">El hueco sale como <b>forma libre</b>, centrado, y se puede mover, escalar y girar en la vista ▦ Huecos.</p>`,
+      [['✔ Crear el hueco', () => {
+        let L = simplificarLazo(L0, clamp(+$('#dxPts').value || 120, 4, 2000));
+        const hu = huecoNuevo('libre'), cb2 = cajaLazo(L);
+        const k = $('#dxTam').value === 'ancho' ? Math.max(10, +$('#dxAncho').value || cb2.w) / cb2.w : 1;
+        // centrado donde el programa pone los huecos nuevos
+        const cx = hu.x + hu.ancho / 2, cy = hu.y + hu.alto / 2;
+        hu.pts = L.map(p => [Math.round((cx + (p[0] - cb2.x0 - cb2.w / 2) * k) * 10) / 10, Math.round((cy + (p[1] - cb2.y0 - cb2.h / 2) * k) * 10) / 10]);
+        const c3 = cajaDe(hu.pts); hu.x = c3.x0; hu.y = c3.y0; hu.ancho = c3.w; hu.alto = c3.h; hu.radio = 0;
+        P.huecos.push(hu); UI.hueco = P.huecos.length - 1;
+        cerrarModal(); cambio('Hueco desde ' + nombre);
+        if (!UI.vistaHuecos) verHuecos(true); else encuadrarHuecos();
+      }, true]]);
+    $('#dxTam').onchange = () => $('#filaDxAncho').classList.toggle('oculto', $('#dxTam').value !== 'ancho');
+  });
+}
+function dialogoPerfilDXF() {
+  if (!P.claves.length) { aviso('Este mueble no tiene perfiles clave.'); return; }
+  pedirDXF((r, nombre) => {
+    const L0 = r.lazos[0], cb = cajaLazo(L0), M = P.claves[0].pts.length, kSel = clamp(UI.clave, 0, P.claves.length - 1);
+    modal('📐 Perfil clave desde un DXF', `
+      <p class="nota"><b>${esc(nombre)}</b>: contorno de ${fmt(cb.w, 1)} × ${fmt(cb.h, 1)} mm${r.lazos.length > 1 ? ` (hay ${r.lazos.length} contornos cerrados: se usa el mayor)` : ''}.${r.aviso ? `<br>⚠ ${esc(r.aviso)}` : ''}</p>
+      <p class="nota">El contorno se reparte en los <b>${M} puntos</b> que tienen los perfiles de este mueble (con ✂ Simplificar o añadiendo puntos puedes cambiarlos antes). En cada esquina viva del dibujo cae un punto; si lo pones en todos los perfiles, esos puntos se marcan como esquinas.</p>
+      <label class="fila">Ponerlo en <select id="dxDest"><option value="una">El perfil seleccionado (clave ${kSel + 1})</option><option value="todas">Todos los perfiles</option></select></label>
+      <label class="fila">Medidas <select id="dxEsc"><option value="real">Las del DXF (mm reales)</option><option value="alto">Escalar al alto del perfil de ahora</option></select></label>
+      <label class="fila chk"><input type="checkbox" id="dxCentrar" checked> Centrarlo sobre el perfil de ahora (mismo centro y misma base)</label>`,
+      [['✔ Traer el perfil', () => {
+        const act = P.claves[kSel].pts, cbA = cajaDe(act);
+        let L = L0.slice();
+        const k = $('#dxEsc').value === 'alto' && cb.h > 0.1 ? cbA.h / cb.h : 1;
+        L = L.map(p => [p[0] * k, p[1] * k]);
+        const cb2 = cajaDe(L);
+        if ($('#dxCentrar').checked) { const dx = (cbA.x0 + cbA.w / 2) - (cb2.x0 + cb2.w / 2), dy = cbA.y0 - cb2.y0; L = L.map(p => [p[0] + dx, p[1] + dy]); }
+        // mismo sentido de giro que el perfil actual
+        const areaS = Q => Q.reduce((s, p, i2) => { const q = Q[(i2 + 1) % Q.length]; return s + p[0] * q[1] - q[0] * p[1]; }, 0) / 2;
+        if (areaS(L) * areaS(act) < 0) L.reverse();
+        let nuevo = remuestrearLazo(L, M);
+        // gira el comienzo del lazo para que cada punto caiga cerca del suyo (que no se retuerza la transición)
+        let mejor = 0, min = Infinity;
+        for (let o = 0; o < M; o++) { let s = 0; for (let i2 = 0; i2 < M; i2++) { const p = nuevo[(i2 + o) % M]; s += (p[0] - act[i2][0]) ** 2 + (p[1] - act[i2][1]) ** 2; } if (s < min) { min = s; mejor = o; } }
+        nuevo = nuevo.map((_, i2) => { const p = nuevo[(i2 + mejor) % M]; return [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]; });
+        // en cada esquina viva del DXF, clava el punto más cercano (y márcala si va a todos los perfiles)
+        const esqIdx = [];
+        esquinasLazo(L).forEach(iv => {
+          let mi = 0, md = Infinity;
+          nuevo.forEach((p, i2) => { const dd = (p[0] - L[iv][0]) ** 2 + (p[1] - L[iv][1]) ** 2; if (dd < md) { md = dd; mi = i2; } });
+          nuevo[mi] = [Math.round(L[iv][0] * 10) / 10, Math.round(L[iv][1] * 10) / 10];
+          if (!esqIdx.includes(mi)) esqIdx.push(mi);
+        });
+        const todasC = $('#dxDest').value === 'todas';
+        (todasC ? P.claves : [P.claves[kSel]]).forEach(c => c.pts = nuevo.map(p => p.slice()));
+        if (todasC) P.esquinas = nuevo.map((_, i2) => esqIdx.includes(i2));
+        P.editado = true; UI.punto = -1;
+        cerrarModal(); cambio('Perfil desde ' + nombre); encuadrarPerfil();
+      }, true]]);
   });
 }
 
@@ -2583,6 +2843,7 @@ function iniciarHuecos() {
     if (!UI.vistaHuecos) verHuecos(true); else encuadrarHuecos();
   });
   $('#bHuecoQuitar').onclick = () => borrarHueco(UI.hueco);
+  $('#bHuecoDXF').onclick = dialogoHuecoDXF;
   $('#bHuecoCopia').onclick = () => { const h = huecoSel(); if (!h) return; const c2 = JSON.parse(JSON.stringify(h)); c2.id = 'h' + Date.now().toString(36); c2.x += 50; c2.y += 50; if (c2.pts) c2.pts = c2.pts.map(p => [p[0] + 50, p[1] + 50]); P.huecos.push(c2); UI.hueco = P.huecos.length - 1; cambio('Hueco duplicado'); };
   const campo = (sel, fn) => enlazar(sel, () => { const h = huecoSel(); if (!h) return; fn(h, $(sel)); cambio(); });
   campo('#hcForma', (h, el) => { const v = el.value; if (v === 'libre' && !h.pts) h.pts = formaHueco(h).filter((_, i, a) => a.length <= 8 || i % Math.ceil(a.length / 8) === 0); h.forma = v; });
@@ -2601,6 +2862,7 @@ function iniciarHuecos() {
   campo('#hcMueble', (h, el) => { h.mueble.tipo = el.value; });
   campo('#hcFondo', (h, el) => { h.mueble.fondo = Math.max(0, +el.value || 0); });
   campo('#hcTrasera', (h, el) => { h.mueble.trasera = el.checked; });
+  campo('#hcGrosorM', (h, el) => { h.mueble.grosor = clamp(+el.value || 0, 0, 100); });
   campo('#hcPuerta', (h, el) => { h.mueble.puerta = el.value; });
   campo('#hcHolPuerta', (h, el) => { h.mueble.holguraPuerta = Math.max(0, +el.value || 0); });
 }
@@ -2621,6 +2883,7 @@ function ponerCamposHueco() {
   [...$('#hcMueble').options].forEach(o => { o.hidden = !fr && o.value === 'armario'; });
   if (!fr && h.mueble.tipo === 'armario') h.mueble.tipo = 'caja';
   $('#hcMueble').value = h.mueble.tipo; $('#hcFondo').value = h.mueble.fondo; $('#filaHcFondo').classList.toggle('oculto', !fr);
+  $('#hcGrosorM').value = h.mueble.grosor || '';
   $('#hcTrasera').checked = !!h.mueble.trasera; $('#filaHcTrasera').classList.toggle('oculto', !fr || h.mueble.tipo === 'balda');
   $('#filaHcPuerta').classList.toggle('oculto', h.mueble.tipo !== 'armario'); $('#hcPuerta').value = h.mueble.puerta; $('#hcHolPuerta').value = h.mueble.holguraPuerta;
   $('#hcXTit').textContent = fr ? 'X desde la izquierda (mm)' : 'u: fondo (mm)'; $('#hcYTit').textContent = fr ? 'Y desde abajo (mm)' : 'v: altura (mm)';
@@ -3231,6 +3494,7 @@ function iniciarPanel() {
   $('#bFigEjemplo').onclick = () => dialogoModelos(true);
   $('#bConvertirPerfiles').onclick = dialogoConvertir;
   $('#bSimplificar').onclick = dialogoSimplificar;
+  $('#bPerfilDXF').onclick = dialogoPerfilDXF;
   $$('.bLetra').forEach(bt => bt.onclick = () => {
     const destino = bt.closest('#caCampos') ? 'capa' : 'texto', f = $('#fLetra'); f.value = '';
     f.onchange = () => {
@@ -3557,6 +3821,10 @@ const textoEscala = () => enMaqueta() ? 'maqueta 1:' + P.maqueta.escala : 'tama�
 // medidas de una costilla tal y como se fabrica (a escala si es maqueta)
 // todas las piezas que se cortan: costillas y, en la retícula, largueros
 const piezasFab = () => [...R.costillas, ...(R.otras || [])].filter(c => c.ok);
+const grosorDe = c => enMaqueta() ? grosorFab() : (c.grosorPieza || grosor());   // los muebles de los huecos pueden llevar otro grosor
+const vetaOn = () => P.cnc.veta === 'si';
+function vetaDe(c) { const v = (P.cnc.vetaPiezas || {})[c.nombre]; return v === 'y' || v === 'libre' ? v : 'x'; }
+function ponVeta(c, v) { const m = P.cnc.vetaPiezas = P.cnc.vetaPiezas || {}; if (v === 'x') delete m[c.nombre]; else m[c.nombre] = v; }
 const holguraRanuraFab = () => enMaqueta() ? P.maqueta.holgura : P.tipo === 'radial' ? P.radial.holgura : P.reticula.holgura;
 function geoFab(c) {
   const k = escalaFab();
@@ -3590,43 +3858,50 @@ function fabActual() {
 }
 
 // colocación por estantes (piezas por su rectángulo envolvente)
+// con veta, las piezas marcadas no giran; cada grosor de tablero va en sus propios tableros
 function colocarEnTableros(f) {
   const piezas = piezasFab().map(c => {
     const g = geoFab(c);
-    let w = g.caja.w, h = g.caja.h, rot = false;
-    if (f.girar && h > w) { rot = true; [w, h] = [h, w]; }
+    let w = g.caja.w, h = g.caja.h, rot = false, fija = false;
+    if (vetaOn()) { const v = vetaDe(c); if (v === 'y') { fija = true; rot = true; [w, h] = [h, w]; } else if (v === 'x') fija = true; }
+    if (!fija && f.girar && h > w) { rot = true; [w, h] = [h, w]; }
     const W = f.ancho - 2 * f.borde, H = f.alto - 2 * f.borde;
-    if (f.girar && (w > W || h > H) && h <= W && w <= H) { rot = !rot; [w, h] = [h, w]; }
-    return { c, g, w, h, rot, cabe: w <= W + 1e-6 && h <= H + 1e-6 };
+    if (!fija && f.girar && (w > W || h > H) && h <= W && w <= H) { rot = !rot; [w, h] = [h, w]; }
+    return { c, g, w, h, rot, e: grosorDe(c), cabe: w <= W + 1e-6 && h <= H + 1e-6 };
   });
   const grandes = piezas.filter(p => !p.cabe);
-  const lista = piezas.filter(p => p.cabe).sort((a, b) => b.h - a.h || b.w - a.w);
   const tableros = [];
   if (f.modo === 'fila') {
-    let x = 0; const t = { piezas: [], ancho: 0, alto: 0 };
+    let x = 0; const t = { piezas: [], ancho: 0, alto: 0, grosor: grosorFab() };
     piezas.sort((a, b) => a.c.i - b.c.i).forEach(p => { t.piezas.push({ ...p, x, y: 0 }); x += p.w + f.sep; t.alto = Math.max(t.alto, p.h); });
     t.ancho = Math.max(0, x - f.sep); tableros.push(t);
-    return { tableros, grandes: [], uso: 0 };
+    return { tableros, grandes: [], uso: 0, grosores: [grosorFab()] };
   }
-  for (const p of lista) {
-    let puesto = false;
-    for (const t of tableros) {
-      for (const e of t.estantes) if (p.h <= e.h + 1e-6 && e.x + p.w <= f.ancho - f.borde + 1e-6) { t.piezas.push({ ...p, x: e.x, y: e.y }); e.x += p.w + f.sep; puesto = true; break; }
-      if (puesto) break;
-      const yN = t.yLibre;
-      if (yN + p.h <= f.alto - f.borde + 1e-6) {
-        const e = { y: yN, h: p.h, x: f.borde }; t.estantes.push(e); t.yLibre = yN + p.h + f.sep;
-        t.piezas.push({ ...p, x: e.x, y: e.y }); e.x += p.w + f.sep; puesto = true; break;
+  const e0 = grosorFab(), grosores = [...new Set(piezas.map(p => p.e))].sort((a, b) => (a === e0 ? 0 : 1) - (b === e0 ? 0 : 1) || a - b);
+  for (const eG of grosores) {
+    const lista = piezas.filter(p => p.cabe && p.e === eG).sort((a, b) => b.h - a.h || b.w - a.w);
+    const tabs = [];
+    for (const p of lista) {
+      let puesto = false;
+      for (const t of tabs) {
+        for (const e of t.estantes) if (p.h <= e.h + 1e-6 && e.x + p.w <= f.ancho - f.borde + 1e-6) { t.piezas.push({ ...p, x: e.x, y: e.y }); e.x += p.w + f.sep; puesto = true; break; }
+        if (puesto) break;
+        const yN = t.yLibre;
+        if (yN + p.h <= f.alto - f.borde + 1e-6) {
+          const e = { y: yN, h: p.h, x: f.borde }; t.estantes.push(e); t.yLibre = yN + p.h + f.sep;
+          t.piezas.push({ ...p, x: e.x, y: e.y }); e.x += p.w + f.sep; puesto = true; break;
+        }
+      }
+      if (!puesto) {
+        const t = { piezas: [], estantes: [], yLibre: f.borde, ancho: f.ancho, alto: f.alto, grosor: eG };
+        const e = { y: f.borde, h: p.h, x: f.borde }; t.estantes.push(e); t.yLibre = f.borde + p.h + f.sep;
+        t.piezas.push({ ...p, x: e.x, y: e.y }); e.x += p.w + f.sep; tabs.push(t);
       }
     }
-    if (!puesto) {
-      const t = { piezas: [], estantes: [], yLibre: f.borde, ancho: f.ancho, alto: f.alto };
-      const e = { y: f.borde, h: p.h, x: f.borde }; t.estantes.push(e); t.yLibre = f.borde + p.h + f.sep;
-      t.piezas.push({ ...p, x: e.x, y: e.y }); e.x += p.w + f.sep; tableros.push(t);
-    }
+    tabs.forEach(t => tableros.push(t));
   }
   const areaP = piezas.reduce((s, p) => s + p.g.area, 0);
-  return { tableros, grandes, uso: tableros.length ? areaP / (tableros.length * f.ancho * f.alto) : 0 };
+  return { tableros, grandes, uso: tableros.length ? areaP / (tableros.length * f.ancho * f.alto) : 0, grosores };
 }
 // pasa un punto de la costilla (ya a escala de fabricación) a coordenadas del tablero
 function aTablero(pz, p) {
@@ -3651,6 +3926,7 @@ function abrirFabricar() {
         <label class="fila" title="Margen sin piezas en todo el borde del tablero">Margen al borde (mm) <input type="number" id="fB" value="${f.borde}" min="0" step="1"></label>
         <label class="fila" title="Espacio entre piezas: al menos el diámetro de la fresa más unos milímetros (en láser, 2 a 4 mm)">Separación entre piezas (mm) <input type="number" id="fS" value="${f.sep}" min="0" step="1"></label>
         <label class="fila chk"><input type="checkbox" id="fG" ${f.girar ? 'checked' : ''}> Permitir girar 90° (cuida la veta)</label>
+        <label class="fila" title="Con veta, las piezas no se giran: su dirección marcada va a lo largo del tablero. Clic en una pieza de la vista para cambiarle la veta">Veta del tablero <select id="fVeta"><option value="no">Sin veta (da igual el giro)</option><option value="si">A lo largo (las piezas la siguen)</option></select></label>
         <label class="fila chk"><input type="checkbox" id="fN" ${f.numeros ? 'checked' : ''}> Grabar el número (o la letra) en cada pieza</label>
         <h4>CNC</h4>
         <label class="fila" title="${enMaqueta() ? 'En láser, 0 (sin hueso de perro)' : 'Diámetro de la fresa de corte'}">Ø de la fresa${enMaqueta() ? ' (maqueta)' : ''} (mm) <input type="number" id="fFresa" value="${fresaFab()}" min="0" step="0.5"></label>
@@ -3670,14 +3946,15 @@ function abrirFabricar() {
     f.ancho = Math.max(50, +$('#fA').value); f.alto = Math.max(50, +$('#fH').value);
     f.borde = Math.max(0, +$('#fB').value); f.sep = Math.max(0, +$('#fS').value);
     f.girar = $('#fG').checked; f.numeros = $('#fN').checked; f.modo = $('#fModo').value;
+    P.cnc.veta = $('#fVeta').value;
     const fr = Math.max(0, +$('#fFresa').value || 0); if (enMaqueta()) P.maqueta.fresa = fr; else P.cnc.fresa = fr;
     P.cnc.hueso = $('#fHueso').checked; P.cnc.arcos = $('#fArcos').checked; P.cnc.tolArco = clamp(+$('#fTol').value || 0.05, 0.005, 1);
     UI.sucio = true;
     previsualizarFab();
   };
-  $('#fModo').value = f.modo;
+  $('#fModo').value = f.modo; $('#fVeta').value = vetaOn() ? 'si' : 'no';
   if (!lista.some(t => t.a === f.ancho && t.h === f.alto)) $('#fTab').value = 'otro';
-  ['#fTab', '#fB', '#fS', '#fG', '#fN', '#fModo', '#fFresa', '#fHueso', '#fArcos', '#fTol'].forEach(s => $(s).onchange = leer);
+  ['#fTab', '#fB', '#fS', '#fG', '#fN', '#fModo', '#fVeta', '#fFresa', '#fHueso', '#fArcos', '#fTol'].forEach(s => $(s).onchange = leer);
   ['#fA', '#fH'].forEach(s => $(s).onchange = () => { $('#fTab').value = 'otro'; leer(); });
   previsualizarFab();
 }
@@ -3696,7 +3973,7 @@ function dibujarTableros(ctx, col, f, Wc, opciones = {}) {
     if (f.modo !== 'fila') {
       ctx.fillStyle = '#efe2c9'; ctx.strokeStyle = '#a88b5c'; ctx.lineWidth = 1;
       ctx.fillRect(ox, oy, tw * sc, th * sc); ctx.strokeRect(ox + .5, oy + .5, tw * sc, th * sc);
-      ctx.fillStyle = opciones.texto || cssVar('--suave'); ctx.font = '11px system-ui'; ctx.fillText(`Tablero ${b + 1}: ${t.piezas.length} piezas`, ox, oy - 6);
+      ctx.fillStyle = opciones.texto || cssVar('--suave'); ctx.font = '11px system-ui'; ctx.fillText(`Tablero ${b + 1}: ${t.piezas.length} piezas` + ((col.grosores || []).length > 1 ? ` · ${fmt(t.grosor, 1)} mm` : ''), ox, oy - 6);
     }
     t.piezas.forEach(pz => {
       ctx.beginPath();
@@ -3709,6 +3986,21 @@ function dibujarTableros(ctx, col, f, Wc, opciones = {}) {
         ctx.fillStyle = '#1f4f8a'; ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(pz.c.etq, x, y);
         ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
       }
+      if (opciones.veta) {
+        // rayitas con la dirección de la veta de la pieza (en el tablero siempre salen a lo largo)
+        const v = vetaDe(pz.c);
+        if (v !== 'libre') {
+          const et = pz.g.etiqueta, L2 = clamp(Math.min(pz.g.caja.w, pz.g.caja.h) * 0.3, 6, 36) / 2, [ux, uy] = v === 'y' ? [0, 1] : [1, 0];
+          const [ax, ay] = P2(...aTablero(pz, [et[0] - L2 * ux, et[1] - L2 * uy])), [bx, by] = P2(...aTablero(pz, [et[0] + L2 * ux, et[1] + L2 * uy]));
+          const dx = bx - ax, dy = by - ay, dL = Math.hypot(dx, dy) || 1, px = -dy / dL, py = dx / dL;
+          ctx.strokeStyle = 'rgba(122, 82, 38, .5)'; ctx.lineWidth = 1;
+          [-1, 0, 1].forEach(k => { const o = (f.numeros ? 9 : 0) + k * 3.5; ctx.beginPath(); ctx.moveTo(ax + px * o, ay + py * o); ctx.lineTo(bx + px * o, by + py * o); ctx.stroke(); });
+        }
+      }
+      if (opciones.cajas) {
+        const [x0, y0] = P2(pz.x, pz.y), [x1, y1] = P2(pz.x + pz.w, pz.y + pz.h);
+        opciones.cajas.push({ x0: Math.min(x0, x1), y0: Math.min(y0, y1), x1: Math.max(x0, x1), y1: Math.max(y0, y1), c: pz.c });
+      }
     });
   });
   return Hc;
@@ -3718,12 +4010,27 @@ function previsualizarFab() {
   const d = window.devicePixelRatio || 1, Wc = cv.clientWidth || 900;
   const Hc = dibujarTableros(null, col, f, Wc, { soloAlto: true });
   cv.width = Wc * d; cv.height = Hc * d; cv.style.height = Hc + 'px'; ctx.setTransform(d, 0, 0, d, 0, 0);
-  dibujarTableros(ctx, col, f, Wc);
+  const cajas = [];
+  dibujarTableros(ctx, col, f, Wc, { veta: vetaOn(), cajas });
+  cv.onclick = ev => {
+    if (!vetaOn()) return;
+    const r = cv.getBoundingClientRect(), x = ev.clientX - r.left, y = ev.clientY - r.top;
+    const hit = cajas.find(b => x >= b.x0 && x <= b.x1 && y >= b.y0 && y <= b.y1);
+    if (!hit) return;
+    const v = vetaDe(hit.c); ponVeta(hit.c, v === 'x' ? 'y' : v === 'y' ? 'libre' : 'x');
+    UI.sucio = true; previsualizarFab();
+  };
   const info = [];
+  const varios = (col.grosores || []).length > 1;
   if (f.modo === 'fila') info.push(`${piezasFab().length} piezas en fila: ${fmt(col.tableros[0] ? col.tableros[0].ancho : 0)} × ${fmt(col.tableros[0] ? col.tableros[0].alto : 0)} mm.`);
   else {
-    info.push(`<b>${col.tableros.length}</b> tablero${col.tableros.length === 1 ? '' : 's'} de ${fmt(f.ancho)} × ${fmt(f.alto)} mm · aprovechamiento <b>${fmt(col.uso * 100)} %</b>.`);
+    const porG = varios ? ' (' + col.grosores.map(e => `${col.tableros.filter(t => t.grosor === e).length} de ${fmt(e, 1)} mm`).join(' y ') + ')' : '';
+    info.push(`<b>${col.tableros.length}</b> tablero${col.tableros.length === 1 ? '' : 's'} de ${fmt(f.ancho)} × ${fmt(f.alto)} mm${porG} · aprovechamiento <b>${fmt(col.uso * 100)} %</b>.`);
     if (col.grandes.length) info.push(`<span style="color:var(--peligro)">No caben en el tablero: ${col.grandes.map(p => p.c.nombre).join(', ')}.</span>`);
+  }
+  if (vetaOn()) {
+    const nY = piezasFab().filter(c => vetaDe(c) === 'y').length, nL = piezasFab().filter(c => vetaDe(c) === 'libre').length;
+    info.push(`Las rayitas marcan la veta de cada pieza. Clic en una pieza para cambiarla: <b>↔ a lo ancho</b> → <b>↕ a lo alto</b>${nY ? ' (' + nY + ')' : ''} → <b>libre, puede girar</b>${nL ? ' (' + nL + ')' : ''}.`);
   }
   // CNC: huesos de perro, arcos y si la fresa cabe en las ranuras
   const ps = col.tableros.flatMap(t => t.piezas), nH = ps.reduce((a, p) => a + p.g.nHuesos, 0), mH = ps.reduce((a, p) => a + p.g.huesosMal, 0), nE = ps.reduce((a, p) => a + p.g.nEsq, 0);
@@ -3755,7 +4062,10 @@ function dxf() {
   };
   col.tableros.forEach((t, b) => {
     const ox = b * ((f.modo === 'fila' ? t.ancho : f.ancho) + 200);
-    if (f.modo !== 'fila') poli('TABLERO', [[ox, 0], [ox + f.ancho, 0], [ox + f.ancho, f.alto], [ox, f.alto]]);
+    if (f.modo !== 'fila') {
+      poli('TABLERO', [[ox, 0], [ox + f.ancho, 0], [ox + f.ancho, f.alto], [ox, f.alto]]);
+      if ((col.grosores || []).length > 1) { g(0, 'TEXT'); g(8, 'TABLERO'); g(10, n(ox)); g(20, n(f.alto + 10)); g(30, 0); g(40, 20); g(1, 'Tablero ' + (b + 1) + ' - grosor ' + (Math.round(t.grosor * 10) / 10) + ' mm'); }
+    }
     t.piezas.forEach(pz => {
       const cc = contornoCNC(pz.g.poly);
       // primero los huecos de dentro (así la pieza no se suelta antes de tiempo) y luego el contorno
@@ -3781,7 +4091,10 @@ function svg() {
     const tw = f.modo === 'fila' ? t.ancho : f.ancho, th = f.modo === 'fila' ? t.alto : f.alto, ox = W;
     H = Math.max(H, th);
     const Y = y => th - y, n = v => Math.round(v * 100) / 100;
-    if (f.modo !== 'fila') partes.push(`<rect x="${ox}" y="0" width="${tw}" height="${th}" fill="none" stroke="#999" stroke-width="0.5"/>`);
+    if (f.modo !== 'fila') {
+      partes.push(`<rect x="${ox}" y="0" width="${tw}" height="${th}" fill="none" stroke="#999" stroke-width="0.5"/>`);
+      if ((col.grosores || []).length > 1) partes.push(`<text x="${ox + 2}" y="12" font-family="Arial" font-size="10" fill="#999">grosor ${Math.round(t.grosor * 10) / 10} mm</text>`);
+    }
     t.piezas.forEach(pz => {
       let d = '';
       [pz.g.poly, ...(pz.g.interiores || [])].forEach(pol => {
@@ -3828,7 +4141,15 @@ function calcularCompraFab() { // material con las medidas de fabricación (maqu
 function listaCompra() {
   const cm = calcularCompraFab(), V = P.varillas, tv = VARILLA_TIPOS[V.tipo], L = [], maq = enMaqueta(), k = escalaFab();
   const tablero = maq ? `Tablero de maqueta (DM, contrachapado…) de ${fmt(P.maqueta.grosor, 1)} mm` : `${MATERIALES[P.costillas.material].nombre}, ${fmt(grosor(), 1)} mm`;
-  L.push([tablero, `${cm.nTableros} tablero${cm.nTableros === 1 ? '' : 's'} de ${fmt(cm.tablero[0])} × ${fmt(cm.tablero[1])} mm (${maq ? fmt(cm.area / 100, 0) + ' cm²' : fmt(cm.area / 1e6, 2) + ' m²'} de piezas)`]);
+  const col = cm.colocacion, gs = col.grosores || [];
+  if (gs.length > 1) {   // los muebles de los huecos con otro grosor llevan su tablero aparte
+    gs.forEach(e => {
+      const nT = col.tableros.filter(t => t.grosor === e).length, propio = Math.abs(e - grosor()) > 0.01;
+      L.push([`${MATERIALES[P.costillas.material].nombre}, ${fmt(e, 1)} mm${propio ? ' (muebles de los huecos)' : ''}`,
+        `${nT} tablero${nT === 1 ? '' : 's'} de ${fmt(cm.tablero[0])} × ${fmt(cm.tablero[1])} mm`]);
+    });
+    L.push(['Superficie de las piezas', `${fmt(cm.area / 1e6, 2)} m² en total`]);
+  } else L.push([tablero, `${cm.nTableros} tablero${cm.nTableros === 1 ? '' : 's'} de ${fmt(cm.tablero[0])} × ${fmt(cm.tablero[1])} mm (${maq ? fmt(cm.area / 100, 0) + ' cm²' : fmt(cm.area / 1e6, 2) + ' m²'} de piezas)`]);
   if (P.tipo === 'reticula') {
     L.push(['Piezas', `${R.costillas.filter(c => c.ok).length} costillas y ${R.largueros.filter(z => z.ok).length} largueros, con ${R.cruces.length} cruces`]);
     L.push(['Ranuras a media madera', `${fmt(grosorFab() + holguraRanuraFab(), 2)} mm de ancho`]);
@@ -3864,7 +4185,7 @@ function filasDespiece() {
   return piezasFab().map(c => {
     const g = geoFab(c), rad = P.tipo === 'radial' && !c.disco;
     return { n: c.etq, nombre: c.nombre, x: (c.disco ? c.v : c.z ? c.u : c.x) * (rad ? 1 : escalaFab()), eje: c.disco ? 'altura' : c.z ? 'z' : rad ? 'ángulo' : 'x',
-      ranuras: c.ranuras.length + (c.disco ? R.n : 0), w: g.caja.w, h: g.caja.h, e: grosorFab(), area: g.area, ag: g.agujeros.length, dA: g.agujeros.length ? fmt(2 * g.agujeros[0][2], 2) : '', mat };
+      ranuras: c.ranuras.length + (c.disco ? R.n : 0), w: g.caja.w, h: g.caja.h, e: grosorDe(c), area: g.area, ag: g.agujeros.length, dA: g.agujeros.length ? fmt(2 * g.agujeros[0][2], 2) : '', mat };
   });
 }
 function abrirDespiece() {
@@ -3892,7 +4213,11 @@ function exportarCSV() {
 // cada costilla con su rectángulo envolvente, para abrirla en el Anidador o en una hoja de cálculo
 function exportarCSVCortes() {
   const filas = ['nombre;largo;ancho;cantidad;veta;canto largo;canto ancho;tipo de canto'];
-  piezasFab().forEach(c => { const g = geoFab(c); filas.push([c.nombre, csvN(g.caja.w, 1), csvN(g.caja.h, 1), 1, 'no', 0, 0, ''].join(';')); });
+  piezasFab().forEach(c => {
+    const g = geoFab(c); let w = g.caja.w, h = g.caja.h, v = 'no';
+    if (vetaOn()) { const vd = vetaDe(c); if (vd !== 'libre') v = 'si'; if (vd === 'y') [w, h] = [h, w]; }
+    filas.push([c.nombre, csvN(w, 1), csvN(h, 1), 1, v, 0, 0, ''].join(';'));
+  });
   descargar(nombreArchivo(P.nombre) + '_cortes' + sufijoFab() + '.csv', '﻿' + filas.join('\r\n') + '\r\n', 'text/csv');
   aviso('CSV de cortes guardado');
 }
@@ -4168,8 +4493,9 @@ function planoPDF() {
       const [x0, x1] = P.tipo === 'pared' ? [0, 0] : tramoX(h);
       filas.push([`Hueco H${n}`, `${{ rect: 'rectángulo', redondeado: 'redondeado', arco: 'arco', circulo: 'círculo', libre: 'forma libre' }[h.forma]} ${fmt(cb.w * k)} × ${fmt(cb.h * k)} mm en (${fmt(cb.x0 * k)}, ${fmt(cb.y0 * k)})${P.tipo === 'pared' ? '' : ` · de x = ${fmt(x0 * k)} a ${fmt(x1 * k)} mm`} · ${mod}`]); });
     if (mods.length) {
-      filas.push({ titulo: `Tableros de los muebles: ${fmt(grosor() * k, 1)} mm (el mismo grosor que las ${P.tipo === 'pared' ? 'lamas' : 'costillas'})` });
-      mods.forEach(m => filas.push([`${m.etq} · ${m.nombre}`, `${fmt(m.medidas[0] * k)} × ${fmt(m.medidas[1] * k)} mm`]));
+      const gsM = [...new Set(mods.map(m => m.grosorPieza || grosor()))], propio = gsM.some(e => Math.abs(e - grosor()) > 0.01);
+      filas.push({ titulo: propio ? `Tableros de los muebles (cada uno con su grosor; el que no lleva el de las ${P.tipo === 'pared' ? 'lamas' : 'costillas'} va en tablero aparte)` : `Tableros de los muebles: ${fmt(grosor() * k, 1)} mm (el mismo grosor que las ${P.tipo === 'pared' ? 'lamas' : 'costillas'})` });
+      mods.forEach(m => filas.push([`${m.etq} · ${m.nombre}`, `${fmt(m.medidas[0] * k)} × ${fmt(m.medidas[1] * k)} mm${propio ? ` · grosor ${fmt((m.grosorPieza || grosor()) * k, 1)} mm` : ''}`]));
     }
     tabla(M, M + 22, W - 2 * M, filas, { c1: 70 });
   }
@@ -4178,12 +4504,13 @@ function planoPDF() {
   if (f.modo !== 'fila' && col.tableros.length) {
     const porH = 4;
     for (let t0 = 0; t0 < col.tableros.length; t0 += porH) {
-      cabecera(`4. Corte: tableros de ${fmt(f.ancho)} × ${fmt(f.alto)} mm (${col.tableros.length} en total, aprovechamiento ${fmt(col.uso * 100)} %)`);
+      const variosG = (col.grosores || []).length > 1;
+      cabecera(`4. Corte: tableros de ${fmt(f.ancho)} × ${fmt(f.alto)} mm (${col.tableros.length} en total, aprovechamiento ${fmt(col.uso * 100)} %${vetaOn() ? ' · la veta, a lo largo del tablero' : ''})`);
       const tw = (W - 2 * M - 10) / 2, th = (H - 2 * M - 30) / 2, s4 = Math.min(tw / f.ancho, (th - 6) / f.alto);
       col.tableros.slice(t0, t0 + porH).forEach((t, j) => {
         const bx = M + (j % 2) * (tw + 10), by = M + 24 + Math.floor(j / 2) * (th + 4);
         const BX = x => bx + x * s4, BY = yv => by + 5 + (f.alto - yv) * s4;
-        D.texto(bx, by + 2.5, `Tablero ${t0 + j + 1}: ${t.piezas.length} piezas`, { pt: 8.5, b: true });
+        D.texto(bx, by + 2.5, `Tablero ${t0 + j + 1}: ${t.piezas.length} piezas` + (variosG ? ` · grosor ${fmt(t.grosor, 1)} mm` : ''), { pt: 8.5, b: true });
         D.relleno([244, 235, 218]).trazo([168, 139, 92]).grosor(0.3).rect(BX(0), BY(f.alto), f.ancho * s4, f.alto * s4, 'b');
         t.piezas.forEach(pz => {
           D.relleno([226, 205, 172]).trazo(madera).grosor(0.2).poli(simplificaCerrado(pz.g.poly, 0.3 * (maq ? 0.2 : 1)).map(p => { const q = aTablero(pz, p); return [BX(q[0]), BY(q[1])]; }), true, 'b');
@@ -4401,17 +4728,19 @@ function hojaPared(D, cabecera, tabla, o) {
    como piezas del Calcador (contorno exterior y agujeros de las varillas) y las medidas del tablero. */
 const PUENTES0 = { n: 0, ancho: 5, alto: 2 };
 function piezaCalcador(c) {
-  const g = geoFab(c), b = g.caja, r3 = v => +v.toFixed(3);
-  const cc = contornoCNC(g.poly), ext = cc.pts.map(p => ({ x: r3(p[0] - b.x0), y: r3(p[1] - b.y0) }));
+  // con la veta «a lo alto», la pieza se manda ya girada 90° para que su veta siga el largo del tablero
+  const gira = vetaOn() && vetaDe(c) === 'y', R90 = p => [p[1], -p[0]];
+  const g = geoFab(c), poly = gira ? g.poly.map(R90) : g.poly, b = gira ? cajaDe(poly) : g.caja, r3 = v => +v.toFixed(3);
+  const cc = contornoCNC(poly), ext = cc.pts.map(p => ({ x: r3(p[0] - b.x0), y: r3(p[1] - b.y0) }));
   const contornos = [{ pts: ext, b: cc.b.map(v => +v.toFixed(6)), cerrado: true, tipo: 'exterior', mec: { op: 'corte', prof: null, puentes: { ...PUENTES0 } } }];
   // huecos interiores de la pieza (túneles, ventanas)
-  (g.interiores || []).forEach(hh => { const ci = contornoCNC(hh); contornos.push({ pts: ci.pts.map(p => ({ x: r3(p[0] - b.x0), y: r3(p[1] - b.y0) })), b: ci.b.map(v => +v.toFixed(6)), cerrado: true, tipo: 'interior', mec: { op: 'corte', prof: null, puentes: { ...PUENTES0 } } }); });
+  (g.interiores || []).forEach(hh => { const ci = contornoCNC(gira ? hh.map(R90) : hh); contornos.push({ pts: ci.pts.map(p => ({ x: r3(p[0] - b.x0), y: r3(p[1] - b.y0) })), b: ci.b.map(v => +v.toFixed(6)), cerrado: true, tipo: 'interior', mec: { op: 'corte', prof: null, puentes: { ...PUENTES0 } } }); });
   // cada agujero: círculo de dos medias vueltas (bulge 1)
-  g.agujeros.forEach(a => {
-    const x = a[0] - b.x0, y = a[1] - b.y0;
+  g.agujeros.forEach(a0 => {
+    const a = gira ? [a0[1], -a0[0], a0[2]] : a0, x = a[0] - b.x0, y = a[1] - b.y0;
     contornos.push({ pts: [{ x: r3(x + a[2]), y: r3(y) }, { x: r3(x - a[2]), y: r3(y) }], b: [1, 1], cerrado: true, tipo: 'interior', mec: { op: 'corte', prof: null, puentes: { ...PUENTES0 } } });
   });
-  return { nombre: c.nombre, cantidad: 1, veta: false, calcador: { contornos } };
+  return { nombre: c.nombre, cantidad: 1, veta: vetaOn() && vetaDe(c) !== 'libre', calcador: { contornos } };
 }
 let tAnid = 0;
 function abrirAnidador() {
@@ -4419,7 +4748,10 @@ function abrirAnidador() {
   const n = piezasFab().length;
   if (!n) { aviso('No hay costillas que colocar.'); return; }
   UI.anidListo = false;
-  $('#anidInfo').textContent = `${P.nombre}: ${n} piezas · ${textoEscala()} · tablero de ${fmt(grosorFab(), 1)} mm`;
+  const gs = [...new Set(piezasFab().map(grosorDe))];
+  $('#anidInfo').textContent = `${P.nombre}: ${n} piezas · ${textoEscala()} · tablero de ${fmt(grosorFab(), 1)} mm` +
+    (gs.length > 1 ? ` · ⚠ los muebles de los huecos llevan tablero de ${gs.filter(e => Math.abs(e - grosorFab()) > 0.01).map(e => fmt(e, 1)).join(' y ')} mm: anídalos aparte` : '') +
+    (vetaOn() ? ' · con veta' : '');
   const caja = $('#anidCaja'); caja.innerHTML = '';
   const fr = document.createElement('iframe'); fr.src = 'assets/anidador/anidador.html?desde=rebanadas'; fr.title = 'Anidador de tableros';
   caja.appendChild(fr); UI.anidFrame = fr;
@@ -4437,7 +4769,7 @@ window.addEventListener('message', e => {
     tipo: 'rebanadas-piezas',
     nombre: P.nombre + (enMaqueta() ? ` (maqueta 1:${P.maqueta.escala})` : ''),
     piezas: piezasFab().map(piezaCalcador),
-    tablero: { largo: f.ancho, ancho: f.alto, grosor: grosorFab(), margen: f.borde, modo: 'forma' },
+    tablero: { largo: f.ancho, ancho: f.alto, grosor: grosorFab(), margen: f.borde, modo: 'forma', veta: vetaOn() },
   }, '*');
 });
 
@@ -4899,6 +5231,7 @@ function iniciar() {
 }
 // para las pruebas automáticas
 window.MadeRebanadas = { get P() { return P; }, get R() { return R; }, calcular: () => { const t = performance.now(); R = calcular(); return performance.now() - t; }, autoVar: () => autoVarillas(P.varillas.autoN), construir3D: () => { const t = performance.now(); construir3D(); return performance.now() - t; }, cargar: o => cargarProyecto(validarProyecto(o)), dxf: () => dxf(), svg: () => svg(), plano: () => planoPDF(), malla3D: o => piezasMalla3D(o || {}), pieza: i => piezaCalcador([...R.costillas, ...R.otras][i]), geo: i => geoFab([...R.costillas, ...R.otras][i]), camara: t => camara(t), selCostilla: i => selCostilla(i),
+  leerDXF: t => leerDXF(t), colocar: () => colocarEnTableros(fabActual()), compra: () => listaCompra(), despiece: () => filasDespiece(), csvCortes: () => { let out; const d0 = descargar; descargar = (n, c) => { out = c; }; try { exportarCSVCortes(); } finally { descargar = d0; } return out; }, vetaDe: c => vetaDe(c), ponVeta: (c, v) => ponVeta(c, v),
   pantallaPunto: i => { const k = claveActual().pts[i], r = $('#cPerfil').getBoundingClientRect(), q = VP.aPantalla(k[0], k[1]); return [r.left + q[0], r.top + q[1]]; },
   pantallaVarilla: i => { const k = P.varillas.lista[i], r = $('#cPerfil').getBoundingClientRect(), q = VP.aPantalla(k[0], k[1]); return [r.left + q[0], r.top + q[1]]; } };
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();
