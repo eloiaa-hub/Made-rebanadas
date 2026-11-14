@@ -241,6 +241,18 @@ function generarPared(p, prof) {
   });
   return { largo: p.largo, esquinas, claves };
 }
+PLANTILLAS.radial_vacio = {
+  nombre: 'Vacío radial: cilindro', grupo: 'radial',
+  desc: 'Un cilindro liso de partida, para dibujar tu lámpara, columna o peana desde cero.',
+  params: [
+    { id: 'alto', nombre: 'Altura', min: 100, max: 1500, paso: 5, valor: 400 },
+    { id: 'radio', nombre: 'Radio', min: 40, max: 600, paso: 5, valor: 150 },
+  ],
+  generar(p) {
+    const r = p.radio, H = p.alto;
+    return { largo: 360, esquinas: [true, true, true, true], claves: clavesUniformes(3, 360, () => redondeaPts([[0, 0], [r, 0], [r, H], [0, H]])) };
+  },
+};
 PLANTILLAS.pared_ondas = {
   nombre: 'Panel de pared ondulado', grupo: 'pared',
   desc: 'Lamas verticales cuyo canto dibuja ondas en horizontal y en vertical (o en diagonal).',
