@@ -131,7 +131,7 @@ function construir3D() {
   const e = grosor(), mats = materialesTablero(), rh = radioAgujero(), V = P.varillas;
   // medidas del mueble montado
   const bb = new T.Box3(), cs = R.costillas.filter(c => c.ok);
-  cs.forEach(c => { const m = marcoEn(c.x); for (let k = 0; k < c.poly.length; k += 3) bb.expandByPoint(V3(puntoMarco(m, c.poly[k][0], c.poly[k][1]))); });
+  cs.forEach(c => { const m = marcoEn(c.x), paso = c.poly.length > 24 ? 3 : 1; for (let k = 0; k < c.poly.length; k += paso) bb.expandByPoint(V3(puntoMarco(m, c.poly[k][0], c.poly[k][1]))); });
   if (bb.isEmpty()) bb.set(new T.Vector3(-1, 0, -1), new T.Vector3(1, 1, 1));
   const sz = bb.getSize(new T.Vector3());
   G.dims = [sz.x, sz.z, sz.y]; G.alto = sz.y; G.fondo = sz.z; G.rmax = Math.max(sz.x, sz.z) / 2;

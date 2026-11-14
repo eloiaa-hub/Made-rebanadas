@@ -2,6 +2,9 @@
 
 ## v1.5
 
+- La ventana **🗋 Mueble nuevo** enseña las plantillas en **cuadrícula, con una foto** del mueble que genera cada una (y la descripción entera, sin cortar).
+- Plantilla nueva **«Vacío: empezar de cero»**: dos perfiles rectangulares de partida, sin ninguna forma hecha, para dibujar el mueble punto a punto o traer los perfiles de un DXF.
+- Arreglado: con perfiles de muy pocos puntos (un rectángulo), las «Medidas totales» del resumen salían con el fondo a 0.
 - **Huecos y perfiles desde un DXF**: dibuja un contorno cerrado en LibreCAD, QCAD, Inkscape o AutoCAD y tráelo con **📐 DXF…** (apartado Huecos) como forma libre, o con **📐 Perfil desde un DXF…** (Perfiles clave) como perfil del mueble, en uno o en todos los perfiles. Lee líneas, arcos, círculos, elipses, polilíneas y splines; junta los trazos por sus extremos y clava un punto en cada esquina viva.
 - **Veta del tablero** en Fabricar: con «A lo largo», cada pieza lleva unas rayitas con su veta y no se gira sola; clic en una pieza para cambiarla (↔ a lo ancho → ↕ a lo alto → libre). La respetan la colocación, el DXF, el SVG, el plano, el CSV de cortes y el Anidador (las piezas llegan marcadas y las de «a lo alto», ya giradas).
 - **Grosor propio de los muebles de los huecos**: lamas de 12 con caja o armario de 18, por ejemplo. Sus piezas van en tableros aparte en Fabricar (con el grosor en el rótulo, también en el DXF y el SVG), con su línea en la lista de compra, su grosor en el despiece y en la hoja 3c del plano.

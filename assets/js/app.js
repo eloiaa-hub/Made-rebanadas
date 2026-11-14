@@ -2144,6 +2144,19 @@ const PLANTILLAS = {
       return { largo: p.largo, esquinas, claves };
     },
   },
+  vacio: {
+    nombre: 'Vacío: empezar de cero',
+    desc: 'Dos perfiles rectangulares de partida, para dibujarlos punto a punto o traerlos de un DXF.',
+    params: [
+      { id: 'largo', nombre: 'Largo', min: 200, max: 3000, paso: 10, valor: 1000 },
+      { id: 'fondo', nombre: 'Fondo', min: 100, max: 1200, paso: 5, valor: 300 },
+      { id: 'alto', nombre: 'Altura', min: 100, max: 1500, paso: 5, valor: 300 },
+    ],
+    generar(p) {
+      const F = p.fondo, H = p.alto;
+      return { largo: p.largo, esquinas: [true, true, true, true], claves: clavesUniformes(2, p.largo, () => redondeaPts([[0, 0], [F, 0], [F, H], [0, H]])) };
+    },
+  },
 };
 
 // ---------- plantillas radiales (la posición de cada perfil es un ángulo: 0 a 360°) ----------
@@ -3044,7 +3057,7 @@ function construir3D() {
   const e = grosor(), mats = materialesTablero(), rh = radioAgujero(), V = P.varillas;
   // medidas del mueble montado
   const bb = new T.Box3(), cs = R.costillas.filter(c => c.ok);
-  cs.forEach(c => { const m = marcoEn(c.x); for (let k = 0; k < c.poly.length; k += 3) bb.expandByPoint(V3(puntoMarco(m, c.poly[k][0], c.poly[k][1]))); });
+  cs.forEach(c => { const m = marcoEn(c.x), paso = c.poly.length > 24 ? 3 : 1; for (let k = 0; k < c.poly.length; k += paso) bb.expandByPoint(V3(puntoMarco(m, c.poly[k][0], c.poly[k][1]))); });
   if (bb.isEmpty()) bb.set(new T.Vector3(-1, 0, -1), new T.Vector3(1, 1, 1));
   const sz = bb.getSize(new T.Vector3());
   G.dims = [sz.x, sz.z, sz.y]; G.alto = sz.y; G.fondo = sz.z; G.rmax = Math.max(sz.x, sz.z) / 2;
@@ -5095,8 +5108,8 @@ function abrirArchivo() {
   f.click();
 }
 function dialogoNuevo() {
-  const items = Object.entries(PLANTILLAS).map(([id, pl]) => `<button data-nuevo="${id}"><b>${pl.nombre}</b><small>${pl.desc}</small></button>`).join('');
-  modal('🗋 Mueble nuevo', `<p class="nota">Elige una plantilla. Después puedes cambiar sus medidas y retocar los perfiles a mano.</p><div class="ejemplos">${items}</div>`);
+  const items = Object.entries(PLANTILLAS).map(([id, pl]) => `<button data-nuevo="${id}"><img src="assets/miniaturas/${id}.jpg" alt="" loading="lazy" onerror="this.style.display='none'"><b>${pl.nombre}</b><small>${pl.desc}</small></button>`).join('');
+  modal('🗋 Mueble nuevo', `<p class="nota">Elige una plantilla. Después puedes cambiar sus medidas y retocar los perfiles a mano.</p><div class="plantillas">${items}</div>`, [], true);
   $$('[data-nuevo]').forEach(b => b.onclick = () => {
     if (UI.sucio && !confirm('Hay cambios sin guardar. ¿Empezar un mueble nuevo?')) return;
     cerrarModal(); cargarProyecto(proyectoDePlantilla(b.dataset.nuevo), true);

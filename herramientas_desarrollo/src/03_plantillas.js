@@ -165,6 +165,19 @@ const PLANTILLAS = {
       return { largo: p.largo, esquinas, claves };
     },
   },
+  vacio: {
+    nombre: 'Vacío: empezar de cero',
+    desc: 'Dos perfiles rectangulares de partida, para dibujarlos punto a punto o traerlos de un DXF.',
+    params: [
+      { id: 'largo', nombre: 'Largo', min: 200, max: 3000, paso: 10, valor: 1000 },
+      { id: 'fondo', nombre: 'Fondo', min: 100, max: 1200, paso: 5, valor: 300 },
+      { id: 'alto', nombre: 'Altura', min: 100, max: 1500, paso: 5, valor: 300 },
+    ],
+    generar(p) {
+      const F = p.fondo, H = p.alto;
+      return { largo: p.largo, esquinas: [true, true, true, true], claves: clavesUniformes(2, p.largo, () => redondeaPts([[0, 0], [F, 0], [F, H], [0, H]])) };
+    },
+  },
 };
 
 // ---------- plantillas radiales (la posición de cada perfil es un ángulo: 0 a 360°) ----------

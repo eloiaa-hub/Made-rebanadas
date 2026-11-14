@@ -104,8 +104,8 @@ function abrirArchivo() {
   f.click();
 }
 function dialogoNuevo() {
-  const items = Object.entries(PLANTILLAS).map(([id, pl]) => `<button data-nuevo="${id}"><b>${pl.nombre}</b><small>${pl.desc}</small></button>`).join('');
-  modal('🗋 Mueble nuevo', `<p class="nota">Elige una plantilla. Después puedes cambiar sus medidas y retocar los perfiles a mano.</p><div class="ejemplos">${items}</div>`);
+  const items = Object.entries(PLANTILLAS).map(([id, pl]) => `<button data-nuevo="${id}"><img src="assets/miniaturas/${id}.jpg" alt="" loading="lazy" onerror="this.style.display='none'"><b>${pl.nombre}</b><small>${pl.desc}</small></button>`).join('');
+  modal('🗋 Mueble nuevo', `<p class="nota">Elige una plantilla. Después puedes cambiar sus medidas y retocar los perfiles a mano.</p><div class="plantillas">${items}</div>`, [], true);
   $$('[data-nuevo]').forEach(b => b.onclick = () => {
     if (UI.sucio && !confirm('Hay cambios sin guardar. ¿Empezar un mueble nuevo?')) return;
     cerrarModal(); cargarProyecto(proyectoDePlantilla(b.dataset.nuevo), true);

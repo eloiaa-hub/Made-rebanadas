@@ -36,6 +36,10 @@ No hacen falta para usar el programa: solo para cambiarlo.
 | `08_archivo.js` | Ventanas, deshacer, guardar, abrir, ejemplos |
 | `09_inicio.js` | Arranque, botones y teclado |
 
+## Miniaturas de las plantillas
+
+`node miniaturas.js` (con Playwright) carga cada plantilla, fotografía la vista 3D y guarda `assets/miniaturas/<id>.jpg` (336 px de ancho). Hay que ejecutarlo otra vez si se añade una plantilla o cambia su forma.
+
 ## Pruebas y rendimiento
 
 `window.MadeRebanadas` expone `calcular()` y `construir3D()`, que devuelven lo que han tardado en ms. Las cachés que hay que vaciar si cambias su cálculo: `c._etq` (punto de la etiqueta de cada pieza, en `puntoEtiqueta`), `CACHE_FIG`, `CACHE_SEC` y `CACHE_POLI` (figuras, en `02e_figura.js`). Antes de publicar conviene cargar todos los ejemplos con planta en arco y en S, maqueta, un hueco, lamas horizontales y figura (eje z) y comprobar que no hay errores y que salen el DXF, el SVG, el 3D y el plano.
