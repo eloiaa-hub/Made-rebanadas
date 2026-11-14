@@ -2151,10 +2151,11 @@ const PLANTILLAS = {
       { id: 'largo', nombre: 'Largo', min: 200, max: 3000, paso: 10, valor: 1000 },
       { id: 'fondo', nombre: 'Fondo', min: 100, max: 1200, paso: 5, valor: 300 },
       { id: 'alto', nombre: 'Altura', min: 100, max: 1500, paso: 5, valor: 300 },
+      { id: 'claves', nombre: 'Perfiles clave', min: 2, max: 12, paso: 1, valor: 2 },
     ],
     generar(p) {
       const F = p.fondo, H = p.alto;
-      return { largo: p.largo, esquinas: [true, true, true, true], claves: clavesUniformes(2, p.largo, () => redondeaPts([[0, 0], [F, 0], [F, H], [0, H]])) };
+      return { largo: p.largo, esquinas: [true, true, true, true], claves: clavesUniformes(clamp(Math.round(p.claves || 2), 2, 12), p.largo, () => redondeaPts([[0, 0], [F, 0], [F, H], [0, H]])) };
     },
   },
 };
@@ -2211,7 +2212,7 @@ PLANTILLAS.columna = {
 // ---------- plantillas de pared (u = lo que sale de la pared, v = altura) ----------
 function generarPared(p, prof) {
   const M = 13, H = p.alto, esquinas = [true, true, ...new Array(M - 2).fill(false), true, true];
-  const K = clamp(Math.round((p.ondasX || 1) * 6) + 1, 7, 31);
+  const K = p.claves ? clamp(Math.round(p.claves), 2, 31) : clamp(Math.round((p.ondasX || 1) * 6) + 1, 7, 31);
   const claves = clavesUniformes(K, p.largo, t => {
     const pts = [[0, 0]];
     for (let j = 0; j < M; j++) { const v = H * j / (M - 1); pts.push([Math.max(4, prof(t, v / H)), v]); }
@@ -2226,10 +2227,11 @@ PLANTILLAS.radial_vacio = {
   params: [
     { id: 'alto', nombre: 'Altura', min: 100, max: 1500, paso: 5, valor: 400 },
     { id: 'radio', nombre: 'Radio', min: 40, max: 600, paso: 5, valor: 150 },
+    { id: 'claves', nombre: 'Perfiles clave', min: 3, max: 12, paso: 1, valor: 3 },
   ],
   generar(p) {
     const r = p.radio, H = p.alto;
-    return { largo: 360, esquinas: [true, true, true, true], claves: clavesUniformes(3, 360, () => redondeaPts([[0, 0], [r, 0], [r, H], [0, H]])) };
+    return { largo: 360, esquinas: [true, true, true, true], claves: clavesUniformes(clamp(Math.round(p.claves || 3), 3, 12), 360, () => redondeaPts([[0, 0], [r, 0], [r, H], [0, H]])) };
   },
 };
 PLANTILLAS.pared_ondas = {
@@ -2254,8 +2256,9 @@ PLANTILLAS.pared_libre = {
   params: [
     { id: 'largo', nombre: 'Largo del panel (donde van las lamas)', min: 200, max: 6000, paso: 10, valor: 1200 },
     { id: 'alto', nombre: 'Largo de cada lama', min: 200, max: 3000, paso: 10, valor: 1000 },
+    { id: 'claves', nombre: 'Perfiles clave', min: 2, max: 15, paso: 1, valor: 7 },
   ],
-  generar(p) { return generarPared({ largo: p.largo, alto: p.alto, ondasX: 0.5 }, () => 40); },
+  generar(p) { return generarPared({ largo: p.largo, alto: p.alto, claves: p.claves }, () => 40); },
 };
 PLANTILLAS.pared_relieve = {
   nombre: 'Panel de pared con relieve', grupo: 'pared',

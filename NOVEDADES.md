@@ -2,6 +2,7 @@
 
 ## v1.5
 
+- Las plantillas de partida dejan elegir **cuántos perfiles clave** quieres: «Panel de pared libre» (de 2 a 15; antes siempre 7), «Vacío: empezar de cero» (2 a 12) y «Vacío radial» (3 a 12). Después se pueden seguir añadiendo o quitando con **+ Clave / − Clave**.
 - Plantilla **«Vacío radial: cilindro»**: el «empezar de cero» de las lámparas y columnas. En los paneles de pared ese papel lo hace «Panel de pared libre».
 - Arreglado: al elegir **Lámpara de lóbulos** o **Columna** en la ventana 🗋 Mueble nuevo, el mueble se creaba como costillas en vez de radial. Ahora además sale con tablero de 6 mm, 12 costillas y un tubo en el que caben, como al cambiar el tipo con el selector.
 - La ventana **🗋 Mueble nuevo** enseña las plantillas en **cuadrícula, con una foto** del mueble que genera cada una (y la descripción entera, sin cortar).
