@@ -3,13 +3,14 @@
 ## v1.5
 
 - Quitado el modelo y el ejemplo de **Nefertiti** (su escaneo es CC BY-NC-SA, que no permite vender lo hecho con él; los demás modelos siguen, todos de licencia libre).
+- La ventana **🪑 Ejemplos** también va en cuadrícula, con una foto de cada uno de los 27 ejemplos.
 - La ventana 🗋 Mueble nuevo con fotos también se abre desde el panel izquierdo, con el botón **🗔 Ver las plantillas con fotos…** bajo el selector de plantilla.
 - Arreglado: la hoja de estilos no se recargaba al actualizar el programa (los textos de la ventana de plantillas podían salir montados); ahora lleva sello de versión como los scripts. Si lo ves raro, un último Ctrl + F5.
 - **Maderas con veta real en el 3D**: las caras de los cinco materiales de madera (abedul, chopo, pino, chapa de roble y de nogal, y el alistonado) usan ahora maderas escaneadas de Poly Haven (CC0) con color, relieve y rugosidad de verdad, recoloreadas al tono de cada material para que el 3D siga casando con los alzados y el plano. Los cantos (alma de contrachapado, MDF) siguen como estaban.
 - Las plantillas de partida dejan elegir **cuántos perfiles clave** quieres: «Panel de pared libre» (de 2 a 15; antes siempre 7), «Vacío: empezar de cero» (2 a 12) y «Vacío radial» (3 a 12). Después se pueden seguir añadiendo o quitando con **+ Clave / − Clave**.
 - Plantilla **«Vacío radial: cilindro»**: el «empezar de cero» de las lámparas y columnas. En los paneles de pared ese papel lo hace «Panel de pared libre».
 - Arreglado: al elegir **Lámpara de lóbulos** o **Columna** en la ventana 🗋 Mueble nuevo, el mueble se creaba como costillas en vez de radial. Ahora además sale con tablero de 6 mm, 12 costillas y un tubo en el que caben, como al cambiar el tipo con el selector.
-- La ventana **🗋 Mueble nuevo** enseña las plantillas en **cuadrícula, con una foto** del mueble que genera cada una (y la descripción entera, sin cortar).
+- La ventana **🗋 Mueble nuevo** enseña las plantillas en **cuadrícula, con una foto** del mueble que genera cada una (y la descripción entera, sin cortar). Las fotos son capturas limpias, sin las líneas de los perfiles.
 - Plantilla nueva **«Vacío: empezar de cero»**: dos perfiles rectangulares de partida, sin ninguna forma hecha, para dibujar el mueble punto a punto o traer los perfiles de un DXF.
 - Arreglado: con perfiles de muy pocos puntos (un rectángulo), las «Medidas totales» del resumen salían con el fondo a 0.
 - **Huecos y perfiles desde un DXF**: dibuja un contorno cerrado en LibreCAD, QCAD, Inkscape o AutoCAD y tráelo con **📐 DXF…** (apartado Huecos) como forma libre, o con **📐 Perfil desde un DXF…** (Perfiles clave) como perfil del mueble, en uno o en todos los perfiles. Lee líneas, arcos, círculos, elipses, polilíneas y splines; junta los trazos por sus extremos y clava un punto en cada esquina viva.

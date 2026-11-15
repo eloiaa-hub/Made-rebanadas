@@ -164,10 +164,12 @@ async function dialogoImagenes() {
     } catch (e) { aviso('⚠ ' + esc(e.message), 5000); }
   });
 }
+// nombre de archivo de la miniatura de un ejemplo: «Banco en S» → assets/miniaturas/ej_banco_en_s.jpg
+const slugEjemplo = n => 'ej_' + n.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 function dialogoEjemplos() {
   const E = window.MADE_EJEMPLOS || [];
-  const items = E.map((e, i) => `<button data-ej="${i}"><b>${esc(e.nombre)}</b><small>${esc(e.desc)}</small></button>`).join('');
-  modal('🪑 Ejemplos', `<p class="nota">Muebles de ejemplo para ver cómo funciona. Se abren como un proyecto nuevo.</p><div class="ejemplos">${items || '<p>No se encuentra assets/ejemplos/ejemplos.js</p>'}</div>`);
+  const items = E.map((e, i) => `<button data-ej="${i}"><img src="assets/miniaturas/${slugEjemplo(e.nombre)}.jpg" alt="" loading="lazy" onerror="this.style.display='none'"><b>${esc(e.nombre)}</b><small>${esc(e.desc)}</small></button>`).join('');
+  modal('🪑 Ejemplos', `<p class="nota">Muebles de ejemplo para ver cómo funciona. Se abren como un proyecto nuevo.</p><div class="plantillas">${items || '<p>No se encuentra assets/ejemplos/ejemplos.js</p>'}</div>`, [], true);
   $$('[data-ej]').forEach(b => b.onclick = async () => {
     if (UI.sucio && !confirm('Hay cambios sin guardar. ¿Abrir el ejemplo?')) return;
     const e = E[+b.dataset.ej]; cerrarModal();

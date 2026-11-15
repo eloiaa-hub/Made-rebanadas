@@ -1,7 +1,7 @@
-// Genera las miniaturas de las plantillas para la ventana «Mueble nuevo».
+// Genera las miniaturas de las plantillas (ventana «Mueble nuevo») y de los ejemplos (ventana «Ejemplos»).
 // Carga cada plantilla, hace una foto de la vista 3D y la guarda en assets/miniaturas/<id>.jpg.
 // Uso:  node miniaturas.js        (necesita Playwright con Chromium: npm i playwright)
-// Hay que ejecutarlo otra vez si se añade una plantilla o cambia su forma.
+// Hay que ejecutarlo otra vez si se añade o cambia una plantilla o un ejemplo.
 const { chromium } = require('playwright');
 const path = require('path');
 (async () => {
@@ -17,12 +17,26 @@ const path = require('path');
   const fs = require('fs'); fs.mkdirSync(raiz + '/assets/miniaturas', { recursive: true });
   for (const id of ids) {
     await p.click('#bNuevo'); await p.click(`[data-nuevo="${id}"]`); await p.waitForTimeout(1600);
-    await p.evaluate(() => MadeRebanadas.camara('tres4')); await p.waitForTimeout(500);
+    // foto limpia: sin perfiles clave ni costilla resaltada, y con el 3D ya construido
+    await p.evaluate(() => { for (const id of ['cClaves3d', 'cResalta', 'cFantasma']) { const c = document.getElementById(id); if (c && c.checked) c.click(); } MadeRebanadas.construir3D(); MadeRebanadas.camara('tres4'); });
+    await p.waitForTimeout(1500);
     const v = await p.locator('#v3d').boundingBox();
     // recorte centrado 16:10 de la vista 3D
     let w = v.width, h = w * 10 / 16; if (h > v.height) { h = v.height; w = h * 16 / 10; }
     await p.screenshot({ path: raiz + `/assets/miniaturas/${id}.png`, clip: { x: v.x + (v.width - w) / 2, y: v.y + (v.height - h) / 2, width: w, height: h } });
     console.log(id);
+  }
+  // ejemplos: se abren desde 🪑 Ejemplos (algunos cargan modelos o imágenes y tardan más)
+  const ejs = await p.evaluate(() => window.MADE_EJEMPLOS.map((e, i) => [i, MadeRebanadas.slugEjemplo(e.nombre)]));
+  for (const [i, slug] of ejs) {
+    await p.click('#bEjemplo'); await p.click(`[data-ej="${i}"]`); await p.waitForTimeout(4000);
+    // foto limpia: sin perfiles clave ni costilla resaltada, y con el 3D ya construido
+    await p.evaluate(() => { for (const id of ['cClaves3d', 'cResalta', 'cFantasma']) { const c = document.getElementById(id); if (c && c.checked) c.click(); } MadeRebanadas.construir3D(); MadeRebanadas.camara('tres4'); });
+    await p.waitForTimeout(1500);
+    const v = await p.locator('#v3d').boundingBox();
+    let w = v.width, h = w * 10 / 16; if (h > v.height) { h = v.height; w = h * 16 / 10; }
+    await p.screenshot({ path: raiz + `/assets/miniaturas/${slug}.png`, clip: { x: v.x + (v.width - w) / 2, y: v.y + (v.height - h) / 2, width: w, height: h } });
+    ids.push(slug); console.log(slug);
   }
   await b.close();
   // a JPEG pequeño (336 px de ancho) con sharp si está, o con ImageMagick/PIL a mano

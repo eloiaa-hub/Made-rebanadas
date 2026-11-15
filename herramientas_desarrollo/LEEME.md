@@ -39,7 +39,7 @@ No hacen falta para usar el programa: solo para cambiarlo.
 
 ## Miniaturas de las plantillas
 
-`node miniaturas.js` (con Playwright) carga cada plantilla, fotografía la vista 3D y guarda `assets/miniaturas/<id>.jpg` (336 px de ancho). Hay que ejecutarlo otra vez si se añade una plantilla o cambia su forma.
+`node miniaturas.js` (con Playwright) carga cada plantilla y cada ejemplo, fotografía la vista 3D sin perfiles ni resaltado y guarda `assets/miniaturas/<id>.jpg` (plantillas) y `ej_<nombre>.jpg` (ejemplos; el nombre sale de `slugEjemplo`), a 336 px de ancho. Hay que ejecutarlo otra vez si se añade o cambia una plantilla o un ejemplo.
 
 ## Pruebas y rendimiento
 
