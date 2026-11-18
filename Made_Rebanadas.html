@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Made-rebanadas — Por Eloi A.A.</title>
-<link rel="stylesheet" href="assets/css/estilo.css?v=202611150101">
+<link rel="stylesheet" href="assets/css/estilo.css?v=202611182240">
 </head>
 <body>
 <header class="barra">
@@ -164,12 +164,19 @@
           <button data-hnuevo="circulo" title="Círculo u óvalo">◯ Círculo</button>
           <button data-hnuevo="libre" title="Forma libre: mueve los vértices en la vista; doble clic en un lado añade uno">✎ Libre</button>
           <button id="bHuecoDXF" title="Trae un contorno cerrado dibujado en LibreCAD, Inkscape u otro CAD (DXF de texto) como hueco de forma libre">📐 DXF…</button>
+          <button data-hnuevo="texto" id="bHuecoTexto" title="Un texto sobre las lamas: las letras salen hacia fuera o se hunden hacia dentro (también se pueden recortar)">🔤 Texto</button>
         </div>
         <ul id="listaHuecos" class="lista corta"></ul>
         <div id="hcCampos" class="oculto">
           <p class="nota"><b id="hcTit"></b></p>
           <label class="fila chk"><input type="checkbox" id="hcActivo"> Activo</label>
-          <label class="fila">Forma <select id="hcForma"><option value="rect">Rectángulo</option><option value="redondeado">Redondeado</option><option value="arco">Arco</option><option value="circulo">Círculo u óvalo</option><option value="libre">Forma libre</option></select></label>
+          <label class="fila" id="filaHcForma">Forma <select id="hcForma"><option value="rect">Rectángulo</option><option value="redondeado">Redondeado</option><option value="arco">Arco</option><option value="circulo">Círculo u óvalo</option><option value="libre">Forma libre</option></select></label>
+          <div id="hcTextoCampos">
+            <label class="fila" style="align-items:flex-start">Texto <textarea id="hcTexto" rows="2" style="width:58%;resize:vertical;font:inherit;border:1px solid var(--borde);border-radius:5px;background:var(--panel);padding:4px 6px"></textarea></label>
+            <label class="fila">Letra <select id="hcLetra" class="selLetra"></select></label>
+            <button class="ancho bLetra" title="Usar una letra tuya (.ttf, .otf, .woff): se guarda dentro del proyecto">🔤 Cargar una letra (.ttf, .otf)…</button>
+            <label class="fila chk"><input type="checkbox" id="hcNegrita"> Negrita</label>
+          </div>
           <label class="fila"><span id="hcXTit">X (mm)</span> <input type="number" id="hcX" step="5"></label>
           <label class="fila"><span id="hcYTit">Y (mm)</span> <input type="number" id="hcY" step="5"></label>
           <label class="fila">Ancho (mm) <input type="number" id="hcAncho" min="10" step="5"></label>
@@ -180,8 +187,9 @@
             <label class="fila" title="El túnel empieza en esta posición a lo largo del mueble">Desde x (mm) <input type="number" id="hcDesde" step="10"></label>
             <label class="fila" title="Y termina en esta">Hasta x (mm) <input type="number" id="hcHasta" step="10"></label>
           </div>
-          <label class="fila">Tipo de hueco <select id="hcModo"><option value="pasante">Pasante (se quita todo)</option><option value="rebaje">Rebaje (hasta una profundidad)</option><option value="mueble">Con mueble dentro</option></select></label>
+          <label class="fila">Tipo de hueco <select id="hcModo"><option value="pasante">Pasante (se quita todo)</option><option value="rebaje">Rebaje (hasta una profundidad)</option><option value="saliente">En relieve: sale hacia fuera</option><option value="hundido">Hundido: entra hacia dentro</option><option value="mueble">Con mueble dentro</option></select></label>
           <label class="fila" id="filaHcProf" title="Las lamas se recortan a esta distancia de la pared">Profundidad desde la pared (mm) <input type="number" id="hcProf" min="0" step="5"></label>
+          <label class="fila" id="filaHcRelieve" title="Lo que sale o se hunde el canto de las lamas dentro de la forma, siguiendo su curva">Cuánto sale o se hunde (mm) <input type="number" id="hcRelieve" min="1" step="5"></label>
           <label class="fila" id="filaHcHolgura" title="Holgura entre el mueble y las lamas o costillas">Holgura (mm) <input type="number" id="hcHolgura" min="0" step="0.5"></label>
           <div id="hcMuebleCampos">
             <label class="fila">Mueble <select id="hcMueble"><option value="balda">Balda</option><option value="caja">Caja (hornacina)</option><option value="armario">Armario con puerta</option></select></label>
@@ -404,15 +412,15 @@
 <input type="file" id="fLetra" class="oculto" accept=".ttf,.otf,.woff,.woff2">
 <div id="aviso" class="aviso"></div>
 
-<script src="assets/js/three-bundle.js?v=202611150101"></script>
-<script src="assets/texturas/texturas.js?v=202611150101"></script>
+<script src="assets/js/three-bundle.js?v=202611182240"></script>
+<script src="assets/texturas/texturas.js?v=202611182240"></script>
 <script src="assets/texturas/pbr/roble.js"></script>
 <script src="assets/texturas/pbr/nogal.js"></script>
 <script src="assets/texturas/pbr/fresno.js"></script>
 <script src="assets/texturas/pbr/haya.js"></script>
 <script src="assets/texturas/pbr/pino.js"></script>
-<script src="assets/ejemplos/ejemplos.js?v=202611150101"></script>
-<script src="assets/js/clipper.js?v=202611150101"></script>
-<script src="assets/js/app.js?v=202611150101"></script>
+<script src="assets/ejemplos/ejemplos.js?v=202611182240"></script>
+<script src="assets/js/clipper.js?v=202611182240"></script>
+<script src="assets/js/app.js?v=202611182240"></script>
 </body>
 </html>

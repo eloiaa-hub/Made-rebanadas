@@ -2,6 +2,9 @@
 
 ## v1.5
 
+- **Texto en las lamas** (paneles de pared): nuevo hueco **🔤 Texto**. Se coloca, se estira y se gira como cualquier hueco en la vista ▦ Huecos, con su texto (varias líneas), su letra (también las tuyas) y negrita, y puede **salir hacia fuera** o **hundirse hacia dentro** los milímetros que digas siguiendo la curva del panel, o recortarse del todo. Avisa si la letra es demasiado pequeña para la separación de las lamas o si al hundir queda poca madera delante de un rastrel.
+- Los huecos de cualquier forma también pueden **salir hacia fuera** o **hundirse** (tipos nuevos «En relieve» y «Hundido»).
+- Ejemplo nuevo: **Panel ondulado con rótulo** («TALLER» saliendo 25 mm).
 - Quitado el modelo y el ejemplo de **Nefertiti** (su escaneo es CC BY-NC-SA, que no permite vender lo hecho con él; los demás modelos siguen, todos de licencia libre).
 - La ventana **🪑 Ejemplos** también va en cuadrícula, con una foto de cada uno de los 27 ejemplos.
 - La ventana 🗋 Mueble nuevo con fotos también se abre desde el panel izquierdo, con el botón **🗔 Ver las plantillas con fotos…** bajo el selector de plantilla.

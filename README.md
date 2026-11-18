@@ -20,6 +20,7 @@ Funciona en el navegador (Chrome, Edge o Firefox), sin instalar nada y **sin con
 - **Forma paramétrica**: plantillas de banco ondulado, tumbona, pouf / taburete, mesa baja «ola», estantería «duna», forma libre y «vacío: empezar de cero», elegidas en una cuadrícula con fotos y con sus medidas en deslizadores.
 - **Perfiles clave**: la forma se define con unos pocos perfiles a lo largo del mueble; cada costilla es la mezcla suave de los perfiles que tiene a los lados. Se editan a mano (puntos de curva o de esquina)) o se traen de un **DXF** dibujado en otro programa.
 - **Cuatro tipos**: costillas unidas con varillas (en planta recta, en **arco** o **en S**), **retícula entrelazada** a media madera, **radiales** (lámparas y columnas alrededor de un tubo, con discos de unión) y **paneles de pared** (lamas sobre rastreles).
+- **Texto en las lamas** (paneles de pared): un rótulo que sale hacia fuera o se hunde hacia dentro sobre cualquier panel, con la letra que quieras.
 - **Huecos**: ventanas, rebajes, hornacinas, baldas y armarios dentro de las lamas, y túneles en los muebles de costillas (formas rectangulares, redondeadas, en arco, círculos o libres), o un contorno traído de un **DXF**). Los muebles de los huecos pueden llevar **otro grosor de tablero**, con sus tableros aparte.
 - **Figuras de pie desde un STL/OBJ**: el modelo cortado de verdad en costillas o en retícula (bustos, esculturas).
 - **Modelo 3D**: el mueble montado se guarda en STL u OBJ (para otros programas o impresión 3D).

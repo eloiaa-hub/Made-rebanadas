@@ -85,7 +85,7 @@ function registrarLetras() {
     letrasRegistradas.add(k);
     try {
       const ff = new FontFace(f.nombre, bufferDeB64(f.b64));
-      ff.load().then(x => { document.fonts.add(x); UI.letrasCargadas = (UI.letrasCargadas || 0) + 1; if (relieveActivo()) { recalcular(); } })
+      ff.load().then(x => { document.fonts.add(x); UI.letrasCargadas = (UI.letrasCargadas || 0) + 1; if (relieveActivo() || (P.huecos || []).some(h => h.forma === 'texto')) { recalcular(); } })
         .catch(() => aviso('⚠ No se puede usar la letra «' + esc(f.nombre) + '»', 5000));
     } catch (e) { aviso('⚠ ' + esc(e.message), 5000); }
   });

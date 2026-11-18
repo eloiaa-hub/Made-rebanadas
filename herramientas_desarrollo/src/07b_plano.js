@@ -266,7 +266,7 @@ function planoPDF() {
   if (huecosActivos().length) {
     cabecera('3c. Huecos y sus muebles');
     const filas = [{ titulo: P.tipo === 'pared' ? 'Huecos (medidas desde la esquina de abajo a la izquierda del panel)' : 'Huecos (túneles, en el perfil: u fondo, v altura)' }];
-    huecosActivos().forEach(h => { const cb = cajaHueco(h), n = P.huecos.indexOf(h) + 1, mod = { pasante: 'pasante', rebaje: `rebaje a ${fmt(h.prof * k)} mm de la pared`, mueble: { balda: 'con balda', caja: 'con caja (hornacina)', armario: `con armario y puerta ${h.mueble.puerta === 'lamas' ? 'de lamas' : 'lisa'}` }[h.mueble.tipo] }[h.modo];
+    huecosActivos().forEach(h => { const cb = cajaHueco(h), n = P.huecos.indexOf(h) + 1, mod = (h.forma === 'texto' ? `texto «${String(h.texto || '').replace(/\n/g, ' ')}», ` : '') + { pasante: 'pasante', rebaje: `rebaje a ${fmt(h.prof * k)} mm de la pared`, saliente: `sale ${fmt((h.relieve || 0) * k)} mm hacia fuera`, hundido: `hundido ${fmt((h.relieve || 0) * k)} mm`, mueble: { balda: 'con balda', caja: 'con caja (hornacina)', armario: `con armario y puerta ${h.mueble.puerta === 'lamas' ? 'de lamas' : 'lisa'}` }[h.mueble.tipo] }[h.modo];
       const [x0, x1] = P.tipo === 'pared' ? [0, 0] : tramoX(h);
       filas.push([`Hueco H${n}`, `${{ rect: 'rectángulo', redondeado: 'redondeado', arco: 'arco', circulo: 'círculo', libre: 'forma libre' }[h.forma]} ${fmt(cb.w * k)} × ${fmt(cb.h * k)} mm en (${fmt(cb.x0 * k)}, ${fmt(cb.y0 * k)})${P.tipo === 'pared' ? '' : ` · de x = ${fmt(x0 * k)} a ${fmt(x1 * k)} mm`} · ${mod}`]); });
     if (mods.length) {

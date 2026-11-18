@@ -450,13 +450,15 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <img src="img/huecos_panel.png" alt="Apartado Huecos" class="estrecha">
   <div>
     <ul>
-      <li>En el apartado <b>Huecos</b> (panel izquierdo) se añade uno con su forma: <b>▭ Rectángulo</b>, <b>▢ Redondeado</b>, <b>⌒ Arco</b> (medio punto arriba), <b>◯ Círculo u óvalo</b>, <b>✎ Libre</b> o <b>📐 DXF…</b> (un contorno dibujado en otro programa; ver más abajo).</li>
+      <li>En el apartado <b>Huecos</b> (panel izquierdo) se añade uno con su forma: <b>▭ Rectángulo</b>, <b>▢ Redondeado</b>, <b>⌒ Arco</b> (medio punto arriba), <b>◯ Círculo u óvalo</b>, <b>✎ Libre</b>, <b>📐 DXF…</b> (un contorno dibujado en otro programa) o, en los paneles de pared, <b>🔤 Texto</b> (unas letras que salen o se hunden; ver más abajo).</li>
       <li>Al añadir el primero se abre la vista <b>▦ Huecos</b> (en el sitio del editor de perfil; el mismo botón vuelve al perfil).</li>
       <li>Cada hueco tiene su <b>posición</b> (X, Y de la esquina de abajo a la izquierda), <b>ancho</b>, <b>alto</b>, <b>giro</b> (grados, alrededor de su centro) y, si es redondeado, <b>radio</b>. Se puede <b>apagar</b> sin borrarlo, <b>duplicar</b> o <b>borrar</b> (🗑 en la lista, el botón 🗑 Borrar o <kbd>Supr</kbd> en la vista ▦ Huecos; se recupera con ↶).</li>
       <li><b>Tipo de hueco</b>:
         <ul>
           <li><b>Pasante</b>: se quita todo (se ve la pared, o se abre un túnel en el mueble).</li>
           <li><b>Rebaje</b> (solo pared): las lamas se recortan a una <b>profundidad desde la pared</b>, para apoyar algo plano.</li>
+          <li><b>En relieve: sale hacia fuera</b> (solo pared): dentro de la forma, el canto de las lamas <b>sale</b> los milímetros que digas, siguiendo su curva.</li>
+          <li><b>Hundido: entra hacia dentro</b> (solo pared): dentro de la forma, el canto se <b>hunde</b> esos milímetros.</li>
           <li><b>Con mueble dentro</b>: además se dibujan y se fabrican los tableros de una <b>balda</b>, una <b>caja (hornacina)</b> o, en la pared, un <b>armario con puerta</b>. La <b>holgura</b> separa el mueble de las lamas. <b>Grosor de sus tableros</b>: en blanco, el mismo que las lamas; con un número (18, por ejemplo), el mueble se hace con tablero de ese grosor.</li>
         </ul>
       </li>
@@ -481,6 +483,21 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <figure><img src="img/huecos_pared.jpg" alt="Pared con hornacinas"><figcaption>Ejemplo «Pared con hornacinas y armario»: ventana redondeada a la pared, hornacina y armario con puerta.</figcaption></figure>
   <figure><img src="img/huecos_banco.jpg" alt="Banco con revistero"><figcaption>Ejemplo «Banco con revistero»: un túnel a lo largo, forrado por dentro.</figcaption></figure>
 </div>
+<h3>Texto en las lamas</h3>
+<p>En los paneles de pared, <b>🔤 Texto</b> pone un rótulo sobre cualquier panel (recto, ondulado, con relieve…), como si fuera un hueco más: se mueve, se estira y se gira en la vista <b>▦ Huecos</b>, y las letras se ven dibujadas en ella. Escribe el <b>texto</b> (con <kbd>Intro</kbd>, varias líneas), elige la <b>letra</b> (las del ordenador o una tuya con <b>🔤 Cargar una letra…</b>) y si va en <b>negrita</b>, y su <b>tipo</b>:</p>
+<ul>
+  <li><b>En relieve: sale hacia fuera</b> (el que sale por defecto): dentro de las letras las lamas salen <b>«cuánto sale o se hunde»</b> mm por delante de su canto, siguiendo la onda del panel.</li>
+  <li><b>Hundido: entra hacia dentro</b>: dentro de las letras el canto se hunde esos milímetros.</li>
+  <li><b>Pasante</b>: las letras se recortan del todo y se ve la pared por ellas (las lamas quedan en muchos trozos: mira los avisos).</li>
+</ul>
+<figure><img src="img/hueco_texto.png" alt="Texto en las lamas"><figcaption>Ejemplo «Panel ondulado con rótulo»: la palabra TALLER sale 25 mm de las lamas. A la derecha, una lama de perfil con los escalones donde la cruzan las letras.</figcaption></figure>
+<ul>
+  <li>Al cambiar el texto, la letra o la negrita, la caja toma la proporción de las letras sin moverse del sitio; al estirarla, las letras crecen sin deformarse.</li>
+  <li>Las lamas cortan las letras en tiras: para que se lean bien, la letra tiene que medir <b>unas 7 veces la separación</b> entre lamas o más (con lamas cada 26 mm, unos 180 mm). Si es más pequeña, el programa lo avisa.</li>
+  <li>Al hundir mucho cerca de un rastrel puede quedar poca madera delante de su muesca: el programa también lo avisa.</li>
+  <li>Lo que sale o se hunde va en las piezas de verdad: en el plano, el DXF, el SVG, el Anidador, el 3D y el STL.</li>
+</ul>
+
 <h3>Traer un hueco desde un DXF</h3>
 <p>Con <b>📐 DXF…</b> puedes dibujar la forma del hueco en <b>LibreCAD, QCAD, Inkscape, AutoCAD</b> o el CAD de clase y traerla como <b>forma libre</b>. El programa lee DXF <b>de texto</b> (R12 o 2000) con líneas, arcos, círculos, elipses, polilíneas (con arcos) y splines, en mm; junta los trazos sueltos por sus extremos y usa el <b>contorno cerrado</b> más grande. Antes de crearlo eliges el tamaño (el del DXF o ajustado a un ancho) y cuántos puntos dejar. Después se mueve, se estira y se gira como cualquier forma libre. Los <b>bloques (INSERT)</b> no se leen: explótalos antes de guardar; si el DXF solo tiene trazos abiertos, ciérralos en el CAD.</p>
 <h3>Lo que hace el programa con las piezas</h3>

@@ -7,7 +7,8 @@
    (doble clic en un lado añade uno, clic derecho en un vértice lo quita). Mayús: sin rejilla. */
 let VH = null;
 const HU = { arr: null };
-const NOMBRE_FORMA = { rect: 'Rectángulo', redondeado: 'Redondeado', arco: 'Arco', circulo: 'Círculo', libre: 'Forma libre' };
+const NOMBRE_FORMA = { rect: 'Rectángulo', redondeado: 'Redondeado', arco: 'Arco', circulo: 'Círculo', libre: 'Forma libre', texto: 'Texto' };
+const NOMBRE_MODO = { pasante: 'pasante', rebaje: 'rebaje', saliente: 'sale hacia fuera', hundido: 'hundido' };
 const huecoSel = () => (P.huecos || [])[UI.hueco] || null;
 const snapH = (v, ev) => ev && ev.shiftKey ? Math.round(v * 10) / 10 : Math.round(v / 10) * 10;
 
@@ -47,10 +48,20 @@ function dibujarHuecos(ctx, V) {
     ctx.save();
     ctx.strokeStyle = act ? (sel ? acento : '#d0453a') : cssVar('--suave'); ctx.lineWidth = sel ? 2.4 : 1.6; if (!act) ctx.setLineDash([5, 4]);
     ctx.fillStyle = act ? (sel ? conAlfa(acento, .12) : 'rgba(208,69,58,.10)') : 'transparent';
-    V.camino(ctx, f); ctx.fill(); ctx.stroke(); ctx.restore();
+    if (h.forma === 'texto') {
+      // las letras (con sus agujeros) y la caja en discontinua
+      ctx.beginPath(); formasTexto(h).forEach(L => { L.forEach((p, i) => { const [x, y] = V.aPantalla(p[0], p[1]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.closePath(); });
+      ctx.fill('nonzero'); ctx.lineWidth = sel ? 1.6 : 1.2; ctx.stroke();
+      ctx.setLineDash([4, 4]); ctx.lineWidth = 1; V.camino(ctx, f); ctx.stroke(); ctx.restore();
+      const [lx, ly] = V.aPantalla(...(giraHueco(h) ? rotarPunto([h.x, h.y + h.alto], centroHueco(h), giraHueco(h)) : [h.x, h.y + h.alto]));
+      ctx.fillStyle = act ? (sel ? acento : '#d0453a') : cssVar('--suave'); ctx.font = 'bold 12px system-ui'; ctx.textBaseline = 'bottom';
+      ctx.fillText('H' + (k + 1) + (h.modo === 'saliente' ? ' ↑' : h.modo === 'hundido' ? ' ↓' : ''), lx + 2, ly - 3); ctx.textBaseline = 'alphabetic';
+    } else { V.camino(ctx, f); ctx.fill(); ctx.stroke(); ctx.restore(); }
     const cb = cajaDe(f), [lx, ly] = V.aPantalla(cb.x0 + cb.w / 2, cb.y0 + cb.h / 2);
+    if (h.forma !== 'texto') {
     ctx.fillStyle = act ? (sel ? acento : '#d0453a') : cssVar('--suave'); ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('H' + (k + 1), lx, ly); ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+    }
     if (sel) {
       // asas
       asasHueco(h).forEach(a => {
@@ -139,6 +150,11 @@ function iniciarHuecos() {
       if (g) { const C = centroHueco(O), cN = rotarPunto([(x0 + x1) / 2, (y0 + y1) / 2], C, g); h.x = cN[0] - w / 2; h.y = cN[1] - hh / 2; }
       else { h.x = x0; h.y = y0; }
       h.ancho = w; h.alto = hh;
+      if (h.forma === 'texto') {   // las letras no se deforman: la caja guarda su proporción (sin mover su centro)
+        const m = medidaTexto(h), q = m.w / m.h, c = centroHueco(h);
+        if (t === 'e' || t === 'w') h.alto = Math.max(10, h.ancho / q); else h.ancho = Math.max(10, h.alto * q);
+        h.x = c[0] - h.ancho / 2; h.y = c[1] - h.alto / 2;
+      }
     }
     ponerCamposHueco(); VH.pintar();
   });
@@ -156,6 +172,7 @@ function iniciarHuecos() {
     if (!window.ClipperLib) { aviso('⚠ Falta assets/js/clipper.js'); return; }
     P.huecos = P.huecos || []; const h = huecoNuevo(b.dataset.hnuevo);
     if (P.tipo !== 'pared') h.modo = 'pasante';
+    if (h.forma === 'texto') llenarLetras();
     P.huecos.push(h); UI.hueco = P.huecos.length - 1; cambio('Hueco ' + P.huecos.length + ': ' + NOMBRE_FORMA[h.forma].toLowerCase());
     if (!UI.vistaHuecos) verHuecos(true); else encuadrarHuecos();
   });
@@ -170,10 +187,19 @@ function iniciarHuecos() {
       const cb = cajaDe(h.pts), nx = k === 'x' ? v : cb.x0, ny = k === 'y' ? v : cb.y0, sw = k === 'ancho' ? Math.max(10, v) / cb.w : 1, sh = k === 'alto' ? Math.max(10, v) / cb.h : 1;
       h.pts = h.pts.map(p => [nx + (p[0] - cb.x0) * sw, ny + (p[1] - cb.y0) * sh]); const c2 = cajaDe(h.pts); h.x = c2.x0; h.y = c2.y0; h.ancho = c2.w; h.alto = c2.h; return;
     }
+    if (['ancho', 'alto'].includes(k) && h.forma === 'texto') {   // el texto guarda su proporción
+      const m = medidaTexto(h), q = m.w / m.h, c = centroHueco(h);
+      if (k === 'ancho') { h.ancho = Math.max(10, v); h.alto = Math.max(10, h.ancho / q); } else { h.alto = Math.max(10, v); h.ancho = Math.max(10, h.alto * q); }
+      h.x = c[0] - h.ancho / 2; h.y = c[1] - h.alto / 2; return;
+    }
     if (['ancho', 'alto'].includes(k) && giraHueco(h)) { const c = centroHueco(h); h[k] = Math.max(10, v); h.x = c[0] - h.ancho / 2; h.y = c[1] - h.alto / 2; return; }
     h[k] = ['ancho', 'alto'].includes(k) ? Math.max(10, v) : v;
   }));
-  campo('#hcModo', (h, el) => { h.modo = el.value; });
+  campo('#hcModo', (h, el) => { h.modo = el.value; if (h.relieve == null) h.relieve = 20; });
+  campo('#hcRelieve', (h, el) => { h.relieve = clamp(+el.value || 0, 1, 500); });
+  campo('#hcTexto', (h, el) => { h.texto = el.value; ajustarCajaTexto(h); });
+  campo('#hcLetra', (h, el) => { h.letra = el.value; ajustarCajaTexto(h); });
+  campo('#hcNegrita', (h, el) => { h.negrita = el.checked; ajustarCajaTexto(h); });
   campo('#hcGiro', (h, el) => { const g = ((Math.round(+el.value || 0) % 360) + 540) % 360 - 180; if (h.forma === 'libre' && h.pts) { const C = centroHueco(h); h.pts = h.pts.map(p => rotarPunto(p, C, g - (h.giro || 0))); const cb = cajaDe(h.pts); h.x = cb.x0; h.y = cb.y0; h.ancho = cb.w; h.alto = cb.h; } h.giro = g; });
   campo('#hcActivo', (h, el) => { h.activo = el.checked; });
   campo('#hcMueble', (h, el) => { h.mueble.tipo = el.value; });
@@ -187,13 +213,18 @@ function ponerCamposHueco() {
   const h = huecoSel(), fr = P.tipo === 'pared';
   $('#hcCampos').classList.toggle('oculto', !h); if (!h) return;
   $('#hcTit').textContent = 'H' + (UI.hueco + 1) + ' · ' + NOMBRE_FORMA[h.forma];
-  $('#hcActivo').checked = h.activo !== false; $('#hcForma').value = h.forma;
+  $('#hcActivo').checked = h.activo !== false; const tx = h.forma === 'texto';
+  $('#filaHcForma').classList.toggle('oculto', tx); if (!tx) $('#hcForma').value = h.forma;
+  $('#hcTextoCampos').classList.toggle('oculto', !tx);
+  if (tx) { if (document.activeElement !== $('#hcTexto')) $('#hcTexto').value = h.texto || ''; if (![...$('#hcLetra').options].some(o => o.value === h.letra)) llenarLetras(); $('#hcLetra').value = h.letra; $('#hcNegrita').checked = !!h.negrita; }
   $('#hcX').value = Math.round(h.x * 10) / 10; $('#hcY').value = Math.round(h.y * 10) / 10; $('#hcAncho').value = Math.round(h.ancho * 10) / 10; $('#hcAlto').value = Math.round(h.alto * 10) / 10;
   $('#hcGiro').value = h.giro || 0; $('#filaHcGiro').classList.toggle('oculto', h.modo === 'mueble');
   $('#hcRadio').value = h.radio; $('#filaHcRadio').classList.toggle('oculto', h.forma !== 'redondeado');
-  [...$('#hcModo').options].forEach(o => { o.hidden = !fr && o.value === 'rebaje'; });
-  if (!fr && h.modo === 'rebaje') h.modo = 'pasante';
+  [...$('#hcModo').options].forEach(o => { o.hidden = (!fr && ['rebaje', 'saliente', 'hundido'].includes(o.value)) || (tx && o.value === 'mueble'); });
+  if (!fr && ['rebaje', 'saliente', 'hundido'].includes(h.modo)) h.modo = 'pasante';
+  if (tx && h.modo === 'mueble') h.modo = 'saliente';
   $('#hcModo').value = h.modo; $('#hcProf').value = h.prof; $('#filaHcProf').classList.toggle('oculto', h.modo !== 'rebaje');
+  $('#hcRelieve').value = h.relieve != null ? h.relieve : 20; $('#filaHcRelieve').classList.toggle('oculto', !['saliente', 'hundido'].includes(h.modo));
   $('#hcHolgura').value = h.holgura; $('#filaHcHolgura').classList.toggle('oculto', h.modo !== 'mueble');
   $('#filaHcDesde').classList.toggle('oculto', fr); $('#hcDesde').value = h.desde; $('#hcHasta').value = h.hasta;
   $('#hcMuebleCampos').classList.toggle('oculto', h.modo !== 'mueble');
@@ -211,7 +242,7 @@ function borrarHueco(k) {
 }
 function refrescarHuecos() {
   const ok = ['pared', 'costillas', 'reticula'].includes(P.tipo);
-  $('#secHuecos').classList.toggle('oculto', !ok); $('#bVistaHuecos').classList.toggle('oculto', !ok);
+  $('#secHuecos').classList.toggle('oculto', !ok); $('#bVistaHuecos').classList.toggle('oculto', !ok); $('#bHuecoTexto').classList.toggle('oculto', P.tipo !== 'pared');
   if (!ok && UI.vistaHuecos) verHuecos(false);
   P.huecos = P.huecos || [];
   if (UI.hueco == null || UI.hueco >= P.huecos.length) UI.hueco = P.huecos.length - 1;
@@ -219,8 +250,8 @@ function refrescarHuecos() {
   const ul = $('#listaHuecos'); ul.innerHTML = '';
   P.huecos.forEach((h, k) => {
     const li = document.createElement('li'); li.className = k === UI.hueco ? 'sel' : '';
-    const modo = h.modo === 'mueble' ? { balda: 'con balda', caja: 'con caja', armario: 'con armario' }[h.mueble.tipo] : h.modo;
-    li.innerHTML = `<span><b>H${k + 1}</b> ${NOMBRE_FORMA[h.forma]} · ${fmt(h.ancho)} × ${fmt(h.alto)}${giraHueco(h) ? ' · ' + fmt(h.giro) + '°' : ''} · ${modo}${h.activo === false ? ' <i>(apagado)</i>' : ''}</span><button class="quitarHueco" title="Borrar este hueco">🗑</button>`;
+    const modo = h.modo === 'mueble' ? { balda: 'con balda', caja: 'con caja', armario: 'con armario' }[h.mueble.tipo] : (NOMBRE_MODO[h.modo] || h.modo) + (['saliente', 'hundido'].includes(h.modo) ? ' ' + fmt(h.relieve || 0) + ' mm' : '');
+    li.innerHTML = `<span><b>H${k + 1}</b> ${h.forma === 'texto' ? '«' + esc(String(h.texto || '').replace(/\n/g, ' ').slice(0, 18)) + '»' : NOMBRE_FORMA[h.forma]} · ${fmt(h.ancho)} × ${fmt(h.alto)}${giraHueco(h) ? ' · ' + fmt(h.giro) + '°' : ''} · ${modo}${h.activo === false ? ' <i>(apagado)</i>' : ''}</span><button class="quitarHueco" title="Borrar este hueco">🗑</button>`;
     li.onclick = () => { UI.hueco = k; refrescarHuecos(); if (VH) VH.pintar(); };
     li.querySelector('.quitarHueco').onclick = ev => { ev.stopPropagation(); borrarHueco(k); };
     ul.appendChild(li);

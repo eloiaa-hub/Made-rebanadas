@@ -3,7 +3,9 @@
    Un hueco es una forma (rectángulo, redondeado, arco, círculo o libre) que se resta de las piezas:
    - Panel de pared: se dibuja en la vista de frente (X a lo ancho, Y a lo alto, desde abajo a la izquierda).
        pasante: quita las lamas (se ve la pared) · rebaje: recorta las lamas a una profundidad
+       hundido: el canto de las lamas se hunde N mm dentro de la forma · saliente: sale N mm por delante
        mueble: quita las lamas y pone una balda, una caja (hornacina) o un armario con puerta.
+     La forma «texto» son las letras de un texto (varios contornos con sus agujeros), en su caja.
    - Costillas y retícula: se dibuja en el perfil (u, v) y atraviesa las piezas entre «desde» y «hasta»
        (un túnel); también puede llevar balda o caja por dentro.
    Las restas se hacen con Clipper (assets/js/clipper.js). Una lama o costilla puede quedar en varias
@@ -20,6 +22,11 @@ function huecoNuevo(forma) {
   const hu = { id: 'h' + Date.now().toString(36) + (sigHueco++), activo: true, forma, giro: 0, x, y, ancho: w, alto: h, radio: Math.round(Math.min(w, h) / 5), pts: null,
     modo: 'pasante', prof: 40, holgura: 2, desde: 0, hasta: Math.round(P.largo), mueble: { tipo: 'caja', fondo: fr ? 150 : 0, trasera: true, puerta: 'lisa', holguraPuerta: 3, grosor: 0 } };
   if (forma === 'libre') hu.pts = [[x, y], [x + w, y], [x + w * 0.85, y + h], [x + w * 0.15, y + h * 0.8]];
+  if (forma === 'texto') {   // letras de 300 mm (o menos en paneles pequeños); el ancho sale de la letra
+    Object.assign(hu, { texto: 'HOLA', letra: 'Arial', negrita: true, modo: 'saliente', relieve: 20 });
+    hu.alto = Math.round(Math.min(300, (fr ? H : 400) * 0.3) / 10) * 10; ajustarCajaTexto(hu, true);
+    hu.x = fr ? Math.round((W - hu.ancho) / 20) * 10 : hu.x; hu.y = fr ? Math.round((H - hu.alto) / 20) * 10 : hu.y;
+  }
   return hu;
 }
 // contorno de la forma en su plano (frente o perfil)
@@ -52,15 +59,96 @@ function formaBase(h) {
 }
 function cajaHueco(h) { return cajaDe(formaHueco(h)); }
 
+/* ---- texto: las letras como contornos (se dibujan en un lienzo, se sigue el borde de los píxeles y se simplifica) ---- */
+const fuenteTexto = (h, pt) => `${h.negrita ? 'bold ' : ''}${pt}px "${h.letra || 'Arial'}", sans-serif`;
+const lineasTexto = h => String(h.texto == null ? '' : h.texto).split('\n');
+// medidas del texto con letra de 100 px: ancho de la línea más larga y alto del bloque (sin sobrantes)
+function medidaTexto(h) {
+  if (typeof document === 'undefined') return { w: 300, h: 100 };
+  const ctx = (medidaTexto.cv = medidaTexto.cv || document.createElement('canvas')).getContext('2d'); ctx.font = fuenteTexto(h, 100);
+  const ls = lineasTexto(h); let w = 1, sube = 0, baja = 0;
+  ls.forEach((l, i) => { const m = ctx.measureText(l || ' '); w = Math.max(w, (m.actualBoundingBoxLeft || 0) + (m.actualBoundingBoxRight || m.width)); if (i === 0) sube = m.actualBoundingBoxAscent || 72; if (i === ls.length - 1) baja = m.actualBoundingBoxDescent || 0; });
+  return { w, h: Math.max(10, sube + baja + (ls.length - 1) * 100 * 1.15) };
+}
+// pone el ancho de la caja a la proporción del texto (con el alto de ahora), sin mover su centro
+function ajustarCajaTexto(h, sinCentro) {
+  const m = medidaTexto(h), c = centroHueco(h);
+  h.ancho = Math.max(10, Math.round(h.alto * m.w / m.h));
+  if (!sinCentro) { h.x = c[0] - h.ancho / 2; h.y = c[1] - h.alto / 2; }
+}
+// lazos de borde de una máscara (lleno a la izquierda: exteriores en un sentido y agujeros en el otro)
+function lazosMascara(M, W, H) {
+  const lleno = (i, j) => i >= 0 && j >= 0 && i < W && j < H && M[j * W + i] === 1;
+  const sig = new Map(), clave = (i, j) => j * (W + 1) + i;
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+    if (!lleno(i, j)) continue;
+    if (!lleno(i, j - 1)) sig.set(clave(i, j), clave(i + 1, j));
+    if (!lleno(i + 1, j)) sig.set(clave(i + 1, j), clave(i + 1, j + 1));
+    if (!lleno(i, j + 1)) sig.set(clave(i + 1, j + 1), clave(i, j + 1));
+    if (!lleno(i - 1, j)) sig.set(clave(i, j + 1), clave(i, j));
+  }
+  const vistos = new Set(), out = [];
+  sig.forEach((_, ini) => {
+    if (vistos.has(ini)) return;
+    const l = []; let k = ini, n = 0;
+    while (!vistos.has(k) && sig.has(k) && n++ < 1e6) { vistos.add(k); l.push([k % (W + 1), Math.floor(k / (W + 1))]); k = sig.get(k); }
+    if (l.length >= 8) out.push(l);
+  });
+  return out;
+}
+// Douglas-Peucker sobre un lazo cerrado
+function simplificarLetra(L, tol) {
+  if (L.length < 8) return L;
+  const d2s = (p, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], q = dx * dx + dy * dy; if (!q) return (p[0] - a[0]) ** 2 + (p[1] - a[1]) ** 2; const t = clamp(((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / q, 0, 1); return (p[0] - a[0] - t * dx) ** 2 + (p[1] - a[1] - t * dy) ** 2; };
+  const dp = (pts) => {
+    const keep = new Uint8Array(pts.length); keep[0] = keep[pts.length - 1] = 1; const pila = [[0, pts.length - 1]], t2 = tol * tol;
+    while (pila.length) { const [i, j] = pila.pop(); let m = -1, md = t2; for (let k = i + 1; k < j; k++) { const d = d2s(pts[k], pts[i], pts[j]); if (d > md) { md = d; m = k; } } if (m > 0) { keep[m] = 1; pila.push([i, m], [m, j]); } }
+    return pts.filter((_, k) => keep[k]);
+  };
+  const mid = Math.floor(L.length / 2), r = [...dp(L.slice(0, mid + 1)).slice(0, -1), ...dp([...L.slice(mid), L[0]]).slice(0, -1)];
+  return r.length >= 3 ? r : L;
+}
+const CACHE_TXT = new Map();
+// contornos de las letras en el plano del hueco (mm), girados con el hueco
+function formasTexto(h) {
+  const clave = JSON.stringify([h.texto, h.letra, h.negrita, h.x, h.y, h.ancho, h.alto, h.giro, UI.letrasCargadas || 0]);
+  if (CACHE_TXT.has(clave)) return CACHE_TXT.get(clave);
+  if (CACHE_TXT.size > 40) CACHE_TXT.clear();
+  let res = [];
+  if (typeof document !== 'undefined' && String(h.texto || '').trim()) {
+    const m = medidaTexto(h), mmPx = Math.max(0.25, Math.max(h.ancho, h.alto) / 1600);   // ≤ 1600 px de lado
+    const W = Math.max(8, Math.ceil(h.ancho / mmPx) + 4), H = Math.max(8, Math.ceil(h.alto / mmPx) + 4);
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d'), k = Math.min((W - 4) / m.w, (H - 4) / m.h);   // escala de la letra de 100 px
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); ctx.fillStyle = '#fff';
+    ctx.font = fuenteTexto(h, 100 * k); ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    const ls = lineasTexto(h), c0 = ctx.measureText(ls[0] || ' '), sube = (c0.actualBoundingBoxAscent || 72) * 1;   // en px de la letra escalada
+    const y0 = (H - m.h * k) / 2 + sube;
+    ls.forEach((l, i) => ctx.fillText(l, W / 2, y0 + i * 100 * k * 1.15));
+    const px = ctx.getImageData(0, 0, W, H).data, M = new Uint8Array(W * H);
+    for (let i = 0; i < W * H; i++) M[i] = px[i * 4] > 127 ? 1 : 0;
+    const g = giraHueco(h), C = centroHueco(h), ox = h.x + h.ancho / 2 - W / 2 * mmPx, oy = h.y + h.alto / 2 + H / 2 * mmPx;
+    res = lazosMascara(M, W, H).map(L => simplificarLetra(L, 0.7)).map(L => L.map(([i, j]) => { const p = [ox + i * mmPx, oy - j * mmPx]; return g ? rotarPunto(p, C, g) : p; }))
+      .filter(L => Math.abs(areaFirmada(L)) > 1);
+  }
+  CACHE_TXT.set(clave, res);
+  return res;
+}
+// todas las formas de un hueco (una, o las letras del texto)
+const formasDe = h => h.forma === 'texto' ? formasTexto(h) : [formaHueco(h)];
+// desplaza un polígono a lo largo del primer eje (hacia fuera de la pared en las lamas)
+const desplazarU = (poly, d) => poly.map(q => [q[0] + d, q[1]]);
+
 // ---- Clipper ----
 const aCl = poly => poly.map(p => ({ X: Math.round(p[0] * ESC_CL), Y: Math.round(p[1] * ESC_CL) }));
 const deCl = path => path.map(q => [q.X / ESC_CL, q.Y / ESC_CL]);
+// sujeto: un polígono o una lista de polígonos (las letras de un texto, con sus agujeros en sentido contrario)
 function booleana(sujeto, recortes, tipo) {
   const C = window.ClipperLib, c = new C.Clipper();
-  c.AddPath(aCl(sujeto), C.PolyType.ptSubject, true);
+  (Array.isArray(sujeto[0] && sujeto[0][0]) ? sujeto : [sujeto]).forEach(s => { if (s.length >= 3) c.AddPath(aCl(s), C.PolyType.ptSubject, true); });
   recortes.forEach(r => { if (r.length >= 3) c.AddPath(aCl(r), C.PolyType.ptClip, true); });
   const arbol = new C.PolyTree();
-  c.Execute(tipo === 'interseccion' ? C.ClipType.ctIntersection : C.ClipType.ctDifference, arbol, C.PolyFillType.pftNonZero, C.PolyFillType.pftNonZero);
+  c.Execute(tipo === 'interseccion' ? C.ClipType.ctIntersection : tipo === 'union' ? C.ClipType.ctUnion : C.ClipType.ctDifference, arbol, C.PolyFillType.pftNonZero, C.PolyFillType.pftNonZero);
   return C.JS.PolyTreeToExPolygons(arbol).map(ex => {
     let poly = deCl(ex.outer); if (areaFirmada(poly) < 0) poly.reverse();
     const int = ex.holes.map(deCl).filter(hh => Math.abs(areaFirmada(hh)) > 1).map(hh => areaFirmada(hh) < 0 ? hh : hh.slice().reverse());
@@ -89,15 +177,24 @@ function tramoX(h) { const L = P.largo, e = grosor(); return [clamp(Math.min(h.d
 const lamasH = () => P.tipo === 'pared' && P.relieve && P.relieve.orient === 'h';
 
 /* ---- lo que se quita a una pieza: polígonos en sus coordenadas (u, v) o (x, v) para los largueros ---- */
-function recortesDe(p) {
-  const e = grosor(), out = [], extra = [];   // extra: trozos que se añaden (lamas de la puerta)
+function recortesDe(p, poly) {
+  const e = grosor(), out = [], extra = [], suma = [];   // extra: trozos que se añaden (lamas de la puerta) · suma: lo que sale por delante
+  poly = poly || p.poly;
   huecosActivos().forEach((h, ih) => {
     const muebleH = h.modo === 'mueble', hol = muebleH ? Math.max(0, h.holgura || 0) : 0;
-    let forma = formaHueco(h); if (hol) forma = engordar(forma, hol);
+    let forma = h.forma === 'texto' && P.tipo === 'pared' ? formasTexto(h) : formaHueco(h); if (hol) forma = engordar(forma, hol);
     if (P.tipo === 'pared') {
       // la lama ocupa una franja del frente: en vertical, X en [x - e/2, x + e/2]; en horizontal, Y
       const eje = lamasH() ? 0 : 1;               // a lo largo de la lama: Y (vertical) o X (horizontal)
+      if (!forma.length) return;
       const ts = tramosEnFranja(forma, eje, p.x - e / 2, p.x + e / 2); if (!ts.length) return;
+      if (h.modo === 'hundido' || h.modo === 'saliente') {
+        // el canto se hunde o sale «relieve» mm dentro de la forma: la franja entre el canto y el canto desplazado
+        const d = Math.max(0.5, +h.relieve || 0), fuera = h.modo === 'saliente';
+        const franjas = fuera ? booleana(desplazarU(poly, d), [poly]) : booleana(poly, [desplazarU(poly, -d)]);
+        ts.forEach(([a, b]) => franjas.forEach(fr => booleana(fr.poly, [[[-1e5, a], [1e5, a], [1e5, b], [-1e5, b]]], 'interseccion').forEach(q => (fuera ? suma : out).push(q.poly))));
+        return;
+      }
       const u0 = h.modo === 'rebaje' ? Math.max(0, h.prof) : -1e5;
       ts.forEach(([a, b]) => out.push([[u0, a], [1e5, a], [1e5, b], [u0, b]]));
       // armario con puerta de lamas: los trozos de lama de dentro del hueco van en la puerta
@@ -119,7 +216,7 @@ function recortesDe(p) {
       out.push(forma);
     }
   });
-  return { out, extra };
+  return { out, extra, suma };
 }
 // punto de dentro de un polígono (para reconocer cada trozo al rehacerlo en fabricación)
 function puntoDentro(poly, int) {
@@ -134,8 +231,9 @@ function puntoDentro(poly, int) {
 }
 // trozos de una pieza tras restar los huecos (y añadir los de la puerta)
 function partesDe(p, poly) {
-  const { out, extra } = recortesDe(p);
-  if (!out.length && !extra.length) return null;
+  const { out, extra, suma } = recortesDe(p, poly);
+  if (!out.length && !extra.length && !suma.length) return null;
+  if (suma.length) { const u = booleana([poly, ...suma], [], 'union'); if (u.length) poly = u[0].poly; }   // las letras que salen se pegan al canto
   const partes = out.length ? booleana(poly, out) : [{ poly, int: [], area: Math.abs(areaFirmada(poly)) }];
   extra.forEach(x => booleana(poly, [x.poly], 'interseccion').forEach(q => { q.puerta = x.hueco; partes.push(q); }));
   partes.forEach(q => { q.ref = puntoDentro(q.poly, q.int); });
@@ -232,8 +330,9 @@ function construirModulos(res) {
 function tramosRastrel(v, alto, xA, xB) {
   let tramos = [[xA, xB]];
   huecosActivos().forEach(h => {
-    if (h.modo === 'rebaje') return;
-    const forma = h.modo === 'mueble' ? engordar(formaHueco(h), h.holgura || 0) : formaHueco(h);
+    if (['rebaje', 'hundido', 'saliente'].includes(h.modo)) return;
+    const forma = h.modo === 'mueble' ? engordar(formaHueco(h), h.holgura || 0) : formasDe(h);
+    if (!forma.length) return;
     // la franja del rastrel en el frente: a lo largo de x, entre v - alto/2 y v + alto/2
     const ts = tramosEnFranja(forma, lamasH() ? 1 : 0, v - alto / 2, v + alto / 2);
     ts.forEach(([a, b]) => { tramos = tramos.flatMap(([c, d]) => b <= c || a >= d ? [[c, d]] : [[c, a], [b, d]].filter(([m, n]) => n - m > 20)); });
@@ -262,6 +361,20 @@ function avisosHuecos(res) {
       if (h.modo === 'rebaje' && res.rastreles.length && h.prof < Pa.grueso + 8) {
         const cb = cajaHueco(h), [a, b] = lamasH() ? [cb.x0, cb.x0 + cb.w] : [cb.y0, cb.y0 + cb.h];
         if (res.rastreles.some(r => r.v + Pa.alto / 2 > a && r.v - Pa.alto / 2 < b)) add('error', `Hueco ${P.huecos.indexOf(h) + 1}: el rebaje (${fmt(h.prof)} mm) es menos profundo que el rastrel más 8 mm (${fmt(Pa.grueso + 8)} mm): la muesca se come la lama.`);
+      }
+      if (h.forma === 'texto') {
+        const n = P.huecos.indexOf(h) + 1, sep = P.costillas.separacion || 30;
+        if (!formasTexto(h).length) add('atencion', `Hueco ${n}: el texto está vacío.`);
+        else if (h.alto < sep * 5) add('info', `Hueco ${n}: con lamas cada ${fmt(sep)} mm, unas letras de ${fmt(h.alto)} mm de alto apenas se leen; para que se lean bien, haz el texto de unos ${fmt(sep * 7)} mm o más, o junta las lamas.`);
+      }
+      if (h.modo === 'hundido') {
+        const n = P.huecos.indexOf(h) + 1, d = h.relieve || 0;
+        if (res.rastreles.length) {
+          const cb = cajaHueco(h), [a, b] = lamasH() ? [cb.x0, cb.x0 + cb.w] : [cb.y0, cb.y0 + cb.h];
+          const toca = res.rastreles.some(r => r.v + Pa.alto / 2 > a && r.v - Pa.alto / 2 < b);
+          const finas = todas.filter(q => q.conHuecos && Math.min(q.caja.w, q.caja.h) - d < Pa.grueso + 8 && q.caja.y0 <= b && q.caja.y1 >= a);
+          if (toca && finas.length) add('atencion', `Hueco ${n}: al hundir ${fmt(d)} mm, en ${finas.length} lama${finas.length > 1 ? 's' : ''} queda poca madera por delante de la muesca del rastrel: hunde menos o mueve el texto fuera del rastrel.`);
+        }
       }
       if (h.modo === 'mueble' && h.forma !== 'rect') add('info', `Hueco ${P.huecos.indexOf(h) + 1}: el mueble es rectangular (toma el rectángulo que envuelve la forma).`);
       if (h.modo === 'mueble' && h.mueble.tipo === 'armario' && h.mueble.puerta === 'lamas') {
