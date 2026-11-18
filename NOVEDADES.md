@@ -2,6 +2,9 @@
 
 ## v1.5
 
+- **Partir las lamas** de los paneles de pared (paredes altas o para aprovechar el tablero), en *Pared: rastreles → Partir*: para que quepan en el tablero (el programa pone las juntas) o en las alturas que digas. Junta **a tope** o **con sombra** (una raya a la vista), y juntas **a la misma altura**, **alternas** (al tresbolillo) o **en escalera**. Con las juntas a la misma altura, un **rastrel a cada lado de la junta**: cada banda es un **módulo** que se monta por separado. Los trozos salen como «Lama 12a, 12b…» en el plano, el despiece, el DXF y el Anidador, con su paso de montaje y sus comprobaciones.
+- **Corte láser en el Anidador**: elige *Máquina → Cortadora láser*. Las piezas van separadas solo por el ancho del corte, y salen el **G-code del láser** (GRBL, M4; grabado, interiores y al final los contornos, con potencia, velocidad, pasadas y compensación del corte) y un **SVG para láser** (LightBurn, RDWorks…: rojo cortar contorno, azul interiores, negro grabar). Las maquetas llegan ya en modo láser.
+- Arreglado: con lamas partidas o con huecos, el alzado de la hoja 2 del plano se salía de la hoja.
 - **Texto en las lamas** (paneles de pared): nuevo hueco **🔤 Texto**. Se coloca, se estira y se gira como cualquier hueco en la vista ▦ Huecos, con su texto (varias líneas), su letra (también las tuyas) y negrita, y puede **salir hacia fuera** o **hundirse hacia dentro** los milímetros que digas siguiendo la curva del panel, o recortarse del todo. Avisa si la letra es demasiado pequeña para la separación de las lamas o si al hundir queda poca madera delante de un rastrel.
 - Los huecos de cualquier forma también pueden **salir hacia fuera** o **hundirse** (tipos nuevos «En relieve» y «Hundido»).
 - Ejemplo nuevo: **Panel ondulado con rótulo** («TALLER» saliendo 25 mm).

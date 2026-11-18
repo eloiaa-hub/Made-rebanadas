@@ -151,7 +151,15 @@ function paredExtras(res) {
   cs.forEach(c => { const ints = intervalosV(c.poly, c.caja.x0 + 0.5); if (!ints.length) return; const I = ints.reduce((m, J) => J[1] - J[0] > m[1] - m[0] ? J : m); vA = Math.max(vA, I[0]); vB = Math.min(vB, I[1]); });
   if (!(vB - vA > Pa.alto * 1.5)) return;
   const m = clamp(Pa.margen, Pa.alto / 2, (vB - vA) / 2 - Pa.alto / 2);
-  const alturas = n === 1 ? [(vA + vB) / 2] : Array.from({ length: n }, (_, j) => vA + m + j * (vB - vA - 2 * m) / (n - 1));
+  let alturas = n === 1 ? [(vA + vB) / 2] : Array.from({ length: n }, (_, j) => vA + m + j * (vB - vA - 2 * m) / (n - 1));
+  // lamas partidas con las juntas alineadas: un rastrel a cada lado de cada junta (cada banda, un módulo)
+  prepararJuntas(cs);
+  if (JUNTAS && JUNTAS.bases.length && JUNTAS.patron === 'alineado' && partirP().rastreles) {
+    const dj = anchoJunta() / 2 + 20 + Pa.alto / 2, cerca = v => JUNTAS.bases.some(b => Math.abs(v - b) < dj + Pa.alto);
+    alturas = alturas.filter(v => !cerca(v));
+    JUNTAS.bases.forEach(b => alturas.push(b - dj, b + dj));
+    alturas = alturas.filter(v => v > vA + Pa.alto / 2 && v < vB - Pa.alto / 2).sort((p, q) => p - q);
+  }
   alturas.forEach((v, j) => {
     res.rastreles.push({ j, v });
     cs.forEach(c => {

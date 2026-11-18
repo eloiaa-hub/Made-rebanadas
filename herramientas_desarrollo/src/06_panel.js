@@ -251,6 +251,16 @@ function iniciarPanel() {
   enlazar('#paAlto', () => { P.pared.alto = Math.max(10, +$('#paAlto').value || 45); cambio(); });
   enlazar('#paGrueso', () => { P.pared.grueso = Math.max(5, +$('#paGrueso').value || 20); cambio(); });
   enlazar('#paMargen', () => { P.pared.margen = Math.max(0, +$('#paMargen').value || 0); cambio(); });
+  // partir las lamas
+  const Pt = () => (P.pared.partir = Object.assign({ modo: 'no', alturas: '', largoMax: 0, junta: 'tope', sombra: 8, patron: 'alineado', desfase: 300, rastreles: true }, P.pared.partir || {}));
+  enlazar('#ptModo', () => { Pt().modo = $('#ptModo').value; cambio(Pt().modo === 'no' ? 'Lamas enteras' : 'Lamas partidas'); ponerPartir(); });
+  enlazar('#ptAlturas', () => { Pt().alturas = $('#ptAlturas').value; cambio(); ponerPartir(); });
+  enlazar('#ptMax', () => { Pt().largoMax = Math.max(0, +$('#ptMax').value || 0); cambio(); ponerPartir(); });
+  enlazar('#ptJunta', () => { Pt().junta = $('#ptJunta').value; cambio(); ponerPartir(); });
+  enlazar('#ptSombra', () => { Pt().sombra = clamp(+$('#ptSombra').value || 8, 1, 200); cambio(); ponerPartir(); });
+  enlazar('#ptPatron', () => { Pt().patron = $('#ptPatron').value; cambio(); ponerPartir(); });
+  enlazar('#ptDesfase', () => { Pt().desfase = Math.max(0, +$('#ptDesfase').value || 0); cambio(); ponerPartir(); });
+  enlazar('#ptRast', () => { Pt().rastreles = $('#ptRast').checked; cambio(); ponerPartir(); });
   enlazar('#paHolgura', () => { P.pared.holgura = clamp(+$('#paHolgura').value || 0, 0, 3); cambio(); });
   enlazar('#paVer', () => { P.pared.verPared = $('#paVer').checked; construir3D(); });
   enlazar('#cClaves3d', () => { P.vista.claves = $('#cClaves3d').checked; construirClaves3D(); });
@@ -335,6 +345,17 @@ function mostrarSecciones(forzarFigura) {
   $('#secClaves').classList.toggle('oculto', calc);
   $('#sClave').classList.toggle('oculto', calc); $('#bEsquina').classList.toggle('oculto', calc); $('#infoClave').classList.toggle('oculto', calc);
 }
+// campos de «Partir las lamas» (se enseñan los que hacen falta)
+function ponerPartir() {
+  const Pp = Object.assign({ modo: 'no', alturas: '', largoMax: 0, junta: 'tope', sombra: 8, patron: 'alineado', desfase: 300, rastreles: true }, P.pared.partir || {}), hor = (P.relieve || {}).orient === 'h';
+    $('#ptModo').value = Pp.modo; $('#ptCampos').classList.toggle('oculto', Pp.modo === 'no');
+    if (document.activeElement !== $('#ptAlturas')) $('#ptAlturas').value = Pp.alturas || '';
+    $('#ptAlturasTit').textContent = hor ? 'Juntas a (mm desde la izquierda)' : 'Juntas a (mm desde abajo)';
+    $('#filaPtAlturas').classList.toggle('oculto', Pp.modo !== 'alturas'); $('#filaPtMax').classList.toggle('oculto', Pp.modo !== 'auto');
+    $('#ptMax').value = Pp.largoMax || ''; $('#ptJunta').value = Pp.junta; $('#ptSombra').value = Pp.sombra; $('#filaPtSombra').classList.toggle('oculto', Pp.junta !== 'sombra');
+    $('#ptPatron').value = Pp.patron; $('#ptDesfase').value = Pp.desfase; $('#filaPtDesfase').classList.toggle('oculto', Pp.patron === 'alineado');
+    $('#ptRast').checked = Pp.rastreles !== false; $('#filaPtRast').classList.toggle('oculto', Pp.patron !== 'alineado');
+}
 function ponerControles() {
   llenarPlantillas(); llenarLetras(); refrescarHuecos();
   const C = P.costillas, V = P.varillas;
@@ -352,6 +373,7 @@ function ponerControles() {
   $('#sTipo').value = P.tipo; const Rt = P.reticula; $('#rNum').value = Rt.num; $('#rMargen').value = Rt.margen; $('#rVuelo').value = Rt.vuelo; $('#rHolgura').value = Rt.holgura; $('#rArriba').value = Rt.xArriba !== false ? '1' : '0';
   const Pl = P.planta; $('#plForma').value = Pl.forma; $('#plRadio').value = Pl.radio; $('#plSentido').value = String(Pl.sentido === -1 ? -1 : 1); $('#plAmp').value = Pl.amplitud; $('#plOndas').value = Pl.ondas;
   const Ra = P.radial; $('#raNum').value = P.costillas.numero; $('#raTubo').value = Ra.tubo; $('#raHolTubo').value = Ra.holguraTubo; $('#raDiscos').value = Ra.discos; $('#raRDisco').value = Ra.rDisco; $('#raHolgura').value = Ra.holgura;
+  ponerPartir();
   const Pa = P.pared; $('#paNum').value = Pa.rastreles; $('#paAlto').value = Pa.alto; $('#paGrueso').value = Pa.grueso; $('#paMargen').value = Pa.margen; $('#paHolgura').value = Pa.holgura; $('#paVer').checked = Pa.verPared;
   $('#cClaves3d').checked = P.vista.claves !== false;
   const Fg = P.figura; $('#fgAlto').value = Fg.alto; $('#fgEje').value = Fg.eje; $('#fgGiro').value = String(Fg.giro || 0); $('#fgMin').value = Fg.minArea; $('#fgUnir').checked = Fg.unir !== false;

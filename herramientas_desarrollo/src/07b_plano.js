@@ -340,6 +340,13 @@ function planoPDF() {
     'Acabado: aceite, cera o barniz. Si va al exterior, usa varilla inoxidable y un acabado para exterior.',
   ];
   let yp = M + 24;
+  if (P.tipo === 'pared' && partirActivo() && JUNTAS && JUNTAS.bases.length) {
+    const Pp = partirP(), mods = Pp.patron === 'alineado' && Pp.rastreles;
+    pasos.splice(Math.max(1, pasos.length - 1), 0, `Lamas partidas (${1 + JUNTAS.bases.length} trozos cada una: «a» abajo${lamasH() ? ' (a la izquierda)' : ''}, luego «b»…): ` +
+      (mods ? `con las juntas a la misma altura y un rastrel a cada lado, cada banda es un módulo: puedes montarlo en el taller y colgarlo entero.`
+            : `coloca primero todos los trozos «a» y luego los demás, comprobando que cada trozo llega a un rastrel.`) +
+      (Pp.junta === 'sombra' ? ` Deja la sombra de ${fmt(anchoJunta() * k, 1)} mm con un taco del mismo grueso.` : ` A tope: lija un poco la arista de las testas para que la junta no se marque.`));
+  }
   if (huecosActivos().length) pasos.splice(Math.max(1, pasos.length - 1), 0, P.tipo === 'pared'
     ? 'Huecos (hoja 3c): cuelga primero los muebles de los huecos (cajas, armarios, baldas) atornillados a la pared; después pon las lamas de alrededor. Los trozos de lama (12a, 12b…) van en su sitio, cada uno en su rastrel o atornillado por detrás al mueble.'
     : 'Huecos (hoja 3c): monta el forro del túnel (suelo, techo y laterales) a la vez que las costillas, encolado o atornillado; los trozos de costilla (12a, 12b…) van en su sitio en las varillas.');
@@ -470,7 +477,7 @@ function hojaPared(D, cabecera, tabla, o) {
   const rect = c => { const m = marcoEn(c.x), a = puntoMarco(m, 0, c.caja.y0), b = puntoMarco(m, 0, c.caja.y1), g = ejeGrosor(m);
     const xs = [a[0], b[0], a[0] + g[0] * e / 2, a[0] - g[0] * e / 2], ys = [a[1], b[1], a[1] + g[1] * e / 2, a[1] - g[1] * e / 2];
     return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; };
-  const rs = cs.map(rect), X0 = Math.min(...rs.map(r => r[0])), X1 = Math.max(...rs.map(r => r[2])), Y1 = Math.max(...rs.map(r => r[3]));
+  const rs = [...cs, ...tz].map(rect), X0 = Math.min(...rs.map(r => r[0])), X1 = Math.max(...rs.map(r => r[2])), Y1 = Math.max(...rs.map(r => r[3]));   // con los trozos (lamas partidas o con huecos)
   const zona = { x: M + 10, y: M + 24, w: W - 2 * M - 20, h: 100 }, s = Math.min(zona.w / (X1 - X0 + 80), zona.h / (Y1 + 20));
   const PX = x => zona.x + (x - X0 + 40) * s, PY = v => zona.y + zona.h - v * s;
   D.texto(zona.x, zona.y - 4, `Alzado (de frente): ${R.n} lamas ${hor ? 'horizontales' : 'verticales'} numeradas y ${R.rastreles.length} rastreles detrás.`, { pt: 8.5, col: gris });

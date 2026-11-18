@@ -98,7 +98,8 @@ function proyectoBase() {
     reticula: { num: 4, margen: 40, holgura: 0.3, xArriba: true, vuelo: 25 },
     planta: { forma: 'recta', radio: 2500, sentido: 1, amplitud: 150, ondas: 1 },
     radial: { tubo: 20, holguraTubo: 0.5, discos: 2, rDisco: 0, holgura: 0.3 },
-    pared: { rastreles: 3, alto: 45, grueso: 20, margen: 120, holgura: 0.5, verPared: true },
+    pared: { rastreles: 3, alto: 45, grueso: 20, margen: 120, holgura: 0.5, verPared: true,
+      partir: { modo: 'no', alturas: '', largoMax: 0, junta: 'tope', sombra: 8, patron: 'alineado', desfase: 300, rastreles: true } },
     relieve: { fuente: 'plantilla', orient: 'v', ancho: 1200, alto: 500, fondo: 20, relieve: 60, suavizado: 10, invertir: false,
       texto: 'Made', letra: 'Arial Black', tamLetra: 320, negrita: true, interlinea: 1.05, ondaAmp: 0, ondas: 2,
       vista: 'frente', giro: 0, base: 0.15, modelo: null, gama: 1, imagen: null,
@@ -780,7 +781,15 @@ function paredExtras(res) {
   cs.forEach(c => { const ints = intervalosV(c.poly, c.caja.x0 + 0.5); if (!ints.length) return; const I = ints.reduce((m, J) => J[1] - J[0] > m[1] - m[0] ? J : m); vA = Math.max(vA, I[0]); vB = Math.min(vB, I[1]); });
   if (!(vB - vA > Pa.alto * 1.5)) return;
   const m = clamp(Pa.margen, Pa.alto / 2, (vB - vA) / 2 - Pa.alto / 2);
-  const alturas = n === 1 ? [(vA + vB) / 2] : Array.from({ length: n }, (_, j) => vA + m + j * (vB - vA - 2 * m) / (n - 1));
+  let alturas = n === 1 ? [(vA + vB) / 2] : Array.from({ length: n }, (_, j) => vA + m + j * (vB - vA - 2 * m) / (n - 1));
+  // lamas partidas con las juntas alineadas: un rastrel a cada lado de cada junta (cada banda, un módulo)
+  prepararJuntas(cs);
+  if (JUNTAS && JUNTAS.bases.length && JUNTAS.patron === 'alineado' && partirP().rastreles) {
+    const dj = anchoJunta() / 2 + 20 + Pa.alto / 2, cerca = v => JUNTAS.bases.some(b => Math.abs(v - b) < dj + Pa.alto);
+    alturas = alturas.filter(v => !cerca(v));
+    JUNTAS.bases.forEach(b => alturas.push(b - dj, b + dj));
+    alturas = alturas.filter(v => v > vA + Pa.alto / 2 && v < vB - Pa.alto / 2).sort((p, q) => p - q);
+  }
   alturas.forEach((v, j) => {
     res.rastreles.push({ j, v });
     cs.forEach(c => {
@@ -1437,7 +1446,43 @@ function simplificarPerfiles(n) {
    Las restas se hacen con Clipper (assets/js/clipper.js). Una lama o costilla puede quedar en varias
    piezas (Lama 12a, 12b…) y con agujeros por dentro. */
 const ESC_CL = 1000;
-const usaHuecos = () => ['pared', 'costillas', 'reticula'].includes(P.tipo) && (P.huecos || []).some(h => h.activo !== false) && !!window.ClipperLib;
+const usaHuecos = () => ['pared', 'costillas', 'reticula'].includes(P.tipo) && ((P.huecos || []).some(h => h.activo !== false) || partirActivo()) && !!window.ClipperLib;
+
+/* ---- partir las lamas de un panel de pared (paredes altas o para aprovechar el tablero) ----
+   Cada junta es una franja (0,1 mm a tope, o la sombra) que se resta de la lama, como un hueco: los trozos
+   salen como «Lama 12a, 12b…» (de abajo arriba, o de izquierda a derecha en lamas horizontales).
+   Juntas alineadas, alternas (al tresbolillo) o en escalera; con las alineadas se pueden poner rastreles a los
+   dos lados de cada junta, y cada banda queda como un módulo que se monta por separado. */
+const partirP = () => (P.pared && P.pared.partir) || { modo: 'no' };
+const partirActivo = () => P.tipo === 'pared' && partirP().modo && partirP().modo !== 'no';
+const anchoJunta = () => partirP().junta === 'sombra' ? clamp(+partirP().sombra || 0, 0.5, 200) : 0.1;
+let JUNTAS = null;   // { V0, V1, bases, d, Lmax } del último cálculo (lo usa también Fabricar al rehacer las piezas)
+// largo máximo de un trozo: el que se escriba o el lado largo del tablero de Fabricar menos sus bordes
+function largoMaxTrozo() {
+  const q = +partirP().largoMax; if (q > 0) return q;
+  const f = typeof fabActual === 'function' ? fabActual() : { ancho: 2440, alto: 1220, borde: 10 };
+  return Math.max(f.ancho, f.alto) - 2 * (f.borde || 0) - 10;
+}
+function prepararJuntas(lamas) {
+  JUNTAS = null; if (!partirActivo() || !lamas.length) return;
+  const Pp = partirP(); let V0 = Infinity, V1 = -Infinity;
+  lamas.forEach(c => { V0 = Math.min(V0, c.caja.y0); V1 = Math.max(V1, c.caja.y1); });
+  const L = V1 - V0, d = Pp.patron === 'alineado' ? 0 : Math.max(0, +Pp.desfase || 0), spread = Pp.patron === 'escalera' ? 2 * d : d, Lmax = largoMaxTrozo();
+  let bases = [];
+  if (Pp.modo === 'auto') {
+    const n = Math.max(1, Math.ceil(L / Math.max(100, Lmax - spread - anchoJunta())));
+    bases = Array.from({ length: n - 1 }, (_, k) => V0 + L * (k + 1) / n);
+  } else {
+    bases = String(Pp.alturas || '').split(/[;,\s]+/).map(t => +t).filter(v => isFinite(v) && v > 0).map(v => V0 + v).filter(v => v > V0 + 20 && v < V1 - 20).sort((a, b) => a - b);
+  }
+  JUNTAS = { V0, V1, bases, d, Lmax, patron: Pp.patron };
+}
+// alturas de las juntas de una lama (en su eje v); i: número de la lama
+function juntasLama(i) {
+  if (!JUNTAS || !JUNTAS.bases.length) return [];
+  const { d, patron, V0, V1 } = JUNTAS, k = patron === 'alterno' ? (i % 2 ? 0.5 : -0.5) : patron === 'escalera' ? (i % 3) - 1 : 0;
+  return JUNTAS.bases.map(v => clamp(v + k * d, V0 + 30, V1 - 30));
+}
 const huecosActivos = () => usaHuecos() ? P.huecos.filter(h => h.activo !== false) : [];
 let sigHueco = 1;
 function huecoNuevo(forma) {
@@ -1606,6 +1651,7 @@ const lamasH = () => P.tipo === 'pared' && P.relieve && P.relieve.orient === 'h'
 function recortesDe(p, poly) {
   const e = grosor(), out = [], extra = [], suma = [];   // extra: trozos que se añaden (lamas de la puerta) · suma: lo que sale por delante
   poly = poly || p.poly;
+  if (P.tipo === 'pared' && partirActivo() && !p.z) { const g = anchoJunta() / 2; juntasLama(p.i).forEach(v => out.push([[-1e5, v - g], [1e5, v - g], [1e5, v + g], [-1e5, v + g]])); }
   huecosActivos().forEach((h, ih) => {
     const muebleH = h.modo === 'mueble', hol = muebleH ? Math.max(0, h.holgura || 0) : 0;
     let forma = h.forma === 'texto' && P.tipo === 'pared' ? formasTexto(h) : formaHueco(h); if (hol) forma = engordar(forma, hol);
@@ -1679,8 +1725,10 @@ function aplicarHuecos(res) {
   if (!usaHuecos()) return;
   const letras = 'abcdefghijklmnopqrstuvwxyz';
   const piezas = [...res.costillas, ...(res.largueros || [])].filter(p => p.ok);
+  if (P.tipo === 'pared') prepararJuntas(res.costillas.filter(c => c.ok));
   piezas.forEach(p => {
     const ps = partesDe(p, p.poly); if (!ps) return;
+    if (partirActivo()) ps.sort((m, n) => (m.puerta != null) - (n.puerta != null) || cajaDe(m.poly).y0 - cajaDe(n.poly).y0);   // a: el trozo de abajo (o de la izquierda)
     p.conHuecos = true;
     if (!ps.length) { p.ok = false; p.vaciada = true; p.poly = []; return; }
     const nom = p.nombre, etq0 = p.etq || String(p.i + 1), multi = ps.length > 1;
@@ -1776,6 +1824,15 @@ function avisosHuecos(res) {
   // trozos muy pequeños
   const peq = todas.filter(q => q.conHuecos && (Math.min(q.caja.w, q.caja.h) < Math.max(15, e) || q.area < 30 * 30));
   if (peq.length) add('atencion', `Huecos: quedan trozos muy pequeños (${peq.slice(0, 5).map(q => q.nombre).join(', ')}${peq.length > 5 ? '…' : ''}). Mueve un poco el hueco o cámbiale el tamaño.`);
+  if (P.tipo === 'pared' && partirActivo()) {
+    if (!JUNTAS || !JUNTAS.bases.length) add('atencion', partirP().modo === 'auto' ? 'Partir las lamas: ya caben enteras en el tablero, no hace falta partirlas.' : 'Partir las lamas: escribe la altura de las juntas (mm desde abajo, separadas por «;»).');
+    else {
+      const largas = todas.filter(q => q.conHuecos && q.caja.y1 - q.caja.y0 > JUNTAS.Lmax + 0.5);
+      const nT = 1 + JUNTAS.bases.length;
+      add('info', `Lamas partidas en ${nT} trozos (juntas ${JUNTAS.patron === 'alineado' ? 'a ' + JUNTAS.bases.map(v => fmt(v - JUNTAS.V0)).join(', ') + ' mm' : JUNTAS.patron === 'alterno' ? 'alternas' : 'en escalera'}${partirP().junta === 'sombra' ? ', con sombra de ' + fmt(anchoJunta()) + ' mm' : ', a tope'}).`);
+      if (largas.length) add('atencion', `Partir las lamas: ${largas.length} trozo${largas.length > 1 ? 's' : ''} sigue${largas.length > 1 ? 'n' : ''} siendo más larg${largas.length > 1 ? 'os' : 'o'} que ${fmt(JUNTAS.Lmax)} mm (${largas.slice(0, 4).map(q => q.nombre).join(', ')}${largas.length > 4 ? '…' : ''}): ${partirP().modo === 'auto' ? 'baja el desfase' : 'pon más juntas'}.`);
+    }
+  }
   if (P.tipo === 'pared') {
     const Pa = P.pared;
     // cada trozo tiene que agarrarse a un rastrel (tener la muesca dentro) o al mueble del hueco
@@ -3728,6 +3785,16 @@ function iniciarPanel() {
   enlazar('#paAlto', () => { P.pared.alto = Math.max(10, +$('#paAlto').value || 45); cambio(); });
   enlazar('#paGrueso', () => { P.pared.grueso = Math.max(5, +$('#paGrueso').value || 20); cambio(); });
   enlazar('#paMargen', () => { P.pared.margen = Math.max(0, +$('#paMargen').value || 0); cambio(); });
+  // partir las lamas
+  const Pt = () => (P.pared.partir = Object.assign({ modo: 'no', alturas: '', largoMax: 0, junta: 'tope', sombra: 8, patron: 'alineado', desfase: 300, rastreles: true }, P.pared.partir || {}));
+  enlazar('#ptModo', () => { Pt().modo = $('#ptModo').value; cambio(Pt().modo === 'no' ? 'Lamas enteras' : 'Lamas partidas'); ponerPartir(); });
+  enlazar('#ptAlturas', () => { Pt().alturas = $('#ptAlturas').value; cambio(); ponerPartir(); });
+  enlazar('#ptMax', () => { Pt().largoMax = Math.max(0, +$('#ptMax').value || 0); cambio(); ponerPartir(); });
+  enlazar('#ptJunta', () => { Pt().junta = $('#ptJunta').value; cambio(); ponerPartir(); });
+  enlazar('#ptSombra', () => { Pt().sombra = clamp(+$('#ptSombra').value || 8, 1, 200); cambio(); ponerPartir(); });
+  enlazar('#ptPatron', () => { Pt().patron = $('#ptPatron').value; cambio(); ponerPartir(); });
+  enlazar('#ptDesfase', () => { Pt().desfase = Math.max(0, +$('#ptDesfase').value || 0); cambio(); ponerPartir(); });
+  enlazar('#ptRast', () => { Pt().rastreles = $('#ptRast').checked; cambio(); ponerPartir(); });
   enlazar('#paHolgura', () => { P.pared.holgura = clamp(+$('#paHolgura').value || 0, 0, 3); cambio(); });
   enlazar('#paVer', () => { P.pared.verPared = $('#paVer').checked; construir3D(); });
   enlazar('#cClaves3d', () => { P.vista.claves = $('#cClaves3d').checked; construirClaves3D(); });
@@ -3812,6 +3879,17 @@ function mostrarSecciones(forzarFigura) {
   $('#secClaves').classList.toggle('oculto', calc);
   $('#sClave').classList.toggle('oculto', calc); $('#bEsquina').classList.toggle('oculto', calc); $('#infoClave').classList.toggle('oculto', calc);
 }
+// campos de «Partir las lamas» (se enseñan los que hacen falta)
+function ponerPartir() {
+  const Pp = Object.assign({ modo: 'no', alturas: '', largoMax: 0, junta: 'tope', sombra: 8, patron: 'alineado', desfase: 300, rastreles: true }, P.pared.partir || {}), hor = (P.relieve || {}).orient === 'h';
+    $('#ptModo').value = Pp.modo; $('#ptCampos').classList.toggle('oculto', Pp.modo === 'no');
+    if (document.activeElement !== $('#ptAlturas')) $('#ptAlturas').value = Pp.alturas || '';
+    $('#ptAlturasTit').textContent = hor ? 'Juntas a (mm desde la izquierda)' : 'Juntas a (mm desde abajo)';
+    $('#filaPtAlturas').classList.toggle('oculto', Pp.modo !== 'alturas'); $('#filaPtMax').classList.toggle('oculto', Pp.modo !== 'auto');
+    $('#ptMax').value = Pp.largoMax || ''; $('#ptJunta').value = Pp.junta; $('#ptSombra').value = Pp.sombra; $('#filaPtSombra').classList.toggle('oculto', Pp.junta !== 'sombra');
+    $('#ptPatron').value = Pp.patron; $('#ptDesfase').value = Pp.desfase; $('#filaPtDesfase').classList.toggle('oculto', Pp.patron === 'alineado');
+    $('#ptRast').checked = Pp.rastreles !== false; $('#filaPtRast').classList.toggle('oculto', Pp.patron !== 'alineado');
+}
 function ponerControles() {
   llenarPlantillas(); llenarLetras(); refrescarHuecos();
   const C = P.costillas, V = P.varillas;
@@ -3829,6 +3907,7 @@ function ponerControles() {
   $('#sTipo').value = P.tipo; const Rt = P.reticula; $('#rNum').value = Rt.num; $('#rMargen').value = Rt.margen; $('#rVuelo').value = Rt.vuelo; $('#rHolgura').value = Rt.holgura; $('#rArriba').value = Rt.xArriba !== false ? '1' : '0';
   const Pl = P.planta; $('#plForma').value = Pl.forma; $('#plRadio').value = Pl.radio; $('#plSentido').value = String(Pl.sentido === -1 ? -1 : 1); $('#plAmp').value = Pl.amplitud; $('#plOndas').value = Pl.ondas;
   const Ra = P.radial; $('#raNum').value = P.costillas.numero; $('#raTubo').value = Ra.tubo; $('#raHolTubo').value = Ra.holguraTubo; $('#raDiscos').value = Ra.discos; $('#raRDisco').value = Ra.rDisco; $('#raHolgura').value = Ra.holgura;
+  ponerPartir();
   const Pa = P.pared; $('#paNum').value = Pa.rastreles; $('#paAlto').value = Pa.alto; $('#paGrueso').value = Pa.grueso; $('#paMargen').value = Pa.margen; $('#paHolgura').value = Pa.holgura; $('#paVer').checked = Pa.verPared;
   $('#cClaves3d').checked = P.vista.claves !== false;
   const Fg = P.figura; $('#fgAlto').value = Fg.alto; $('#fgEje').value = Fg.eje; $('#fgGiro').value = String(Fg.giro || 0); $('#fgMin').value = Fg.minArea; $('#fgUnir').checked = Fg.unir !== false;
@@ -4746,6 +4825,13 @@ function planoPDF() {
     'Acabado: aceite, cera o barniz. Si va al exterior, usa varilla inoxidable y un acabado para exterior.',
   ];
   let yp = M + 24;
+  if (P.tipo === 'pared' && partirActivo() && JUNTAS && JUNTAS.bases.length) {
+    const Pp = partirP(), mods = Pp.patron === 'alineado' && Pp.rastreles;
+    pasos.splice(Math.max(1, pasos.length - 1), 0, `Lamas partidas (${1 + JUNTAS.bases.length} trozos cada una: «a» abajo${lamasH() ? ' (a la izquierda)' : ''}, luego «b»…): ` +
+      (mods ? `con las juntas a la misma altura y un rastrel a cada lado, cada banda es un módulo: puedes montarlo en el taller y colgarlo entero.`
+            : `coloca primero todos los trozos «a» y luego los demás, comprobando que cada trozo llega a un rastrel.`) +
+      (Pp.junta === 'sombra' ? ` Deja la sombra de ${fmt(anchoJunta() * k, 1)} mm con un taco del mismo grueso.` : ` A tope: lija un poco la arista de las testas para que la junta no se marque.`));
+  }
   if (huecosActivos().length) pasos.splice(Math.max(1, pasos.length - 1), 0, P.tipo === 'pared'
     ? 'Huecos (hoja 3c): cuelga primero los muebles de los huecos (cajas, armarios, baldas) atornillados a la pared; después pon las lamas de alrededor. Los trozos de lama (12a, 12b…) van en su sitio, cada uno en su rastrel o atornillado por detrás al mueble.'
     : 'Huecos (hoja 3c): monta el forro del túnel (suelo, techo y laterales) a la vez que las costillas, encolado o atornillado; los trozos de costilla (12a, 12b…) van en su sitio en las varillas.');
@@ -4876,7 +4962,7 @@ function hojaPared(D, cabecera, tabla, o) {
   const rect = c => { const m = marcoEn(c.x), a = puntoMarco(m, 0, c.caja.y0), b = puntoMarco(m, 0, c.caja.y1), g = ejeGrosor(m);
     const xs = [a[0], b[0], a[0] + g[0] * e / 2, a[0] - g[0] * e / 2], ys = [a[1], b[1], a[1] + g[1] * e / 2, a[1] - g[1] * e / 2];
     return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; };
-  const rs = cs.map(rect), X0 = Math.min(...rs.map(r => r[0])), X1 = Math.max(...rs.map(r => r[2])), Y1 = Math.max(...rs.map(r => r[3]));
+  const rs = [...cs, ...tz].map(rect), X0 = Math.min(...rs.map(r => r[0])), X1 = Math.max(...rs.map(r => r[2])), Y1 = Math.max(...rs.map(r => r[3]));   // con los trozos (lamas partidas o con huecos)
   const zona = { x: M + 10, y: M + 24, w: W - 2 * M - 20, h: 100 }, s = Math.min(zona.w / (X1 - X0 + 80), zona.h / (Y1 + 20));
   const PX = x => zona.x + (x - X0 + 40) * s, PY = v => zona.y + zona.h - v * s;
   D.texto(zona.x, zona.y - 4, `Alzado (de frente): ${R.n} lamas ${hor ? 'horizontales' : 'verticales'} numeradas y ${R.rastreles.length} rastreles detrás.`, { pt: 8.5, col: gris });
@@ -4953,6 +5039,7 @@ window.addEventListener('message', e => {
     nombre: P.nombre + (enMaqueta() ? ` (maqueta 1:${P.maqueta.escala})` : ''),
     piezas: piezasFab().map(piezaCalcador),
     tablero: { largo: f.ancho, ancho: f.alto, grosor: grosorFab(), margen: f.borde, modo: 'forma', veta: vetaOn() },
+    maquina: fresaFab() === 0 ? 'laser' : 'fresa',   // Ø de fresa 0 (lo normal en la maqueta) = láser
   }, '*');
 });
 
@@ -5257,6 +5344,7 @@ function validarProyecto(o) {
   p.reticula = Object.assign(proyectoBase().reticula, o.reticula || {});
   ['planta', 'radial', 'pared', 'relieve', 'figura'].forEach(k => p[k] = Object.assign(proyectoBase()[k], o[k] || {}));
   p.relieve.capa = Object.assign(proyectoBase().relieve.capa, (o.relieve || {}).capa || {});
+  p.pared.partir = Object.assign(proyectoBase().pared.partir, (o.pared || {}).partir || {});
   p.huecos = Array.isArray(o.huecos) ? o.huecos.map(h => { const b = huecoNuevo(h.forma || 'rect'); return Object.assign(b, h, { mueble: Object.assign(b.mueble, h.mueble || {}) }); }) : [];
   if (!['reticula', 'radial', 'pared'].includes(p.tipo)) p.tipo = 'costillas';
   if (!PLANTILLAS[p.plantilla]) p.plantilla = 'libre';

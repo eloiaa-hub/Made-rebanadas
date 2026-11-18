@@ -298,6 +298,23 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   </div>
 </div>
 <figure><img src="img/plano_pared.jpg" alt="Plano de la pared" style="max-width:640px"><figcaption>Hoja 2 del plano: alzado con las lamas numeradas y la altura de cada rastrel.</figcaption></figure>
+<h3>Partir las lamas (paredes altas o para aprovechar el tablero)</h3>
+<p>Si las lamas son más largas que el tablero, o te conviene cortarlas en trozos para aprovecharlo mejor, en <b>Pared: rastreles → Partir</b> elige:</p>
+<ul>
+  <li><b>Para que quepan en el tablero</b>: el programa pone las juntas justas para que ningún trozo pase del lado largo del tablero de Fabricar (o del <b>trozo más largo</b> que escribas).</li>
+  <li><b>En las alturas que diga</b>: escribe dónde va cada junta, en mm desde abajo (o desde la izquierda en lamas horizontales), separadas por «;»: por ejemplo <code>1200; 2400</code>.</li>
+</ul>
+<p>Y cómo es la junta:</p>
+<ul>
+  <li><b>Junta a tope</b>: los trozos se tocan y la junta casi no se ve. <b>Con sombra</b>: queda una raya de los milímetros que digas, una línea que se ve a propósito.</li>
+  <li><b>Todas a la misma altura</b>: una raya recta. Con <b>Rastreles a los dos lados de la junta</b>, el programa pone un rastrel justo debajo y otro justo encima de cada junta: cada banda es un <b>módulo</b> que se puede montar en el taller y colgar entero (lo mejor para paredes muy altas o para llevarlas en la furgoneta). Puedes tapar la raya con un hueco con balda que cruce todo el panel.</li>
+  <li><b>Alternas (al tresbolillo)</b> o <b>en escalera (diagonal)</b>: cada lama se parte a otra altura, movida el <b>desfase</b> que digas, y el ojo no ve una raya en la pared, como en el parquet.</li>
+</ul>
+<figure><img src="img/juntas.png" alt="Juntas de las lamas"><figcaption>Hoja 2 del plano de una pared de 3 m partida de las tres maneras: juntas a la misma altura con un rastrel a cada lado (módulos), alternas y en escalera.</figcaption></figure>
+<ul>
+  <li>Los trozos se llaman <b>Lama 12a</b> (el de abajo), <b>12b</b>… en la lista, el plano, el despiece, el DXF y el Anidador. El plano explica en los pasos de montaje cómo colocarlos.</li>
+  <li>Las comprobaciones dicen en cuántos trozos ha quedado cada lama, y avisan si algún trozo no llega a un rastrel (se quedaría suelto) o si sigue siendo más largo que el tablero.</li>
+</ul>
 
 <h2 id="relieve">13. Figuras, rótulos y estanterías de pared</h2>
 <p>Los paneles de pared tienen tres maneras más de sacar la forma, en <b>Forma → Origen de la forma</b>:</p>
@@ -607,7 +624,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
     </ul>
   </div>
 </div>
-<p>Con la maqueta activa, <b>Fabricar</b> (con la etiqueta <b>1:5</b> en el botón), el DXF, el SVG, el despiece, el CSV de cortes, el plano y el Anidador salen <b>a escala</b>, con tableros de láser (600 × 400, 900 × 600, A3…). Los archivos llevan <code>_maqueta_1-5</code> en el nombre. El 3D y el panel <b>Resumen</b> siguen a tamaño real.</p>
+<p>Con la maqueta activa, <b>Fabricar</b> (con la etiqueta <b>1:5</b> en el botón), el DXF, el SVG, el despiece, el CSV de cortes, el plano y el Anidador salen <b>a escala</b>, con tableros de láser (600 × 400, 900 × 600, A3…). El <b>Anidador</b> se abre ya en modo <b>cortadora láser</b> (con el Ø de fresa de la maqueta a 0) y saca el G-code del láser o un SVG para su programa (apartado 22). Los archivos llevan <code>_maqueta_1-5</code> en el nombre. El 3D y el panel <b>Resumen</b> siguen a tamaño real.</p>
 <div class="caja">Comprobaciones de la maqueta: avisa si las costillas se pisan (grosor de la maqueta mayor que la separación a escala), si queda menos de 1,5 mm de material alrededor de un agujero, y si el grosor no es proporcional al del tablero real (la maqueta se verá más llena o más calada que el mueble).</div>
 
 <h2 id="plano">21. Plano de montaje en PDF</h2>
@@ -629,11 +646,24 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 <figure><img src="img/anidador.jpg" alt="Anidador dentro de Made-rebanadas"><figcaption>El Anidador dentro de Made-rebanadas, con las costillas de una maqueta 1:5 colocadas por su forma real.</figcaption></figure>
 <p><b>🧩 Anidador</b> (en la barra o en la ventana Fabricar) abre el <b>Anidador de tableros</b> de la Suite CNC dentro del programa. Le llegan solas todas las costillas, cada una con su contorno exterior y los agujeros de las varillas, y las medidas, el grosor, el margen y la <b>veta</b> del tablero de Fabricar: las piezas con veta llegan marcadas (columna <b>Veta</b>) y el Anidador no las gira (las de «a lo alto» llegan ya giradas 90°). Si un mueble de un hueco lleva otro grosor, anida sus piezas aparte (quítales la cantidad a unas u otras, o haz dos pasadas). Coloca las piezas <b>por su forma real</b>: encaja unas en los huecos de otras y aprovecha mucho mejor el tablero que la colocación de Fabricar.</p>
 <ul>
-  <li>Elige la <b>fresa</b> y la <b>holgura</b>: la separación entre piezas es su suma.</li>
+  <li>En <b>Máquina</b> eliges <b>Fresadora CNC</b> o <b>Cortadora láser</b>. Con fresadora, eliges la <b>fresa</b> y la <b>holgura</b>: la separación entre piezas es su suma.</li>
   <li>Puedes mover, girar o fijar (📌) piezas a mano, y cambiar el tablero.</li>
   <li>Desde el Anidador guardas cada tablero en <b>DXF</b>, <b>SVG</b>, <b>PNG</b> o como proyecto del Calcador (<b>.json</b>), y el despiece con el coste en <b>CSV</b>.</li>
   <li><b>✕ Volver a Made-rebanadas</b> cierra el Anidador. Al volver a abrirlo recibe de nuevo las costillas, con los cambios que hayas hecho en el mueble.</li>
 </ul>
+<h3>Corte con láser (maquetas)</h3>
+<div class="dos">
+  <img src="img/anidador_laser.png" alt="Anidador en modo láser">
+  <div>
+    <ul>
+      <li>Con <b>Máquina → Cortadora láser</b>, entre pieza y pieza solo va el <b>ancho del corte</b> (0,1 a 0,2 mm) más la holgura (2 mm), así que en el tablero caben muchas más piezas. Desde Made-rebanadas, una maqueta (Ø de fresa 0) llega ya en modo láser.</li>
+      <li>En la caja <b>Láser</b>: <b>potencia</b> y <b>velocidad</b> de corte, <b>pasadas</b>, potencia de <b>grabado</b>, el <b>S máximo</b> de tu máquina y si se <b>compensa el ancho del corte</b> (el láser pasa medio corte por fuera de la pieza y por dentro de sus agujeros: las medidas y las ranuras quedan exactas).</li>
+      <li><b>⬇ G-code láser</b>: el programa para una máquina GRBL en modo láser ($32=1, con M4). Primero se graba, luego se cortan los agujeros y los interiores, y al final el contorno de cada pieza, para que no se mueva antes de tiempo.</li>
+      <li><b>⬇ SVG para láser</b>: para LightBurn, RDWorks, LaserGRBL o Inkscape, a escala real, con líneas finas: <b style="color:#d00">rojo</b> = cortar el contorno, <b style="color:#00d">azul</b> = cortar los interiores, negro = grabar los nombres. En el programa del láser, pon a cada color su potencia y velocidad, y corta el azul antes que el rojo.</li>
+    </ul>
+  </div>
+</div>
+<div class="caja taller">Antes de cortar la maqueta entera, prueba en un retal la potencia y la velocidad, y una ranura: si queda floja o dura, ajusta la <b>holgura</b> de la ranura en Fabricar (con láser, la ranura sale del ancho exacto si el corte va compensado).</div>
 <div class="caja">El Anidador es un programa aparte de la Suite CNC: está en <code>assets/anidador/anidador.html</code> y también se puede abrir solo. Tiene su propia ayuda (❓).</div>
 
 <h2 id="archivos">23. Guardar, abrir y ejemplos</h2>

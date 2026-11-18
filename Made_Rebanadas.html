@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Made-rebanadas — Por Eloi A.A.</title>
-<link rel="stylesheet" href="assets/css/estilo.css?v=202611182240">
+<link rel="stylesheet" href="assets/css/estilo.css?v=202611182309">
 </head>
 <body>
 <header class="barra">
@@ -235,6 +235,17 @@
         <label class="fila" title="Distancia del primer y último rastrel al borde de abajo y de arriba">Margen arriba y abajo (mm) <input type="number" id="paMargen" min="0" step="5" value="120"></label>
         <label class="fila">Holgura de la muesca (mm) <input type="number" id="paHolgura" min="0" max="3" step="0.1" value="0.5"></label>
         <label class="fila chk"><input type="checkbox" id="paVer" checked> Ver la pared en el 3D</label>
+        <p class="nota" style="margin-top:10px"><b>Partir las lamas</b>: para paredes altas o para aprovechar mejor el tablero.</p>
+        <label class="fila" title="Para que quepan en el tablero: el programa pone las juntas justas (con el tablero de Fabricar). En las alturas que diga: tú escribes dónde">Partir <select id="ptModo"><option value="no">No</option><option value="auto">Para que quepan en el tablero</option><option value="alturas">En las alturas que diga</option></select></label>
+        <div id="ptCampos">
+          <label class="fila" id="filaPtAlturas" title="Distancia de cada junta al principio de la lama, separadas por «;» (por ejemplo: 1200; 2400)"><span id="ptAlturasTit">Juntas a (mm desde abajo)</span> <input type="text" id="ptAlturas" placeholder="1200; 2400" style="width:46%"></label>
+          <label class="fila" id="filaPtMax" title="Largo máximo de cada trozo. Vacío: el lado largo del tablero de Fabricar menos sus bordes">Trozo más largo (mm) <input type="number" id="ptMax" min="0" step="10" placeholder="el del tablero"></label>
+          <label class="fila" title="A tope: los trozos se tocan y la junta casi no se ve. Con sombra: se deja una raya, que se ve a propósito">Junta <select id="ptJunta"><option value="tope">A tope</option><option value="sombra">Con sombra (raya a la vista)</option></select></label>
+          <label class="fila" id="filaPtSombra">Ancho de la sombra (mm) <input type="number" id="ptSombra" min="1" step="1"></label>
+          <label class="fila" title="Todas a la misma altura: una raya recta (o los módulos). Alternas o en escalera: cada lama se parte a otra altura y la junta no se ve como una raya">Juntas <select id="ptPatron"><option value="alineado">Todas a la misma altura</option><option value="alterno">Alternas (al tresbolillo)</option><option value="escalera">En escalera (diagonal)</option></select></label>
+          <label class="fila" id="filaPtDesfase" title="Cuánto se mueve la junta de una lama a la siguiente">Desfase entre juntas (mm) <input type="number" id="ptDesfase" min="0" step="10"></label>
+          <label class="fila chk" id="filaPtRast" title="Con las juntas a la misma altura: un rastrel a cada lado de la junta, así cada banda es un módulo que se monta por separado"><input type="checkbox" id="ptRast"> Rastreles a los dos lados de la junta (módulos)</label>
+        </div>
       </div>
     </section>
 
@@ -412,15 +423,15 @@
 <input type="file" id="fLetra" class="oculto" accept=".ttf,.otf,.woff,.woff2">
 <div id="aviso" class="aviso"></div>
 
-<script src="assets/js/three-bundle.js?v=202611182240"></script>
-<script src="assets/texturas/texturas.js?v=202611182240"></script>
+<script src="assets/js/three-bundle.js?v=202611182309"></script>
+<script src="assets/texturas/texturas.js?v=202611182309"></script>
 <script src="assets/texturas/pbr/roble.js"></script>
 <script src="assets/texturas/pbr/nogal.js"></script>
 <script src="assets/texturas/pbr/fresno.js"></script>
 <script src="assets/texturas/pbr/haya.js"></script>
 <script src="assets/texturas/pbr/pino.js"></script>
-<script src="assets/ejemplos/ejemplos.js?v=202611182240"></script>
-<script src="assets/js/clipper.js?v=202611182240"></script>
-<script src="assets/js/app.js?v=202611182240"></script>
+<script src="assets/ejemplos/ejemplos.js?v=202611182309"></script>
+<script src="assets/js/clipper.js?v=202611182309"></script>
+<script src="assets/js/app.js?v=202611182309"></script>
 </body>
 </html>

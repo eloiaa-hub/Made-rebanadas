@@ -11,7 +11,43 @@
    Las restas se hacen con Clipper (assets/js/clipper.js). Una lama o costilla puede quedar en varias
    piezas (Lama 12a, 12b…) y con agujeros por dentro. */
 const ESC_CL = 1000;
-const usaHuecos = () => ['pared', 'costillas', 'reticula'].includes(P.tipo) && (P.huecos || []).some(h => h.activo !== false) && !!window.ClipperLib;
+const usaHuecos = () => ['pared', 'costillas', 'reticula'].includes(P.tipo) && ((P.huecos || []).some(h => h.activo !== false) || partirActivo()) && !!window.ClipperLib;
+
+/* ---- partir las lamas de un panel de pared (paredes altas o para aprovechar el tablero) ----
+   Cada junta es una franja (0,1 mm a tope, o la sombra) que se resta de la lama, como un hueco: los trozos
+   salen como «Lama 12a, 12b…» (de abajo arriba, o de izquierda a derecha en lamas horizontales).
+   Juntas alineadas, alternas (al tresbolillo) o en escalera; con las alineadas se pueden poner rastreles a los
+   dos lados de cada junta, y cada banda queda como un módulo que se monta por separado. */
+const partirP = () => (P.pared && P.pared.partir) || { modo: 'no' };
+const partirActivo = () => P.tipo === 'pared' && partirP().modo && partirP().modo !== 'no';
+const anchoJunta = () => partirP().junta === 'sombra' ? clamp(+partirP().sombra || 0, 0.5, 200) : 0.1;
+let JUNTAS = null;   // { V0, V1, bases, d, Lmax } del último cálculo (lo usa también Fabricar al rehacer las piezas)
+// largo máximo de un trozo: el que se escriba o el lado largo del tablero de Fabricar menos sus bordes
+function largoMaxTrozo() {
+  const q = +partirP().largoMax; if (q > 0) return q;
+  const f = typeof fabActual === 'function' ? fabActual() : { ancho: 2440, alto: 1220, borde: 10 };
+  return Math.max(f.ancho, f.alto) - 2 * (f.borde || 0) - 10;
+}
+function prepararJuntas(lamas) {
+  JUNTAS = null; if (!partirActivo() || !lamas.length) return;
+  const Pp = partirP(); let V0 = Infinity, V1 = -Infinity;
+  lamas.forEach(c => { V0 = Math.min(V0, c.caja.y0); V1 = Math.max(V1, c.caja.y1); });
+  const L = V1 - V0, d = Pp.patron === 'alineado' ? 0 : Math.max(0, +Pp.desfase || 0), spread = Pp.patron === 'escalera' ? 2 * d : d, Lmax = largoMaxTrozo();
+  let bases = [];
+  if (Pp.modo === 'auto') {
+    const n = Math.max(1, Math.ceil(L / Math.max(100, Lmax - spread - anchoJunta())));
+    bases = Array.from({ length: n - 1 }, (_, k) => V0 + L * (k + 1) / n);
+  } else {
+    bases = String(Pp.alturas || '').split(/[;,\s]+/).map(t => +t).filter(v => isFinite(v) && v > 0).map(v => V0 + v).filter(v => v > V0 + 20 && v < V1 - 20).sort((a, b) => a - b);
+  }
+  JUNTAS = { V0, V1, bases, d, Lmax, patron: Pp.patron };
+}
+// alturas de las juntas de una lama (en su eje v); i: número de la lama
+function juntasLama(i) {
+  if (!JUNTAS || !JUNTAS.bases.length) return [];
+  const { d, patron, V0, V1 } = JUNTAS, k = patron === 'alterno' ? (i % 2 ? 0.5 : -0.5) : patron === 'escalera' ? (i % 3) - 1 : 0;
+  return JUNTAS.bases.map(v => clamp(v + k * d, V0 + 30, V1 - 30));
+}
 const huecosActivos = () => usaHuecos() ? P.huecos.filter(h => h.activo !== false) : [];
 let sigHueco = 1;
 function huecoNuevo(forma) {
@@ -180,6 +216,7 @@ const lamasH = () => P.tipo === 'pared' && P.relieve && P.relieve.orient === 'h'
 function recortesDe(p, poly) {
   const e = grosor(), out = [], extra = [], suma = [];   // extra: trozos que se añaden (lamas de la puerta) · suma: lo que sale por delante
   poly = poly || p.poly;
+  if (P.tipo === 'pared' && partirActivo() && !p.z) { const g = anchoJunta() / 2; juntasLama(p.i).forEach(v => out.push([[-1e5, v - g], [1e5, v - g], [1e5, v + g], [-1e5, v + g]])); }
   huecosActivos().forEach((h, ih) => {
     const muebleH = h.modo === 'mueble', hol = muebleH ? Math.max(0, h.holgura || 0) : 0;
     let forma = h.forma === 'texto' && P.tipo === 'pared' ? formasTexto(h) : formaHueco(h); if (hol) forma = engordar(forma, hol);
@@ -253,8 +290,10 @@ function aplicarHuecos(res) {
   if (!usaHuecos()) return;
   const letras = 'abcdefghijklmnopqrstuvwxyz';
   const piezas = [...res.costillas, ...(res.largueros || [])].filter(p => p.ok);
+  if (P.tipo === 'pared') prepararJuntas(res.costillas.filter(c => c.ok));
   piezas.forEach(p => {
     const ps = partesDe(p, p.poly); if (!ps) return;
+    if (partirActivo()) ps.sort((m, n) => (m.puerta != null) - (n.puerta != null) || cajaDe(m.poly).y0 - cajaDe(n.poly).y0);   // a: el trozo de abajo (o de la izquierda)
     p.conHuecos = true;
     if (!ps.length) { p.ok = false; p.vaciada = true; p.poly = []; return; }
     const nom = p.nombre, etq0 = p.etq || String(p.i + 1), multi = ps.length > 1;
@@ -350,6 +389,15 @@ function avisosHuecos(res) {
   // trozos muy pequeños
   const peq = todas.filter(q => q.conHuecos && (Math.min(q.caja.w, q.caja.h) < Math.max(15, e) || q.area < 30 * 30));
   if (peq.length) add('atencion', `Huecos: quedan trozos muy pequeños (${peq.slice(0, 5).map(q => q.nombre).join(', ')}${peq.length > 5 ? '…' : ''}). Mueve un poco el hueco o cámbiale el tamaño.`);
+  if (P.tipo === 'pared' && partirActivo()) {
+    if (!JUNTAS || !JUNTAS.bases.length) add('atencion', partirP().modo === 'auto' ? 'Partir las lamas: ya caben enteras en el tablero, no hace falta partirlas.' : 'Partir las lamas: escribe la altura de las juntas (mm desde abajo, separadas por «;»).');
+    else {
+      const largas = todas.filter(q => q.conHuecos && q.caja.y1 - q.caja.y0 > JUNTAS.Lmax + 0.5);
+      const nT = 1 + JUNTAS.bases.length;
+      add('info', `Lamas partidas en ${nT} trozos (juntas ${JUNTAS.patron === 'alineado' ? 'a ' + JUNTAS.bases.map(v => fmt(v - JUNTAS.V0)).join(', ') + ' mm' : JUNTAS.patron === 'alterno' ? 'alternas' : 'en escalera'}${partirP().junta === 'sombra' ? ', con sombra de ' + fmt(anchoJunta()) + ' mm' : ', a tope'}).`);
+      if (largas.length) add('atencion', `Partir las lamas: ${largas.length} trozo${largas.length > 1 ? 's' : ''} sigue${largas.length > 1 ? 'n' : ''} siendo más larg${largas.length > 1 ? 'os' : 'o'} que ${fmt(JUNTAS.Lmax)} mm (${largas.slice(0, 4).map(q => q.nombre).join(', ')}${largas.length > 4 ? '…' : ''}): ${partirP().modo === 'auto' ? 'baja el desfase' : 'pon más juntas'}.`);
+    }
+  }
   if (P.tipo === 'pared') {
     const Pa = P.pared;
     // cada trozo tiene que agarrarse a un rastrel (tener la muesca dentro) o al mueble del hueco

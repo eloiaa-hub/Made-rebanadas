@@ -46,5 +46,6 @@ window.addEventListener('message', e => {
     nombre: P.nombre + (enMaqueta() ? ` (maqueta 1:${P.maqueta.escala})` : ''),
     piezas: piezasFab().map(piezaCalcador),
     tablero: { largo: f.ancho, ancho: f.alto, grosor: grosorFab(), margen: f.borde, modo: 'forma', veta: vetaOn() },
+    maquina: fresaFab() === 0 ? 'laser' : 'fresa',   // Ø de fresa 0 (lo normal en la maqueta) = láser
   }, '*');
 });

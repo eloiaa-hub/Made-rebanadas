@@ -39,6 +39,7 @@
   input.num.mal { border-color: var(--rojo); }
   input.num:focus, input.txt:focus, select:focus { outline: 2px solid var(--acento-suave); border-color: var(--acento); }
   .nota { font-size: 12.5px; color: var(--texto-sec); margin: 8px 0 0; }
+  body.laser .soloFresa, body:not(.laser) .soloLaser { display: none !important; }
   .boton { border: 1px solid var(--acento); background: var(--acento); color: #fff; border-radius: 8px; padding: 7px 12px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
   .boton.sec { background: transparent; color: var(--acento); }
   .boton:hover { filter: brightness(1.08); }
@@ -128,7 +129,7 @@
 </head>
 <body>
 <div class="barra">
-  <h1><a class="casa" href="index.html" title="Portada de las herramientas">⌂</a> 🪵 Anidador de tableros — Por Eloi A.A. <span class="ver" title="Versión del programa">v8</span></h1>
+  <h1><a class="casa" href="index.html" title="Portada de las herramientas">⌂</a> 🪵 Anidador de tableros — Por Eloi A.A. <span class="ver" title="Versión del programa">v9</span></h1>
   <button id="btnAyuda" title="Cómo se usa el Anidador (F1)">❓ Ayuda</button>
   <button id="btnTema" title="Modo claro / oscuro">🌓</button>
   <button id="btnInfo" title="Créditos y licencias">ℹ</button>
@@ -141,7 +142,7 @@
       <div class="fila" title="Medida del tablero en X (a lo largo de la veta, si la tiene)"><label>Largo <small>(X, mm)</small></label><input class="num" inputmode="decimal" id="tL" value="1000"></div>
       <div class="fila" title="Medida del tablero en Y"><label>Ancho <small>(Y, mm)</small></label><input class="num" inputmode="decimal" id="tA" value="600"></div>
       <div class="fila" title="Grueso del tablero. La profundidad de corte del proyecto será el grosor más lo que pase al martiriño"><label>Grosor <small>(mm)</small></label><input class="num" inputmode="decimal" id="tG" value="16"></div>
-      <div class="fila" title="Cuánto baja la fresa por debajo del tablero para cortar del todo (en el martiriño)"><label>Corte pasante <small>(mm más)</small></label><input class="num" inputmode="decimal" id="tP" value="0.5"></div>
+      <div class="fila soloFresa" title="Cuánto baja la fresa por debajo del tablero para cortar del todo (en el martiriño)"><label>Corte pasante <small>(mm más)</small></label><input class="num" inputmode="decimal" id="tP" value="0.5"></div>
       <div class="fila" title="Franja libre en el borde del tablero, donde no se colocan piezas (para sujetarlo y por si el borde no está sano)"><label>Margen del borde <small>(mm)</small></label><input class="num" inputmode="decimal" id="tM" value="10"></div>
       <div class="fila" title="Dónde está el cero pieza (X0 Y0) del proyecto: en qué esquina del tablero"><label>Cero pieza</label>
         <select id="tCero"><option value="ii">Esquina inferior izquierda</option><option value="si">Esquina superior izquierda</option><option value="id">Esquina inferior derecha</option><option value="sd">Esquina superior derecha</option><option value="c">Centro del tablero</option></select></div>
@@ -151,11 +152,25 @@
     </div>
 
     <div class="caja">
-      <h2>Fresa y separación</h2>
-      <div class="fila" title="Fresa de la base de herramientas compartida (la misma del Calcador y los Simuladores). Su diámetro decide la separación entre piezas"><label>Fresa</label><select id="hSel"></select></div>
-      <div class="fila" title="Diámetro de la fresa que corta las piezas"><label>Diámetro <small>(mm)</small></label><input class="num" inputmode="decimal" id="hD" value="6"></div>
+      <h2>Máquina y separación</h2>
+      <div class="fila" title="Fresadora CNC: separa las piezas el diámetro de la fresa. Cortadora láser: el corte es muy fino, las piezas van casi juntas y se saca el G-code del láser o un SVG para su programa (LightBurn, RDWorks…)"><label>Máquina</label><select id="mMaq"><option value="fresa">Fresadora CNC</option><option value="laser">Cortadora láser</option></select></div>
+      <div class="fila soloFresa" title="Fresa de la base de herramientas compartida (la misma del Calcador y los Simuladores). Su diámetro decide la separación entre piezas"><label>Fresa</label><select id="hSel"></select></div>
+      <div class="fila soloFresa" title="Diámetro de la fresa que corta las piezas"><label>Diámetro <small>(mm)</small></label><input class="num" inputmode="decimal" id="hD" value="6"></div>
+      <div class="fila soloLaser" title="Ancho del corte del láser (lo que se quema): en contrachapado o DM de 3 mm, de 0,1 a 0,2 mm"><label>Ancho del corte <small>(mm)</small></label><input class="num" inputmode="decimal" id="lK" value="0.15"></div>
       <div class="fila" title="Madera que queda entre el corte de una pieza y el de la siguiente (además del ancho de la fresa)"><label>Holgura entre cortes <small>(mm)</small></label><input class="num" inputmode="decimal" id="hH" value="4"></div>
       <p class="nota" id="notaSep"></p>
+    </div>
+
+    <div class="caja soloLaser" id="cajaLaser">
+      <h2>Láser</h2>
+      <div class="fila" title="Potencia del corte, en % de la del láser"><label>Potencia de corte <small>(%)</small></label><input class="num" inputmode="decimal" id="lPot" value="80"></div>
+      <div class="fila" title="Velocidad del corte: más lenta, corta más hondo. Pruébala antes en un retal"><label>Velocidad <small>(mm/min)</small></label><input class="num" inputmode="decimal" id="lF" value="600"></div>
+      <div class="fila" title="Vueltas sobre cada contorno: con tablero grueso, 2 o 3 pasadas a más velocidad queman menos el borde"><label>Pasadas</label><input class="num" inputmode="decimal" id="lPas" value="1"></div>
+      <div class="fila" title="Potencia para marcar los nombres y las líneas de grabado (tan baja que no corte)"><label>Potencia de grabado <small>(%)</small></label><input class="num" inputmode="decimal" id="lPotG" value="15"></div>
+      <div class="fila" title="Valor de S que es el 100 % de potencia en tu máquina (GRBL: $30, normalmente 1000)"><label>S máximo <small>(GRBL $30)</small></label><input class="num" inputmode="decimal" id="lS" value="1000"></div>
+      <div class="fila" title="El láser pasa medio corte por fuera de cada pieza (y por dentro de sus agujeros), para que las medidas queden exactas"><label>Compensar el ancho del corte</label><input type="checkbox" id="lComp" checked></div>
+      <div class="fila" title="Graba el nombre de cada pieza dentro de ella (en el SVG, como texto en otra capa; en el G-code no va el texto)"><label>Nombres para grabar <small>(SVG)</small></label><input type="checkbox" id="lNom" checked></div>
+      <p class="nota">Orden del corte: primero los grabados, luego los agujeros y los interiores y, al final, el contorno de cada pieza, para que no se mueva antes de tiempo. El G-code es para GRBL en modo láser ($32=1, con M4).</p>
     </div>
 
     <div class="caja">
@@ -203,6 +218,8 @@
       <div class="exportar"><span title="Exporta el tablero que estás viendo (elígelo arriba con sus pestañas)">Exportar este tablero:</span>
         <button class="chico" id="btnPNG" title="Imagen del tablero que estás viendo (.png), con las piezas, sus nombres y el cero pieza. Para la memoria o para imprimir">⬇ PNG</button>
         <button class="chico" id="btnSVG" title="Dibujo vectorial del tablero que estás viendo (.svg), a escala real en mm. Se abre en Inkscape, LibreOffice Draw o el navegador">⬇ SVG</button>
+        <button class="chico soloLaser" id="btnGLaser" title="Programa del láser (G-code GRBL, M4) del tablero que estás viendo: grabados, interiores y luego los contornos, con la potencia, la velocidad y las pasadas de la caja Láser">⬇ G-code láser</button>
+        <button class="chico soloLaser" id="btnSVGLaser" title="SVG a escala real en mm para el programa del láser (LightBurn, RDWorks, LaserGRBL, Inkscape): rojo = cortar contorno, azul = cortar interiores, negro = grabar nombres. Líneas finas, sin relleno">⬇ SVG para láser</button>
         <button class="chico" id="btnDXF" title="Plano del tablero que estás viendo (.dxf, R12) en mm, con el cero pieza del proyecto como origen y una capa por tipo (tablero, exterior, interior, grabado, cajera, nombres). Se abre en CAD (LibreCAD, AutoCAD…) o en el Calcador">⬇ DXF</button>
       </div>
       <p class="nota">Las piezas se colocan por su rectángulo envolvente o, con «Colocar las piezas: por su forma real», encajadas por su contorno (las pequeñas, también en los huecos de las grandes), siempre con la separación de la fresa entre ellas. Con el ratón, sobre cada pieza: <b>arrástrala</b> para colocarla a mano (📌), <b>doble clic</b> para girarla 90° y las <b>asas</b> de la pieza seleccionada para cambiar su escala. El programa de la máquina se saca en el Calcador con ⚙️ Mecanizar.</p>
@@ -211,7 +228,7 @@
 </div>
 
 <div class="velo" id="veloInfo"><div class="ventana" role="dialog" aria-modal="true">
-  <h3>🪵 Anidador de tableros <span class="ver">v8</span></h3>
+  <h3>🪵 Anidador de tableros <span class="ver">v9</span></h3>
   <p>Parte de las <b>Herramientas CNC</b> (Suite CNC 2026.10) · © 2026 Eloi A.A.</p>
   <p>Programa: <b>European Union Public Licence v. 1.2 (EUPL-1.2)</b>, archivo <code>LICENSE</code>. No usa bibliotecas de terceros: funciona en el navegador, sin instalar nada y sin conexión.</p>
   <p>Las piezas y el tablero se guardan solo en este navegador. Nada se envía a ningún sitio.</p>
@@ -224,6 +241,9 @@
   <p>Sus medidas, el grosor (la profundidad de corte será el grosor más el corte pasante), el margen libre en el borde y dónde quieres el cero pieza.</p>
   <h4>2. La fresa</h4>
   <p>Elige la fresa de la base de herramientas (o escribe su diámetro). Entre pieza y pieza se deja el diámetro de la fresa más la holgura, para que los dos cortes no se toquen.</p>
+  <h4>Cortadora láser</h4>
+  <p>En <b>Máquina</b> elige <b>Cortadora láser</b> (ideal para maquetas en DM o contrachapado de 3 mm). Entre pieza y pieza se deja el <b>ancho del corte</b> (0,1 a 0,2 mm) más la holgura, así que las piezas van casi juntas. En la caja <b>Láser</b> pones la potencia, la velocidad y las pasadas, y si se <b>compensa el ancho del corte</b> (el láser pasa medio corte por fuera de cada pieza y por dentro de sus agujeros, para que las medidas, y las ranuras, queden exactas).</p>
+  <p>Para cada tablero: <b>⬇ G-code láser</b> (GRBL en modo láser, $32=1, con M4: el láser se apaga solo en los movimientos rápidos) o <b>⬇ SVG para láser</b> para LightBurn, RDWorks, LaserGRBL o Inkscape: <b style="color:#d00">rojo</b> = cortar el contorno, <b style="color:#00d">azul</b> = cortar los interiores y negro = grabar (los nombres de las piezas). En los dos, primero se graba, luego se cortan los interiores y al final el contorno de cada pieza, para que no se mueva antes de tiempo. Las cajeras no se pueden hacer con láser. Prueba siempre la potencia y la velocidad en un retal.</p>
   <h4>3. Las piezas</h4>
   <ul>
     <li><b>Piezas del Calcador (.json)</b>: cualquier proyecto guardado con 💾 Guardar (.json). Lleva todo: arcos, agujeros, cajeras, grabados, puentes y entradas. Si un archivo tiene varias piezas, se colocan juntas, como un bloque.</li>
@@ -740,9 +760,11 @@ function girosPermitidos(p, T) {
   return p.tipo === 'rect' ? gs.filter(g => g < 180) : gs;
 }
 
+const esLaser = () => $('mMaq').value === 'laser';
 function datosTablero() {
-  const L = leer('tL'), A = leer('tA'), M = leer('tM'), D = leer('hD'), Hg = leer('hH'), G = leer('tG'), P = leer('tP');
-  return { L, A, M, D, Hg, G, P, sep: Math.max(0, D) + Math.max(0, Hg), veta: $('tVeta').checked, cero: $('tCero').value };
+  const L = leer('tL'), A = leer('tA'), M = leer('tM'), D = leer('hD'), Hg = leer('hH'), G = leer('tG'), P = leer('tP'), K = leer('lK');
+  const laser = esLaser(), corte = laser ? (isFinite(K) ? Math.max(0, K) : 0.15) : D;   // con láser, entre piezas va el ancho del corte (no la fresa)
+  return { L, A, M, D, Hg, G, P, K: corte, laser, sep: Math.max(0, corte) + Math.max(0, Hg), veta: $('tVeta').checked, cero: $('tCero').value };
 }
 // Rectángulos (con la separación a la derecha y arriba) que se pisan
 const solapan = (a, b) => a.x < b.x + b.w - 1e-3 && b.x < a.x + a.w - 1e-3 && a.y < b.y + b.h - 1e-3 && b.y < a.y + a.h - 1e-3;   // tolerancia: 1 µm (redondeos)
@@ -1117,7 +1139,7 @@ function pintarVista() {
     ['Piezas en este', t ? t.col.length : 0, 'Piezas colocadas en el tablero que estás viendo'],
     ['Aprovechamiento', t ? Math.round(100 * areaPiezas / areaTab) + ' %' : '—', resultado.forma ? 'Superficie real de las piezas (sin sus huecos) sobre la del tablero' : 'Superficie de las piezas (su rectángulo envolvente) sobre la del tablero'],
     ['Separación', f1(T.sep) + ' mm', 'Distancia mínima entre dos piezas: diámetro de la fresa + holgura'],
-    ['Profundidad', f1(T.G + T.P) + ' mm', 'Profundidad de corte que llevará el proyecto a ⚙️ Mecanizar: grosor + corte pasante'] ]
+    ...(T.laser ? [['Máquina', 'Láser', 'Corte por láser: sin profundidad ni pasadas de fresa']] : [['Profundidad', f1(T.G + T.P) + ' mm', 'Profundidad de corte que llevará el proyecto a ⚙️ Mecanizar: grosor + corte pasante']]) ]
     .map(([et, va, ti]) => `<div class="dato" title="${ti}"><div class="et">${et}</div><div class="va">${va}</div></div>`).join('');
   let av = '';
   if (!piezas.length) av += `<div class="aviso ojo">Añade piezas: abre proyectos del Calcador (.json), una lista de despiece (.csv) o añade rectángulos.</div>`;
@@ -1129,8 +1151,8 @@ function pintarVista() {
   botones(n > 0);
   pintarCoste();
 }
-function botones(hay) { ['btnCalcador', 'btnJSON', 'btnTodos', 'btnPNG', 'btnSVG', 'btnDXF'].forEach(id => $(id).disabled = !hay); $('btnTodos').style.display = resultado && resultado.tableros.length > 1 ? '' : 'none'; $('btnSoltar').style.display = piezas.some(p => p.fijas) ? '' : 'none'; }
-function notaSeparacion() { const T = datosTablero(); $('notaSep').textContent = isFinite(T.sep) ? `Separación entre piezas: ${f1(T.sep)} mm (Ø ${f1(T.D)} + holgura ${f1(T.Hg)}).` : ''; }
+function botones(hay) { ['btnCalcador', 'btnJSON', 'btnTodos', 'btnPNG', 'btnSVG', 'btnDXF', 'btnGLaser', 'btnSVGLaser'].forEach(id => $(id).disabled = !hay); $('btnTodos').style.display = resultado && resultado.tableros.length > 1 ? '' : 'none'; $('btnSoltar').style.display = piezas.some(p => p.fijas) ? '' : 'none'; }
+function notaSeparacion() { const T = datosTablero(); $('notaSep').textContent = isFinite(T.sep) ? `Separación entre piezas: ${f1(T.sep)} mm (${T.laser ? 'ancho del corte del láser' : 'diámetro de la fresa'} ${T.laser ? (+T.K.toFixed(2)).toString() : f1(T.K)} + holgura ${f1(Math.max(0, T.Hg))}).` : ''; document.body.classList.toggle('laser', T.laser); }
 function todo() { calcular(); pintarTiposCanto(); pintarLista(); pintarVista(); notaSeparacion(); guardar(); }
 
 // ════════════════════════════════════════════════════════════════════
@@ -1140,7 +1162,8 @@ const CLAVE = 'anidador_estado';
 function guardar() {
   try {
     const d = { v: {}, veta: $('tVeta').checked, cero: $('tCero').value, herr: $('hSel').value, piezas, costes };
-    ['tL', 'tA', 'tG', 'tP', 'tM', 'hD', 'hH', 'tModo'].forEach(id => d.v[id] = $(id).value);
+    ['tL', 'tA', 'tG', 'tP', 'tM', 'hD', 'hH', 'tModo', 'mMaq', 'lK', 'lPot', 'lF', 'lPas', 'lPotG', 'lS'].forEach(id => d.v[id] = $(id).value);
+    d.laserComp = $('lComp').checked; d.laserNom = $('lNom').checked;
     localStorage.setItem(CLAVE, JSON.stringify(d));
   } catch (e) { /* sin sitio en el navegador: se sigue trabajando igual */ }
 }
@@ -1150,11 +1173,15 @@ function cargar() {
   if (!d) { const h = baseHerramientas()[0]; if (h) { $('hSel').value = h.id; $('hD').value = h.d; } return; }
   Object.entries(d.v || {}).forEach(([id, v]) => { if ($(id)) $(id).value = v; });
   $('tVeta').checked = d.veta !== false; if (d.cero) $('tCero').value = d.cero;
+  if (typeof d.laserComp === 'boolean') $('lComp').checked = d.laserComp; if (typeof d.laserNom === 'boolean') $('lNom').checked = d.laserNom;
   if (Array.isArray(d.piezas)) piezas = d.piezas.filter(p => p && (p.tipo === 'rect' || (p.tipo === 'json' && Array.isArray(p.contornos) && p.bb)));
   piezas.forEach(p => { if (!COLORES.some(c => c.id === p.color)) p.color = colorNuevo(); if (p.fijas && typeof p.fijas !== 'object') delete p.fijas; });
   if (d.costes && Array.isArray(d.costes.tipos) && d.costes.tipos.length) costes = { ...costes, ...d.costes };
 }
-['tL', 'tA', 'tG', 'tP', 'tM', 'hD', 'hH'].forEach(id => $(id).addEventListener('input', todo));
+['tL', 'tA', 'tG', 'tP', 'tM', 'hD', 'hH', 'lK'].forEach(id => $(id).addEventListener('input', todo));
+['lPot', 'lF', 'lPas', 'lPotG', 'lS'].forEach(id => $(id).addEventListener('input', guardar));
+['lComp', 'lNom'].forEach(id => $(id).addEventListener('change', guardar));
+$('mMaq').addEventListener('change', () => { if (esLaser() && num($('hH').value) > 3) $('hH').value = 2; todo(); });   // con láser, las piezas casi juntas
 ['tVeta', 'tCero', 'tModo'].forEach(id => $(id).addEventListener('change', todo));
 $('hSel').addEventListener('change', () => { const h = herramientaElegida(); if (h) $('hD').value = h.d; todo(); });  // todo() → pintarVista() → pintarCoste()
 $('hD').addEventListener('input', () => { const h = herramientaElegida(); if (h && Math.abs(num($('hD').value) - h.d) > 1e-9) $('hSel').value = ''; });
@@ -1519,6 +1546,90 @@ const textoDXF = t => String(t).replace(/[\r\n]+/g, ' ').replace(/[^\x20-\x7e]/g
 function exportarDXF() { if (!hayTablero()) return; descargarBlob(new Blob([dxfTablero(tableroVisto)], { type: 'application/dxf' }), nombreArchivo(nombreTablero(tableroVisto)) + '.dxf'); }
 const hayTablero = () => !!(resultado && resultado.tableros.length && resultado.tableros[tableroVisto]);
 $('btnPNG').onclick = exportarPNG;
+
+// ════════════════════════════════════════════════════════════════════
+//  Corte láser: G-code para GRBL en modo láser ($32=1) y SVG para LightBurn, RDWorks, LaserGRBL…
+// ════════════════════════════════════════════════════════════════════
+const areaFirm = q => { let a = 0; for (let i = 0, j = q.length - 1; i < q.length; j = i++) a += (q[j].x + q[i].x) * (q[j].y - q[i].y); return -a / 2; };
+// desplaza un contorno cerrado d mm hacia fuera (d < 0: hacia dentro), con las esquinas en inglete (sin pasarse de 3·d)
+function desplazarContorno(q, d) {
+  let pts = q.slice(); if (pts.length > 2 && Math.hypot(pts[0].x - pts[pts.length - 1].x, pts[0].y - pts[pts.length - 1].y) < 1e-6) pts.pop();
+  const n = pts.length; if (n < 3 || !d) return q;
+  const s = areaFirm(pts) > 0 ? 1 : -1, out = [];   // s: antihorario (normal hacia fuera = a la derecha del avance)
+  for (let i = 0; i < n; i++) {
+    const a = pts[(i - 1 + n) % n], b = pts[i], c = pts[(i + 1) % n];
+    const n1 = (() => { const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1; return { x: s * dy / L, y: -s * dx / L }; })();
+    const n2 = (() => { const dx = c.x - b.x, dy = c.y - b.y, L = Math.hypot(dx, dy) || 1; return { x: s * dy / L, y: -s * dx / L }; })();
+    let bx = n1.x + n2.x, by = n1.y + n2.y; const bl = Math.hypot(bx, by);
+    if (bl < 1e-9) { out.push({ x: b.x + n1.x * d, y: b.y + n1.y * d }); continue; }
+    bx /= bl; by /= bl; const cos = bx * n1.x + by * n1.y, m = Math.min(3, 1 / Math.max(cos, 1e-3));
+    out.push({ x: b.x + bx * d * m, y: b.y + by * d * m });
+  }
+  out.push({ ...out[0] });
+  return out;
+}
+const ajustesLaser = () => {
+  const n = (id, def, a, b) => { const v = leer(id); return Math.min(b, Math.max(a, isFinite(v) ? v : def)); };
+  return { pot: n('lPot', 80, 0, 100), potG: n('lPotG', 15, 0, 100), F: n('lF', 600, 1, 1e5), pas: Math.round(n('lPas', 1, 1, 20)), S: n('lS', 1000, 1, 1e5), comp: $('lComp').checked, nom: $('lNom').checked };
+};
+// trabajos de un tablero en orden de corte: por pieza (de la más cercana), grabados, luego interiores y, al final, el exterior
+function trabajosLaser(i) {
+  const T = resultado.T, Ls = ajustesLaser(), k2 = Ls.comp ? T.K / 2 : 0, piezas = dibujoTablero(i).map(({ c, cont, clases }) => ({ c, cont, clases }));
+  const orden = [], quedan = piezas.slice(); let px = 0, py = 0;
+  while (quedan.length) { let mej = 0, md = Infinity; quedan.forEach((q, j) => { const d = Math.hypot(q.c.x + q.c.w / 2 - px, q.c.y + q.c.h / 2 - py); if (d < md) { md = d; mej = j; } }); const q = quedan.splice(mej, 1)[0]; orden.push(q); px = q.c.x + q.c.w / 2; py = q.c.y + q.c.h / 2; }
+  const trab = []; let sinCajera = 0;
+  orden.forEach(({ c, cont, clases }) => {
+    const grupo = { pieza: c.p.nombre, cortes: [] };
+    [['grabado', 'grabar'], ['interior', 'cortar'], ['exterior', 'cortar']].forEach(([clase, que]) => cont.forEach((k, j) => {
+      if (clases[j] !== clase) return;
+      let pts = poliContorno(k);
+      if (que === 'cortar' && k.cerrado && k2) pts = desplazarContorno(pts, clase === 'exterior' ? k2 : -k2);
+      grupo.cortes.push({ clase, que, pts, cerrado: !!k.cerrado });
+    }));
+    cont.forEach((k, j) => { if (clases[j] === 'cajera') sinCajera++; });
+    trab.push(grupo);
+  });
+  return { trab, sinCajera, Ls, T };
+}
+function gcodeLaser(i) {
+  const { trab, sinCajera, Ls, T } = trabajosLaser(i), o = origen(T), X = v => f3(v - o.x), Y = v => f3(v - o.y);
+  const S = p => Math.round(Ls.S * p / 100), L = [];
+  L.push(`; ${nombreTablero(i)} — Anidador (Made-rebanadas / Suite CNC)`, `; Láser GRBL ($32=1). Tablero ${f1(T.L)} x ${f1(T.A)} x ${f1(T.G)} mm. Cero pieza: ${$('tCero').selectedOptions[0].textContent.toLowerCase()}.`,
+    `; Corte: ${Ls.pot} % (S${S(Ls.pot)}), F${Ls.F}, ${Ls.pas} pasada${Ls.pas > 1 ? 's' : ''}. Grabado: ${Ls.potG} % (S${S(Ls.potG)}). Ancho del corte ${+T.K.toFixed(3)} mm${Ls.comp ? ', compensado' : ', sin compensar'}.`);
+  if (sinCajera) L.push(`; Aviso: ${sinCajera} cajera(s) no se pueden hacer con láser y no van en el programa.`);
+  L.push('G21 G90 G17', 'M5', 'G0 X0 Y0', 'M4 S0');
+  let largo = 0;
+  trab.forEach(g => {
+    L.push(`; --- ${g.pieza}`);
+    g.cortes.forEach(cu => {
+      const pot = cu.que === 'grabar' ? Ls.potG : Ls.pot, pas = cu.que === 'grabar' ? 1 : Ls.pas, pts = cu.pts; if (pts.length < 2) return;
+      L.push(`; ${cu.clase}`, `G0 X${X(pts[0].x)} Y${Y(pts[0].y)}`);
+      for (let k = 0; k < pas; k++) {
+        pts.slice(1).forEach((q, j) => { L.push(`G1 X${X(q.x)} Y${Y(q.y)}${j === 0 ? ` F${Ls.F} S${S(pot)}` : ''}`); });
+        if (!cu.cerrado && k + 1 < pas) L.push(`G0 X${X(pts[0].x)} Y${Y(pts[0].y)}`);   // abierto: vuelve al principio
+        for (let j = 1; j < pts.length; j++) largo += Math.hypot(pts[j].x - pts[j - 1].x, pts[j].y - pts[j - 1].y);
+      }
+      L.push('S0');
+    });
+  });
+  L.push('M5', 'G0 X0 Y0', 'M2', `; Recorrido con el láser encendido: ${f1(largo / 1000)} m (unos ${Math.max(1, Math.round(largo / Ls.F))} min).`);
+  return L.join('\n') + '\n';
+}
+function svgLaser(i) {
+  const { trab, Ls, T } = trabajosLaser(i), H = T.A, X = x => fx(x), Y = y => fx(H - y);
+  const COL = { exterior: '#FF0000', interior: '#0000FF', grabado: '#000000' }, CAPA = { exterior: 'Cortar contorno', interior: 'Cortar interiores', grabado: 'Grabar' };
+  let s = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${fx(T.L)}mm" height="${fx(T.A)}mm" viewBox="0 0 ${fx(T.L)} ${fx(T.A)}">\n<title>${esc(nombreTablero(i))} — láser</title>\n`;
+  s += `<!-- Rojo: cortar el contorno (al final) · Azul: cortar los interiores (antes) · Negro: grabar. Corte ${Ls.pot} %, ${Ls.F} mm/min, ${Ls.pas} pasada(s). Ancho del corte ${+T.K.toFixed(3)} mm${Ls.comp ? ', ya compensado en los trazos' : ''}. -->\n`;
+  ['grabado', 'interior', 'exterior'].forEach(cl => {
+    let g = '';
+    trab.forEach(gr => gr.cortes.filter(cu => cu.clase === cl).forEach(cu => { g += `  <path d="M${cu.pts.map(q => X(q.x) + ' ' + Y(q.y)).join(' L')}${cu.cerrado ? ' Z' : ''}"/>\n`; }));
+    if (cl === 'grabado' && Ls.nom) dibujoTablero(i).forEach(({ c }) => { const et = nombreEnMM(c.p.nombre, c.w, c.h, 30); if (et) g += `  <text x="${X(c.x + c.w / 2)}" y="${Y(c.y + c.h / 2)}" font-family="Arial" font-size="${fx(et.h)}" text-anchor="middle" dominant-baseline="central" fill="#000000" stroke="none">${esc(et.t)}</text>\n`; });
+    if (g) s += `<g id="${cl}" inkscape:label="${CAPA[cl]}" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" fill="none" stroke="${COL[cl]}" stroke-width="0.05">\n${g}</g>\n`;
+  });
+  return s + '</svg>\n';
+}
+$('btnGLaser').onclick = () => { if (!hayTablero()) return; descargar(gcodeLaser(tableroVisto), nombreArchivo(nombreTablero(tableroVisto)) + '_laser.nc', 'text/plain'); };
+$('btnSVGLaser').onclick = () => { if (!hayTablero()) return; descargar(svgLaser(tableroVisto), nombreArchivo(nombreTablero(tableroVisto)) + '_laser.svg', 'image/svg+xml'); };
 $('btnSVG').onclick = exportarSVG;
 $('btnDXF').onclick = exportarDXF;
 
@@ -1566,6 +1677,7 @@ if (DESDE_REBANADAS) {
       (d.piezas || []).forEach(j => { const p = piezaDeJSON(j, (j.nombre || 'Costilla') + '.json'); p.cant = Math.max(1, +j.cantidad || 1); p.veta = !!j.veta; p.color = colorNuevo(nuevas); nuevas.push(p); });
       piezas = nuevas;
       if (d.tablero) { restaurarTablero(d.tablero); if (typeof d.tablero.veta === 'boolean') $('tVeta').checked = d.tablero.veta; }
+      if (d.maquina === 'laser' || d.maquina === 'fresa') { $('mMaq').value = d.maquina; if (d.maquina === 'laser' && num($('hH').value) > 3) $('hH').value = 2; }
       todo();
       snack(`${nuevas.length} costillas de «${d.nombre || 'Made-rebanadas'}»`);
     } catch (err) { snack(err.message || 'No se pudieron recibir las costillas'); }
