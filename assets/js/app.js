@@ -100,7 +100,7 @@ function proyectoBase() {
     radial: { tubo: 20, holguraTubo: 0.5, discos: 2, rDisco: 0, holgura: 0.3 },
     pared: { rastreles: 3, alto: 45, grueso: 20, margen: 120, holgura: 0.5, verPared: true,
       partir: { modo: 'no', alturas: '', largoMax: 0, junta: 'tope', sombra: 8, patron: 'alineado', desfase: 300, rastreles: true },
-      modulos: { modo: 'no', n: 2, medidas: '' } },
+      modulos: { modo: 'no', n: 2, medidas: '', hueco: 0 } },
     relieve: { fuente: 'plantilla', orient: 'v', ancho: 1200, alto: 500, fondo: 20, relieve: 60, suavizado: 10, invertir: false,
       texto: 'Made', letra: 'Arial Black', tamLetra: 320, negrita: true, interlinea: 1.05, ondaAmp: 0, ondas: 2,
       vista: 'frente', giro: 0, base: 0.15, modelo: null, gama: 1, imagen: null,
@@ -301,9 +301,9 @@ function calcular() {
   if (P.tipo === 'reticula') { reticula(res); aplicarHuecos(res); avisosHuecos(res); avisosReticula(res); return fin(); }
   if (P.tipo === 'radial') { radialExtras(res); aplicarRanuras(res, e + P.radial.holgura); avisosRadial(res); return fin(); }
   if (P.tipo === 'pared') {
-    paredExtras(res); aplicarRanuras(res, e); aplicarHuecos(res);
+    separarModulos(res); paredExtras(res); aplicarRanuras(res, e); aplicarHuecos(res);
     if (res.rastreles.length && R0ok(res)) { const cs = res.costillas, xA = cs[0].x - e / 2 - 30, xB = cs[cs.length - 1].x + e / 2 + 30; res.rastreles.forEach(r => { r.tramos = usaHuecos() ? tramosRastrel(r.v, P.pared.alto, xA, xB) : [[xA, xB]]; }); }
-    res.modulosPared = modulosPared(res.costillas); if (res.rastreles.length && R0ok(res)) cortarRastrelesModulos(res); avisosModulos(res);
+    if (res.rastreles.length && R0ok(res)) cortarRastrelesModulos(res); avisosModulos(res);
     avisosHuecos(res); avisosPared(res); return fin();
   }
   aplicarHuecos(res);
@@ -1499,11 +1499,28 @@ function modulosPared(cs) {
   out.forEach(m => { m.ancho = m.x1 - m.x0; });
   return out;
 }
+// hueco extra entre módulos: cada módulo se corre ese hueco respecto al anterior (las lamas guardan la forma de su sitio
+// original, así el dibujo sigue seguido y solo se abre una raya). Se hace antes de los rastreles y los huecos.
+const huecoModulos = () => modulosActivos() ? clamp(+modulosP().hueco || 0, 0, 2000) : 0;
+function separarModulos(res) {
+  res.modulosPared = modulosPared(res.costillas);
+  const ms = res.modulosPared, g = huecoModulos(); if (ms.length < 2) return;
+  const cs = res.costillas.filter(c => c.ok).sort((a, b) => a.x - b.x), e = grosor();
+  const difs = cs.slice(1).map((c, k) => c.x - cs[k].x).sort((a, b) => a - b), paso = difs.length ? difs[Math.floor(difs.length / 2)] : e * 2;
+  if (g > 0) ms.forEach((m, j) => { if (j) res.costillas.forEach(c => { if (c.i >= m.desde && c.i <= m.hasta) c.x += j * g; }); });
+  // bordes de cada módulo (medio paso fuera de sus lamas de los extremos) y raya entre módulos
+  ms.forEach((m, j) => {
+    const a = res.costillas[m.desde], b = res.costillas[m.hasta];
+    m.x0 = j ? a.x - paso / 2 : a.x - e / 2; m.x1 = j < ms.length - 1 ? b.x + paso / 2 : b.x + e / 2; m.ancho = m.x1 - m.x0;
+  });
+  ms.slice(0, -1).forEach((m, j) => { m.corte = (m.x1 + ms[j + 1].x0) / 2; });
+}
 // corta los tramos de los rastreles entre módulos (deja 3 mm de corte de sierra)
 function cortarRastrelesModulos(res) {
   const mods = res.modulosPared || []; if (mods.length < 2) return;
-  const cortes = mods.slice(0, -1).map(m => m.x1);
-  res.rastreles.forEach(r => { r.tramos = (r.tramos || []).flatMap(([a, b]) => { let ts = [[a, b]]; cortes.forEach(c => { ts = ts.flatMap(([p, q]) => c <= p || c >= q ? [[p, q]] : [[p, c - 1.5], [c + 1.5, q]]); }); return ts.filter(([p, q]) => q - p > 20); }); });
+  // entre dos módulos se quita del rastrel lo que hay entre el borde de uno y el del siguiente (como mínimo, 3 mm de sierra)
+  const cortes = mods.slice(0, -1).map((m, j) => { const c = m.corte != null ? m.corte : m.x1, h = Math.max(1.5, (mods[j + 1].x0 - m.x1) / 2); return [c - h, c + h]; });
+  res.rastreles.forEach(r => { r.tramos = (r.tramos || []).flatMap(([a, b]) => { let ts = [[a, b]]; cortes.forEach(([c0, c1]) => { ts = ts.flatMap(([p, q]) => c1 <= p || c0 >= q ? [[p, q]] : [[p, c0], [c1, q]]); }); return ts.filter(([p, q]) => q - p > 20); }); });
 }
 // alturas de las juntas de una lama (en su eje v); i: número de la lama
 function juntasLama(i) {
@@ -1848,7 +1865,7 @@ function avisosModulos(res) {
   if (P.tipo === 'pared' && modulosActivos() && (res.modulosPared || []).length) {
     const ms = res.modulosPared, hor = lamasH();
     if (ms.length < 2) add('atencion', `Módulos: con ${hor ? 'esos altos' : 'esos anchos'} el panel queda en un solo módulo.`);
-    else add('info', `Panel en ${ms.length} módulos ${hor ? 'a lo alto' : 'a lo ancho'}: ${ms.map((m, k) => `M${k + 1} ${fmt(m.ancho)} mm (lamas ${m.desde + 1}–${m.hasta + 1})`).join(', ')}. Los rastreles se cortan entre módulos.`);
+    else add('info', `Panel en ${ms.length} módulos ${hor ? 'a lo alto' : 'a lo ancho'}: ${ms.map((m, k) => `M${k + 1} ${fmt(m.ancho)} mm (lamas ${m.desde + 1}–${m.hasta + 1})`).join(', ')}. Los rastreles se cortan entre módulos${huecoModulos() ? `, separados ${fmt(huecoModulos())} mm más que las lamas (el panel crece ${fmt(huecoModulos() * (ms.length - 1))} mm)` : ''}.`);
     const finos = ms.filter(m => m.n < 2); if (finos.length) add('atencion', `Módulos: ${finos.map(m => 'M' + (ms.indexOf(m) + 1)).join(', ')} se queda${finos.length > 1 ? 'n' : ''} con una sola lama.`);
     if (!res.rastreles.length) add('atencion', 'Módulos: sin rastreles no hay nada que una las lamas de cada módulo (pon rastreles o un tablero trasero por módulo).');
   }
@@ -2955,7 +2972,7 @@ function dibujarHuecos(ctx, V) {
       let v0 = Infinity, v1 = -Infinity; [...R.costillas.filter(c => c.ok), ...(R.trozos || []).filter(t => t.ok)].forEach(c => { v0 = Math.min(v0, c.caja.y0); v1 = Math.max(v1, c.caja.y1); });
       ctx.save(); ctx.strokeStyle = 'rgba(40,90,160,.85)'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]); ctx.fillStyle = 'rgba(40,90,160,.95)'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center';
       R.modulosPared.forEach((m, j) => {
-        if (j < R.modulosPared.length - 1) { const [a, b] = hor ? [V.aPantalla(v0 - 40, m.x1), V.aPantalla(v1 + 40, m.x1)] : [V.aPantalla(m.x1, v0 - 40), V.aPantalla(m.x1, v1 + 40)]; ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke(); }
+        if (j < R.modulosPared.length - 1) { const c = m.corte != null ? m.corte : m.x1, [a, b] = hor ? [V.aPantalla(v0 - 40, c), V.aPantalla(v1 + 40, c)] : [V.aPantalla(c, v0 - 40), V.aPantalla(c, v1 + 40)]; ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke(); }
         const [tx, ty] = hor ? V.aPantalla(v0 - 70, (m.x0 + m.x1) / 2) : V.aPantalla((m.x0 + m.x1) / 2, v0 - 70); ctx.fillText('M' + (j + 1) + ' · ' + fmt(m.ancho), tx, ty + 4);
       });
       ctx.restore();
@@ -3402,7 +3419,7 @@ function construir3D() {
 
     if (Pa.verPared) {
       const mP = new T.MeshStandardMaterial({ color: '#e9e5de', roughness: .95 }); mP.userData.propio = true;
-      const w = new T.Mesh(new T.PlaneGeometry(Math.max(P.largo * 1.6, 2000), Math.max(G.alto * 1.5, 1500)), mP);
+      const w = new T.Mesh(new T.PlaneGeometry(Math.max(P.largo * 1.6, ((G.dims || [0])[0] || 0) * 1.3, 2000), Math.max(G.alto * 1.5, 1500)), mP);
       w.position.set(0, Math.max(G.alto * 1.5, 1500) / 2 - 1, -0.5); w.receiveShadow = true; w.userData.extra = 'pared'; G.modelo.add(w);
     }
   }
@@ -3846,10 +3863,11 @@ function iniciarPanel() {
   enlazar('#ptDesfase', () => { Pt().desfase = Math.max(0, +$('#ptDesfase').value || 0); cambio(); ponerPartir(); });
   enlazar('#ptRast', () => { Pt().rastreles = $('#ptRast').checked; cambio(); ponerPartir(); });
   // dividir en módulos a lo ancho (o a lo alto)
-  const Md = () => (P.pared.modulos = Object.assign({ modo: 'no', n: 2, medidas: '' }, P.pared.modulos || {}));
+  const Md = () => (P.pared.modulos = Object.assign({ modo: 'no', n: 2, medidas: '', hueco: 0 }, P.pared.modulos || {}));
   enlazar('#mdModo', () => { Md().modo = $('#mdModo').value; cambio(Md().modo === 'no' ? 'Panel de una pieza' : 'Panel en módulos'); ponerPartir(); });
   enlazar('#mdN', () => { Md().n = clamp(Math.round(+$('#mdN').value || 2), 2, 20); cambio(); ponerPartir(); });
   enlazar('#mdMedidas', () => { Md().medidas = $('#mdMedidas').value; cambio(); ponerPartir(); });
+  enlazar('#mdHueco', () => { Md().hueco = clamp(+$('#mdHueco').value || 0, 0, 2000); cambio(); ponerPartir(); encuadrarSiHaceFalta(); });
   enlazar('#paHolgura', () => { P.pared.holgura = clamp(+$('#paHolgura').value || 0, 0, 3); cambio(); });
   enlazar('#paVer', () => { P.pared.verPared = $('#paVer').checked; construir3D(); });
   enlazar('#cClaves3d', () => { P.vista.claves = $('#cClaves3d').checked; construirClaves3D(); });
@@ -3941,6 +3959,7 @@ function ponerPartir() {
     $('#mdMedTit').textContent = hor ? 'Altos (mm, desde abajo)' : 'Anchos (mm, desde la izquierda)';
     $('#mdModo').value = Md.modo; $('#mdN').value = Md.n; if (document.activeElement !== $('#mdMedidas')) $('#mdMedidas').value = Md.medidas || '';
     $('#filaMdN').classList.toggle('oculto', Md.modo !== 'iguales'); $('#filaMdMedidas').classList.toggle('oculto', Md.modo !== 'medidas');
+    $('#filaMdHueco').classList.toggle('oculto', Md.modo === 'no'); $('#mdHueco').value = Md.hueco || '';
     const ms = (R && R.modulosPared) || [];
     $('#mdInfo').textContent = Md.modo !== 'no' && ms.length > 1 ? `${ms.length} módulos: ${ms.map((m, j) => `M${j + 1} ${fmt(m.ancho)} mm (${m.n} lamas)`).join(' · ')}. Cada corte va al hueco entre dos lamas más cercano.` : '';
     $('#mdInfo').classList.toggle('oculto', !$('#mdInfo').textContent); }
@@ -5057,7 +5076,7 @@ function hojaPared(D, cabecera, tabla, o) {
     let v0 = Infinity, v1 = -Infinity; [...cs, ...tz].forEach(c => { v0 = Math.min(v0, c.caja.y0); v1 = Math.max(v1, c.caja.y1); });
     const W2 = (pos, v) => { const q = puntoMarco(marcoEn(pos), 0, v); return [PX(q[0]), PY(q[1])]; };
     D.trazo([40, 90, 160]).grosor(0.3).rayas(1.2);
-    R.modulosPared.slice(0, -1).forEach(m => { const a = W2(m.x1, v0 - 40), b = W2(m.x1, v1 + 40); D.linea(a[0], a[1], b[0], b[1]); });
+    R.modulosPared.slice(0, -1).forEach(m => { const c = m.corte != null ? m.corte : m.x1, a = W2(c, v0 - 40), b = W2(c, v1 + 40); D.linea(a[0], a[1], b[0], b[1]); });
     D.rayas(0);
     R.modulosPared.forEach((m, j) => { const q = W2((m.x0 + m.x1) / 2, v0 - 60); D.relleno([40, 90, 160]); D.texto(q[0], q[1] + (hor ? 0 : 3), `M${j + 1} · ${fmt(m.ancho * k)}`, { pt: 7, al: 'c', col: [40, 90, 160] }); });
   }
@@ -5074,11 +5093,11 @@ function hojaPared(D, cabecera, tabla, o) {
   const filas = [{ titulo: hor ? 'Rastreles (posición de su centro desde la izquierda)' : 'Rastreles (altura de su centro desde abajo)' }];
   R.rastreles.forEach(r => { const ts = (r.tramos || []).map(([a, b]) => fmt((b - a) * k)); filas.push([`Rastrel ${r.j + 1}`, `a ${fmt(r.v * k)} mm · ${fmt(Pa.alto * k, 1)} × ${fmt(Pa.grueso * k, 1)} mm · ` + (ts.length > 1 ? `${ts.length} trozos: ${ts.join(' + ')} mm` : `${ts[0] || fmt(cm.rastrel)} mm`)]); });
   if ((R.modulosPared || []).length > 1) filas.push([`${R.modulosPared.length} módulos ${hor ? 'a lo alto' : 'a lo ancho'}`, R.modulosPared.map((m, j) => `M${j + 1}: lamas ${m.desde + 1}–${m.hasta + 1}, ${fmt(m.ancho * k)} mm`).join(' · ')]);
-  filas.push(['Separación entre lamas', `${fmt(cm.sep, 1)} mm entre centros (hueco ${fmt(Math.max(0, cm.hueco), 1)} mm)`]);
+  filas.push(['Separación entre lamas', `${fmt(cm.sep, 1)} mm entre centros (hueco ${fmt(Math.max(0, cm.hueco), 1)} mm${huecoModulos() && (R.modulosPared || []).length > 1 ? `; entre módulos, ${fmt((Math.max(0, cm.hueco / k) + huecoModulos()) * k, 1)} mm` : ''})`]);
   filas.push(['Medidas del panel', `${(G.dims || [0, 0, 0]).map(v => fmt(v * k)).join(' × ')} mm (ancho × fondo × alto)`]);
   if (relieveActivo()) filas.push(['Relieve', P.relieve.fuente === 'texto' ? `texto «${P.relieve.texto.replace(/\n/g, ' / ')}»` : `modelo ${P.relieve.modelo ? P.relieve.modelo.nombre : ''}`]);
   if (altaP) { const tx = zona.x + Math.min(zona.w, (X1 - X0 + 80) * s) + 14; tabla(tx, M + 24, W - M - tx, filas, { c1: 34 }); }
-  else tabla(M, M + 134, W - 2 * M, filas, { c1: 70 });
+  else tabla(M, M + 134, W - 2 * M, filas, { c1: 70, alto: filas.length > 6 ? 4.3 : 5.2 });
 }
 
 /* ===================== ANIDADOR DE TABLEROS (assets/anidador) =====================

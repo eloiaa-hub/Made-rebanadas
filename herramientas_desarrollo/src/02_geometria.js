@@ -189,9 +189,9 @@ function calcular() {
   if (P.tipo === 'reticula') { reticula(res); aplicarHuecos(res); avisosHuecos(res); avisosReticula(res); return fin(); }
   if (P.tipo === 'radial') { radialExtras(res); aplicarRanuras(res, e + P.radial.holgura); avisosRadial(res); return fin(); }
   if (P.tipo === 'pared') {
-    paredExtras(res); aplicarRanuras(res, e); aplicarHuecos(res);
+    separarModulos(res); paredExtras(res); aplicarRanuras(res, e); aplicarHuecos(res);
     if (res.rastreles.length && R0ok(res)) { const cs = res.costillas, xA = cs[0].x - e / 2 - 30, xB = cs[cs.length - 1].x + e / 2 + 30; res.rastreles.forEach(r => { r.tramos = usaHuecos() ? tramosRastrel(r.v, P.pared.alto, xA, xB) : [[xA, xB]]; }); }
-    res.modulosPared = modulosPared(res.costillas); if (res.rastreles.length && R0ok(res)) cortarRastrelesModulos(res); avisosModulos(res);
+    if (res.rastreles.length && R0ok(res)) cortarRastrelesModulos(res); avisosModulos(res);
     avisosHuecos(res); avisosPared(res); return fin();
   }
   aplicarHuecos(res);

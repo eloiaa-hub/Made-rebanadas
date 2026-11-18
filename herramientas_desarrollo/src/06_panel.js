@@ -262,10 +262,11 @@ function iniciarPanel() {
   enlazar('#ptDesfase', () => { Pt().desfase = Math.max(0, +$('#ptDesfase').value || 0); cambio(); ponerPartir(); });
   enlazar('#ptRast', () => { Pt().rastreles = $('#ptRast').checked; cambio(); ponerPartir(); });
   // dividir en módulos a lo ancho (o a lo alto)
-  const Md = () => (P.pared.modulos = Object.assign({ modo: 'no', n: 2, medidas: '' }, P.pared.modulos || {}));
+  const Md = () => (P.pared.modulos = Object.assign({ modo: 'no', n: 2, medidas: '', hueco: 0 }, P.pared.modulos || {}));
   enlazar('#mdModo', () => { Md().modo = $('#mdModo').value; cambio(Md().modo === 'no' ? 'Panel de una pieza' : 'Panel en módulos'); ponerPartir(); });
   enlazar('#mdN', () => { Md().n = clamp(Math.round(+$('#mdN').value || 2), 2, 20); cambio(); ponerPartir(); });
   enlazar('#mdMedidas', () => { Md().medidas = $('#mdMedidas').value; cambio(); ponerPartir(); });
+  enlazar('#mdHueco', () => { Md().hueco = clamp(+$('#mdHueco').value || 0, 0, 2000); cambio(); ponerPartir(); encuadrarSiHaceFalta(); });
   enlazar('#paHolgura', () => { P.pared.holgura = clamp(+$('#paHolgura').value || 0, 0, 3); cambio(); });
   enlazar('#paVer', () => { P.pared.verPared = $('#paVer').checked; construir3D(); });
   enlazar('#cClaves3d', () => { P.vista.claves = $('#cClaves3d').checked; construirClaves3D(); });
@@ -357,6 +358,7 @@ function ponerPartir() {
     $('#mdMedTit').textContent = hor ? 'Altos (mm, desde abajo)' : 'Anchos (mm, desde la izquierda)';
     $('#mdModo').value = Md.modo; $('#mdN').value = Md.n; if (document.activeElement !== $('#mdMedidas')) $('#mdMedidas').value = Md.medidas || '';
     $('#filaMdN').classList.toggle('oculto', Md.modo !== 'iguales'); $('#filaMdMedidas').classList.toggle('oculto', Md.modo !== 'medidas');
+    $('#filaMdHueco').classList.toggle('oculto', Md.modo === 'no'); $('#mdHueco').value = Md.hueco || '';
     const ms = (R && R.modulosPared) || [];
     $('#mdInfo').textContent = Md.modo !== 'no' && ms.length > 1 ? `${ms.length} módulos: ${ms.map((m, j) => `M${j + 1} ${fmt(m.ancho)} mm (${m.n} lamas)`).join(' · ')}. Cada corte va al hueco entre dos lamas más cercano.` : '';
     $('#mdInfo').classList.toggle('oculto', !$('#mdInfo').textContent); }

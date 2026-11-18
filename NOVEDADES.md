@@ -2,6 +2,7 @@
 
 ## v1.5
 
+- **Hueco extra entre módulos**: una raya más ancha entre columnas (o filas). Cada módulo se corre ese hueco, el panel crece lo mismo por junta y la onda sigue seguida; los rastreles se cortan a medio paso de la última lama de cada módulo.
 - **Dividir los paneles a lo ancho** (módulos en columnas; con lamas horizontales, en filas): en partes iguales o con el ancho que digas para cada módulo. Los rastreles se cortan entre módulos (cada corte en el hueco entre dos lamas), así cada módulo se monta y se cuelga por separado. Con «Partir las lamas» se hace una cuadrícula de módulos. El plano marca los módulos y da el largo de cada trozo de rastrel; la lista de compra los cuenta por largos.
 - La hoja 2 del plano pone el alzado grande a la izquierda y la tabla a la derecha cuando la pared es más alta que ancha.
 - Arreglado: con lamas partidas, las medidas del panel (Resumen, plano, 3D) solo contaban el trozo de abajo.

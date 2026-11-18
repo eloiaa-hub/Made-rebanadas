@@ -21,7 +21,7 @@ Funciona en el navegador (Chrome, Edge o Firefox), sin instalar nada y **sin con
 - **Perfiles clave**: la forma se define con unos pocos perfiles a lo largo del mueble; cada costilla es la mezcla suave de los perfiles que tiene a los lados. Se editan a mano (puntos de curva o de esquina)) o se traen de un **DXF** dibujado en otro programa.
 - **Cuatro tipos**: costillas unidas con varillas (en planta recta, en **arco** o **en S**), **retícula entrelazada** a media madera, **radiales** (lámparas y columnas alrededor de un tubo, con discos de unión) y **paneles de pared** (lamas sobre rastreles).
 - **Lamas partidas** para paredes altas: juntas a tope o con sombra, a la misma altura (módulos con su par de rastreles), alternas o en escalera.
-- **Módulos a lo ancho** (o a lo alto): el panel en columnas de la misma o distinta medida, con los rastreles cortados entre módulos.
+- **Módulos a lo ancho** (o a lo alto): el panel en columnas de la misma o distinta medida, con los rastreles cortados entre módulos y, si se quiere, un hueco más ancho entre ellos.
 - **Texto en las lamas** (paneles de pared): un rótulo que sale hacia fuera o se hunde hacia dentro sobre cualquier panel, con la letra que quieras.
 - **Huecos**: ventanas, rebajes, hornacinas, baldas y armarios dentro de las lamas, y túneles en los muebles de costillas (formas rectangulares, redondeadas, en arco, círculos o libres), o un contorno traído de un **DXF**). Los muebles de los huecos pueden llevar **otro grosor de tablero**, con sus tableros aparte.
 - **Figuras de pie desde un STL/OBJ**: el modelo cortado de verdad en costillas o en retícula (bustos, esculturas).

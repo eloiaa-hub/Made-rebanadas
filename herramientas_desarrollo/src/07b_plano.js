@@ -498,7 +498,7 @@ function hojaPared(D, cabecera, tabla, o) {
     let v0 = Infinity, v1 = -Infinity; [...cs, ...tz].forEach(c => { v0 = Math.min(v0, c.caja.y0); v1 = Math.max(v1, c.caja.y1); });
     const W2 = (pos, v) => { const q = puntoMarco(marcoEn(pos), 0, v); return [PX(q[0]), PY(q[1])]; };
     D.trazo([40, 90, 160]).grosor(0.3).rayas(1.2);
-    R.modulosPared.slice(0, -1).forEach(m => { const a = W2(m.x1, v0 - 40), b = W2(m.x1, v1 + 40); D.linea(a[0], a[1], b[0], b[1]); });
+    R.modulosPared.slice(0, -1).forEach(m => { const c = m.corte != null ? m.corte : m.x1, a = W2(c, v0 - 40), b = W2(c, v1 + 40); D.linea(a[0], a[1], b[0], b[1]); });
     D.rayas(0);
     R.modulosPared.forEach((m, j) => { const q = W2((m.x0 + m.x1) / 2, v0 - 60); D.relleno([40, 90, 160]); D.texto(q[0], q[1] + (hor ? 0 : 3), `M${j + 1} · ${fmt(m.ancho * k)}`, { pt: 7, al: 'c', col: [40, 90, 160] }); });
   }
@@ -515,9 +515,9 @@ function hojaPared(D, cabecera, tabla, o) {
   const filas = [{ titulo: hor ? 'Rastreles (posición de su centro desde la izquierda)' : 'Rastreles (altura de su centro desde abajo)' }];
   R.rastreles.forEach(r => { const ts = (r.tramos || []).map(([a, b]) => fmt((b - a) * k)); filas.push([`Rastrel ${r.j + 1}`, `a ${fmt(r.v * k)} mm · ${fmt(Pa.alto * k, 1)} × ${fmt(Pa.grueso * k, 1)} mm · ` + (ts.length > 1 ? `${ts.length} trozos: ${ts.join(' + ')} mm` : `${ts[0] || fmt(cm.rastrel)} mm`)]); });
   if ((R.modulosPared || []).length > 1) filas.push([`${R.modulosPared.length} módulos ${hor ? 'a lo alto' : 'a lo ancho'}`, R.modulosPared.map((m, j) => `M${j + 1}: lamas ${m.desde + 1}–${m.hasta + 1}, ${fmt(m.ancho * k)} mm`).join(' · ')]);
-  filas.push(['Separación entre lamas', `${fmt(cm.sep, 1)} mm entre centros (hueco ${fmt(Math.max(0, cm.hueco), 1)} mm)`]);
+  filas.push(['Separación entre lamas', `${fmt(cm.sep, 1)} mm entre centros (hueco ${fmt(Math.max(0, cm.hueco), 1)} mm${huecoModulos() && (R.modulosPared || []).length > 1 ? `; entre módulos, ${fmt((Math.max(0, cm.hueco / k) + huecoModulos()) * k, 1)} mm` : ''})`]);
   filas.push(['Medidas del panel', `${(G.dims || [0, 0, 0]).map(v => fmt(v * k)).join(' × ')} mm (ancho × fondo × alto)`]);
   if (relieveActivo()) filas.push(['Relieve', P.relieve.fuente === 'texto' ? `texto «${P.relieve.texto.replace(/\n/g, ' / ')}»` : `modelo ${P.relieve.modelo ? P.relieve.modelo.nombre : ''}`]);
   if (altaP) { const tx = zona.x + Math.min(zona.w, (X1 - X0 + 80) * s) + 14; tabla(tx, M + 24, W - M - tx, filas, { c1: 34 }); }
-  else tabla(M, M + 134, W - 2 * M, filas, { c1: 70 });
+  else tabla(M, M + 134, W - 2 * M, filas, { c1: 70, alto: filas.length > 6 ? 4.3 : 5.2 });
 }

@@ -211,7 +211,7 @@ function construir3D() {
 
     if (Pa.verPared) {
       const mP = new T.MeshStandardMaterial({ color: '#e9e5de', roughness: .95 }); mP.userData.propio = true;
-      const w = new T.Mesh(new T.PlaneGeometry(Math.max(P.largo * 1.6, 2000), Math.max(G.alto * 1.5, 1500)), mP);
+      const w = new T.Mesh(new T.PlaneGeometry(Math.max(P.largo * 1.6, ((G.dims || [0])[0] || 0) * 1.3, 2000), Math.max(G.alto * 1.5, 1500)), mP);
       w.position.set(0, Math.max(G.alto * 1.5, 1500) / 2 - 1, -0.5); w.receiveShadow = true; w.userData.extra = 'pared'; G.modelo.add(w);
     }
   }

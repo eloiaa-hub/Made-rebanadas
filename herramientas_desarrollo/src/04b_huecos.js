@@ -35,7 +35,7 @@ function dibujarHuecos(ctx, V) {
       let v0 = Infinity, v1 = -Infinity; [...R.costillas.filter(c => c.ok), ...(R.trozos || []).filter(t => t.ok)].forEach(c => { v0 = Math.min(v0, c.caja.y0); v1 = Math.max(v1, c.caja.y1); });
       ctx.save(); ctx.strokeStyle = 'rgba(40,90,160,.85)'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]); ctx.fillStyle = 'rgba(40,90,160,.95)'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center';
       R.modulosPared.forEach((m, j) => {
-        if (j < R.modulosPared.length - 1) { const [a, b] = hor ? [V.aPantalla(v0 - 40, m.x1), V.aPantalla(v1 + 40, m.x1)] : [V.aPantalla(m.x1, v0 - 40), V.aPantalla(m.x1, v1 + 40)]; ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke(); }
+        if (j < R.modulosPared.length - 1) { const c = m.corte != null ? m.corte : m.x1, [a, b] = hor ? [V.aPantalla(v0 - 40, c), V.aPantalla(v1 + 40, c)] : [V.aPantalla(c, v0 - 40), V.aPantalla(c, v1 + 40)]; ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke(); }
         const [tx, ty] = hor ? V.aPantalla(v0 - 70, (m.x0 + m.x1) / 2) : V.aPantalla((m.x0 + m.x1) / 2, v0 - 70); ctx.fillText('M' + (j + 1) + ' · ' + fmt(m.ancho), tx, ty + 4);
       });
       ctx.restore();
