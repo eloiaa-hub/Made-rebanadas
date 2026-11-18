@@ -261,6 +261,11 @@ function iniciarPanel() {
   enlazar('#ptPatron', () => { Pt().patron = $('#ptPatron').value; cambio(); ponerPartir(); });
   enlazar('#ptDesfase', () => { Pt().desfase = Math.max(0, +$('#ptDesfase').value || 0); cambio(); ponerPartir(); });
   enlazar('#ptRast', () => { Pt().rastreles = $('#ptRast').checked; cambio(); ponerPartir(); });
+  // dividir en módulos a lo ancho (o a lo alto)
+  const Md = () => (P.pared.modulos = Object.assign({ modo: 'no', n: 2, medidas: '' }, P.pared.modulos || {}));
+  enlazar('#mdModo', () => { Md().modo = $('#mdModo').value; cambio(Md().modo === 'no' ? 'Panel de una pieza' : 'Panel en módulos'); ponerPartir(); });
+  enlazar('#mdN', () => { Md().n = clamp(Math.round(+$('#mdN').value || 2), 2, 20); cambio(); ponerPartir(); });
+  enlazar('#mdMedidas', () => { Md().medidas = $('#mdMedidas').value; cambio(); ponerPartir(); });
   enlazar('#paHolgura', () => { P.pared.holgura = clamp(+$('#paHolgura').value || 0, 0, 3); cambio(); });
   enlazar('#paVer', () => { P.pared.verPared = $('#paVer').checked; construir3D(); });
   enlazar('#cClaves3d', () => { P.vista.claves = $('#cClaves3d').checked; construirClaves3D(); });
@@ -347,6 +352,14 @@ function mostrarSecciones(forzarFigura) {
 }
 // campos de «Partir las lamas» (se enseñan los que hacen falta)
 function ponerPartir() {
+  { const Md = Object.assign({ modo: 'no', n: 2, medidas: '' }, P.pared.modulos || {}), hor = (P.relieve || {}).orient === 'h';
+    $('#mdTit').textContent = hor ? 'Dividir a lo alto (filas)' : 'Dividir a lo ancho (columnas)';
+    $('#mdMedTit').textContent = hor ? 'Altos (mm, desde abajo)' : 'Anchos (mm, desde la izquierda)';
+    $('#mdModo').value = Md.modo; $('#mdN').value = Md.n; if (document.activeElement !== $('#mdMedidas')) $('#mdMedidas').value = Md.medidas || '';
+    $('#filaMdN').classList.toggle('oculto', Md.modo !== 'iguales'); $('#filaMdMedidas').classList.toggle('oculto', Md.modo !== 'medidas');
+    const ms = (R && R.modulosPared) || [];
+    $('#mdInfo').textContent = Md.modo !== 'no' && ms.length > 1 ? `${ms.length} módulos: ${ms.map((m, j) => `M${j + 1} ${fmt(m.ancho)} mm (${m.n} lamas)`).join(' · ')}. Cada corte va al hueco entre dos lamas más cercano.` : '';
+    $('#mdInfo').classList.toggle('oculto', !$('#mdInfo').textContent); }
   const Pp = Object.assign({ modo: 'no', alturas: '', largoMax: 0, junta: 'tope', sombra: 8, patron: 'alineado', desfase: 300, rastreles: true }, P.pared.partir || {}), hor = (P.relieve || {}).orient === 'h';
     $('#ptModo').value = Pp.modo; $('#ptCampos').classList.toggle('oculto', Pp.modo === 'no');
     if (document.activeElement !== $('#ptAlturas')) $('#ptAlturas').value = Pp.alturas || '';

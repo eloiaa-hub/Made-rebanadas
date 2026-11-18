@@ -30,6 +30,16 @@ function dibujarHuecos(ctx, V) {
       const rc = hor ? [q.caja.y0, q.x - e / 2, q.caja.y1 - q.caja.y0, e] : [q.x - e / 2, q.caja.y0, e, q.caja.y1 - q.caja.y0];
       const [x0, y0] = V.aPantalla(rc[0], rc[1] + rc[3]); ctx.fillRect(x0, y0, Math.max(1, rc[2] * V.sc), rc[3] * V.sc);
     });
+    // módulos: raya discontinua entre uno y otro
+    if ((R.modulosPared || []).length > 1) {
+      let v0 = Infinity, v1 = -Infinity; [...R.costillas.filter(c => c.ok), ...(R.trozos || []).filter(t => t.ok)].forEach(c => { v0 = Math.min(v0, c.caja.y0); v1 = Math.max(v1, c.caja.y1); });
+      ctx.save(); ctx.strokeStyle = 'rgba(40,90,160,.85)'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]); ctx.fillStyle = 'rgba(40,90,160,.95)'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center';
+      R.modulosPared.forEach((m, j) => {
+        if (j < R.modulosPared.length - 1) { const [a, b] = hor ? [V.aPantalla(v0 - 40, m.x1), V.aPantalla(v1 + 40, m.x1)] : [V.aPantalla(m.x1, v0 - 40), V.aPantalla(m.x1, v1 + 40)]; ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke(); }
+        const [tx, ty] = hor ? V.aPantalla(v0 - 70, (m.x0 + m.x1) / 2) : V.aPantalla((m.x0 + m.x1) / 2, v0 - 70); ctx.fillText('M' + (j + 1) + ' · ' + fmt(m.ancho), tx, ty + 4);
+      });
+      ctx.restore();
+    }
     // muebles de los huecos (su frente)
     (R.modulos || []).forEach(m => {
       const [x0, x1, , , v0, v1] = m.caja3, rc = hor ? [v0, x0, v1 - v0, x1 - x0] : [x0, v0, x1 - x0, v1 - v0];

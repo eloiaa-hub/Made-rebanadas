@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Made-rebanadas — Por Eloi A.A.</title>
-<link rel="stylesheet" href="assets/css/estilo.css?v=202611182309">
+<link rel="stylesheet" href="assets/css/estilo.css?v=202611182348">
 </head>
 <body>
 <header class="barra">
@@ -246,6 +246,11 @@
           <label class="fila" id="filaPtDesfase" title="Cuánto se mueve la junta de una lama a la siguiente">Desfase entre juntas (mm) <input type="number" id="ptDesfase" min="0" step="10"></label>
           <label class="fila chk" id="filaPtRast" title="Con las juntas a la misma altura: un rastrel a cada lado de la junta, así cada banda es un módulo que se monta por separado"><input type="checkbox" id="ptRast"> Rastreles a los dos lados de la junta (módulos)</label>
         </div>
+        <p class="nota" style="margin-top:10px"><b id="mdTit">Dividir a lo ancho (columnas)</b>: el panel en varios módulos, uno al lado del otro. Las lamas no se cortan: se cortan los rastreles entre un módulo y otro.</p>
+        <label class="fila" title="En partes iguales, o con la medida de cada módulo">Dividir <select id="mdModo"><option value="no">No</option><option value="iguales">En partes iguales</option><option value="medidas">Con las medidas que diga</option></select></label>
+        <label class="fila" id="filaMdN">Número de módulos <input type="number" id="mdN" min="2" max="20" step="1"></label>
+        <label class="fila" id="filaMdMedidas" title="La medida de cada módulo, empezando por la izquierda (o por abajo), separadas por «;». El último se queda con lo que sobre"><span id="mdMedTit">Anchos (mm, desde la izquierda)</span> <input type="text" id="mdMedidas" placeholder="600; 900" style="width:46%"></label>
+        <p class="nota" id="mdInfo"></p>
       </div>
     </section>
 
@@ -423,15 +428,15 @@
 <input type="file" id="fLetra" class="oculto" accept=".ttf,.otf,.woff,.woff2">
 <div id="aviso" class="aviso"></div>
 
-<script src="assets/js/three-bundle.js?v=202611182309"></script>
-<script src="assets/texturas/texturas.js?v=202611182309"></script>
+<script src="assets/js/three-bundle.js?v=202611182348"></script>
+<script src="assets/texturas/texturas.js?v=202611182348"></script>
 <script src="assets/texturas/pbr/roble.js"></script>
 <script src="assets/texturas/pbr/nogal.js"></script>
 <script src="assets/texturas/pbr/fresno.js"></script>
 <script src="assets/texturas/pbr/haya.js"></script>
 <script src="assets/texturas/pbr/pino.js"></script>
-<script src="assets/ejemplos/ejemplos.js?v=202611182309"></script>
-<script src="assets/js/clipper.js?v=202611182309"></script>
-<script src="assets/js/app.js?v=202611182309"></script>
+<script src="assets/ejemplos/ejemplos.js?v=202611182348"></script>
+<script src="assets/js/clipper.js?v=202611182348"></script>
+<script src="assets/js/app.js?v=202611182348"></script>
 </body>
 </html>

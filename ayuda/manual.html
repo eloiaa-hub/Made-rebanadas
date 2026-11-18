@@ -315,6 +315,17 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <li>Los trozos se llaman <b>Lama 12a</b> (el de abajo), <b>12b</b>… en la lista, el plano, el despiece, el DXF y el Anidador. El plano explica en los pasos de montaje cómo colocarlos.</li>
   <li>Las comprobaciones dicen en cuántos trozos ha quedado cada lama, y avisan si algún trozo no llega a un rastrel (se quedaría suelto) o si sigue siendo más largo que el tablero.</li>
 </ul>
+<h3>Dividir a lo ancho (módulos en columnas)</h3>
+<p>Para paredes muy anchas, o para montar el panel por partes, en <b>Dividir a lo ancho (columnas)</b> el panel se reparte en varios <b>módulos</b>, uno al lado del otro. Las lamas no se cortan: se cortan los <b>rastreles</b> entre un módulo y el siguiente, así cada módulo se monta en el taller con sus trozos de rastrel y se cuelga por separado.</p>
+<ul>
+  <li><b>En partes iguales</b>: dices cuántos módulos.</li>
+  <li><b>Con las medidas que diga</b>: escribe el ancho de cada módulo, empezando por la izquierda, separados por «;» (por ejemplo <code>600; 900</code>); el último se queda con lo que sobre. Pueden ser todos distintos.</li>
+  <li>Cada corte va al <b>hueco entre dos lamas</b> más cercano, así que la medida real puede variar en media separación; el apartado dice el ancho real de cada módulo y sus lamas.</li>
+  <li>Con lamas horizontales es lo mismo, pero en <b>filas</b>: dividir a lo alto.</li>
+  <li>Se puede combinar con <b>Partir las lamas</b> (juntas a la misma altura y un rastrel a cada lado): el panel queda en una <b>cuadrícula de módulos</b>.</li>
+  <li>En el plano, la hoja 2 marca los módulos con una raya azul discontinua y su medida, y da el <b>largo de cada trozo de rastrel</b>; la lista de compra también los cuenta por largos. En la vista ▦ Huecos se ven las mismas rayas.</li>
+</ul>
+<figure><img src="img/modulos.png" alt="Módulos a lo ancho"><figcaption>Hoja 2 del plano de una pared de 1,8 × 2,8 m en 3 módulos a lo ancho y partida a media altura con un rastrel a cada lado de la junta: seis módulos, cada rastrel en 3 trozos.</figcaption></figure>
 
 <h2 id="relieve">13. Figuras, rótulos y estanterías de pared</h2>
 <p>Los paneles de pared tienen tres maneras más de sacar la forma, en <b>Forma → Origen de la forma</b>:</p>

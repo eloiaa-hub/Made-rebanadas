@@ -58,6 +58,17 @@ function fabDefecto(maq) {
   return maq ? { ancho: 600, alto: 400, borde: 5, sep: 4, girar: true, modo: 'tableros', numeros: true }
              : { ancho: 2440, alto: 1220, borde: 10, sep: 12, girar: true, modo: 'tableros', numeros: true };
 }
+// largos de los trozos de rastrel (cortados por huecos o por módulos), agrupados: «3 de 620 mm y 3 de 600 mm»
+function trozosRastreles(k) {
+  const L = []; R.rastreles.forEach(r => (r.tramos || []).forEach(([a, b]) => L.push(Math.round((b - a) * k))));
+  return L;
+}
+function textoRastreles(k, cm) {
+  const L = trozosRastreles(k); if (!L.length || (L.length === R.rastreles.length && L.every(v => Math.abs(v - L[0]) < 1))) return `${R.rastreles.length} de ${fmt(cm.rastrel)} mm`;
+  const g = new Map(); L.forEach(v => g.set(v, (g.get(v) || 0) + 1));
+  const t = [...g.entries()].sort((a, b) => b[0] - a[0]).map(([v, n]) => `${n} de ${fmt(v)} mm`);
+  return (t.length > 1 ? t.slice(0, -1).join(', ') + ' y ' + t[t.length - 1] : t[0]) + ` (${L.length} trozos)`;
+}
 function fabActual() {
   const k = enMaqueta() ? 'fabMaq' : 'fab';
   return UI[k] || (UI[k] = fabDefecto(enMaqueta()));
@@ -371,7 +382,7 @@ function listaCompra() {
   }
   if (P.tipo === 'pared') {
     const Pa = P.pared;
-    if (R.rastreles.length) L.push([`Rastrel (listón) de ${fmt(Pa.alto * k, 1)} × ${fmt(Pa.grueso * k, 1)} mm`, `${R.rastreles.length} de ${fmt(cm.rastrel)} mm`]);
+    if (R.rastreles.length) L.push([`Rastrel (listón) de ${fmt(Pa.alto * k, 1)} × ${fmt(Pa.grueso * k, 1)} mm`, textoRastreles(k, cm)]);
     else L.push(['Tablero trasero (o escuadras)', `${fmt(cm.rastrel || P.largo * k)} × ${fmt((G.alto || 0) * k)} mm`]);
     if (!maq) { L.push(['Tacos y tornillos para la pared', `${R.rastreles.length * Math.max(2, Math.ceil(cm.rastrel / 500))} (uno cada 50 cm de rastrel)`]); L.push(['Tornillos o cola para las lamas', `${R.n * Math.max(1, R.rastreles.length)} (uno en cada cruce con un rastrel)`]); }
     return L;

@@ -42,6 +42,32 @@ function prepararJuntas(lamas) {
   }
   JUNTAS = { V0, V1, bases, d, Lmax, patron: Pp.patron };
 }
+/* ---- dividir el panel a lo ancho (lamas verticales: columnas) o a lo alto (lamas horizontales: filas) ----
+   Las lamas no se cortan: se agrupan en módulos y los rastreles se cortan entre un módulo y el siguiente
+   (justo en el hueco entre dos lamas), así cada módulo se monta y se cuelga por separado. */
+const modulosP = () => (P.pared && P.pared.modulos) || { modo: 'no' };
+const modulosActivos = () => P.tipo === 'pared' && modulosP().modo && modulosP().modo !== 'no';
+function modulosPared(cs) {
+  cs = cs.filter(c => c.ok).sort((a, b) => a.x - b.x); const e = grosor();
+  if (!modulosActivos() || cs.length < 2) return [];
+  const X0 = cs[0].x - e / 2, X1 = cs[cs.length - 1].x + e / 2, W = X1 - X0, M = modulosP();
+  let cortes = [];
+  if (M.modo === 'iguales') { const n = clamp(Math.round(+M.n || 2), 1, cs.length); cortes = Array.from({ length: n - 1 }, (_, k) => X0 + W * (k + 1) / n); }
+  else { let acc = X0; String(M.medidas || '').split(/[;,\s]+/).map(t => +t).filter(v => isFinite(v) && v > 0).forEach(v => { acc += v; if (acc < X1 - e) cortes.push(acc); }); }
+  // cada corte, al hueco entre dos lamas más cercano
+  const medios = cs.slice(0, -1).map((c, k) => ({ k, m: (c.x + cs[k + 1].x) / 2 }));
+  const ks = [...new Set(cortes.map(t => medios.reduce((a, b) => Math.abs(b.m - t) < Math.abs(a.m - t) ? b : a).k))].sort((a, b) => a - b);
+  const out = []; let i0 = 0;
+  [...ks, cs.length - 1].forEach(k => { const a = cs[i0], b = cs[k]; out.push({ desde: a.i, hasta: b.i, x0: i0 ? (cs[i0 - 1].x + a.x) / 2 : X0, x1: k < cs.length - 1 ? (b.x + cs[k + 1].x) / 2 : X1, n: k - i0 + 1 }); i0 = k + 1; });
+  out.forEach(m => { m.ancho = m.x1 - m.x0; });
+  return out;
+}
+// corta los tramos de los rastreles entre módulos (deja 3 mm de corte de sierra)
+function cortarRastrelesModulos(res) {
+  const mods = res.modulosPared || []; if (mods.length < 2) return;
+  const cortes = mods.slice(0, -1).map(m => m.x1);
+  res.rastreles.forEach(r => { r.tramos = (r.tramos || []).flatMap(([a, b]) => { let ts = [[a, b]]; cortes.forEach(c => { ts = ts.flatMap(([p, q]) => c <= p || c >= q ? [[p, q]] : [[p, c - 1.5], [c + 1.5, q]]); }); return ts.filter(([p, q]) => q - p > 20); }); });
+}
 // alturas de las juntas de una lama (en su eje v); i: número de la lama
 function juntasLama(i) {
   if (!JUNTAS || !JUNTAS.bases.length) return [];
@@ -379,6 +405,17 @@ function tramosRastrel(v, alto, xA, xB) {
   return tramos;
 }
 
+// comprobaciones de los módulos a lo ancho (o a lo alto)
+function avisosModulos(res) {
+  const A = res.avisos, add = (tipo, txt, cost) => A.push({ tipo, txt, cost });
+  if (P.tipo === 'pared' && modulosActivos() && (res.modulosPared || []).length) {
+    const ms = res.modulosPared, hor = lamasH();
+    if (ms.length < 2) add('atencion', `Módulos: con ${hor ? 'esos altos' : 'esos anchos'} el panel queda en un solo módulo.`);
+    else add('info', `Panel en ${ms.length} módulos ${hor ? 'a lo alto' : 'a lo ancho'}: ${ms.map((m, k) => `M${k + 1} ${fmt(m.ancho)} mm (lamas ${m.desde + 1}–${m.hasta + 1})`).join(', ')}. Los rastreles se cortan entre módulos.`);
+    const finos = ms.filter(m => m.n < 2); if (finos.length) add('atencion', `Módulos: ${finos.map(m => 'M' + (ms.indexOf(m) + 1)).join(', ')} se queda${finos.length > 1 ? 'n' : ''} con una sola lama.`);
+    if (!res.rastreles.length) add('atencion', 'Módulos: sin rastreles no hay nada que una las lamas de cada módulo (pon rastreles o un tablero trasero por módulo).');
+  }
+}
 /* ---- comprobaciones ---- */
 function avisosHuecos(res) {
   if (!usaHuecos()) return;
