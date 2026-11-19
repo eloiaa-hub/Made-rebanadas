@@ -5,6 +5,7 @@ Muebles orgánicos hechos con rebanadas: costillas de tablero separadas, unidas 
 Abre con doble clic: Made_Rebanadas.html  (Chrome, Edge o Firefox; no necesita internet)
 Portada: index.html
 Manual: ayuda/manual.html y ayuda/manual.pdf
+Modelo 3D (botón 🧊 3D): STL, OBJ + MTL o SolidCraft (.sc o JSON plano)
 
 Copia siempre la carpeta completa:
   assets/js        programa (app.js) y Three.js empaquetado sin módulos

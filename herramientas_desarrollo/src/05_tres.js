@@ -126,10 +126,27 @@ function cilindroEntre(a, b, r, mat, lados = 18) {
   m.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), d.normalize()); m.castShadow = true;
   return m;
 }
+// quita los puntos repetidos y los que están en línea con sus vecinos: el triangulador de las tapas los
+// descarta y las paredes no, y quedarían aristas sin coser (la malla no cerraría en STL, OBJ o SolidCraft)
+function limpiarContorno(poly) {
+  // a menos de 1 µm: un punto repetido, o uno que se sale de la recta de sus vecinos (astillas que deja el recorte)
+  let q = poly.slice();
+  for (let cambio = true; cambio && q.length > 3;) {
+    cambio = false;
+    for (let i = 0; i < q.length && q.length > 3; i++) {
+      const a = q[(i - 1 + q.length) % q.length], b = q[i], c = q[(i + 1) % q.length];
+      const ab = Math.hypot(b[0] - a[0], b[1] - a[1]), L = Math.hypot(c[0] - a[0], c[1] - a[1]);
+      const cr = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+      if (ab < 1e-3 || (L > 1e-9 ? Math.abs(cr) / L < 1e-3 : true)) { q.splice(i, 1); i--; cambio = true; }
+    }
+  }
+  return q.length >= 3 ? q : poly;
+}
 function extruir(poly, huecos, e, interiores) {
+  poly = limpiarContorno(poly);
   const sh = new T.Shape(poly.map(p => new T.Vector2(p[0], p[1])));
   (huecos || []).forEach(h => { const pa = new T.Path(); pa.absarc(h.x, h.y, h.r, 0, PI2, true); sh.holes.push(pa); });
-  (interiores || []).forEach(hh => sh.holes.push(new T.Path(hh.map(p => new T.Vector2(p[0], p[1])))));
+  (interiores || []).forEach(hh => sh.holes.push(new T.Path(limpiarContorno(hh).map(p => new T.Vector2(p[0], p[1])))));
   const g = new T.ExtrudeGeometry(sh, { depth: e, bevelEnabled: false, curveSegments: 24 });
   g.translate(0, 0, -e / 2); return g;
 }

@@ -566,7 +566,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <li><b>Luz rasante</b>: una luz muy baja, casi paralela a la superficie, como la de una ventana a media tarde. Es la que hace que se lean los relieves de pared y los volúmenes de las figuras. La barra de al lado gira la dirección de la luz. Se recuerda en el proyecto.</li>
 </ul>
 <figure><img src="img/fig_busto_rasante.jpg" alt="Luz rasante en el busto" style="max-width:420px"><figcaption>El «Busto de rebanadas» con luz rasante.</figcaption></figure>
-<h3>Guardar el modelo 3D (STL u OBJ)</h3>
+<h3>Guardar el modelo 3D (STL, OBJ o SolidCraft)</h3>
 <div class="dos">
   <img src="img/guardar3d.png" alt="Guardar el modelo 3D">
   <div>
@@ -574,12 +574,15 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
     <ul>
       <li><b>STL</b>: una sola malla con todas las piezas. Es el formato de la impresión 3D.</li>
       <li><b>OBJ + MTL</b>: cada pieza es un objeto aparte con su nombre (Lama 1, Costilla 3, Larguero A, Rastrel 2…) y el color de su material. Se guardan dos archivos: el <b>.obj</b> y el <b>.mtl</b> (los colores); guárdalos juntos.</li>
+      <li><b>SolidCraft (.sc)</b>: el formato propio de <a href="https://solidcraft.io/">SolidCraft</a>. Se abre directamente con <i>Abrir</i> y cada pieza es un <b>cuerpo aparte</b> con su nombre y su color, dentro de una importación de malla. Es el recomendado para SolidCraft: más pequeño y más rápido de abrir.</li>
+      <li><b>SolidCraft (JSON plano)</b>: lo mismo, pero en un único archivo de texto <b>.json</b> que SolidCraft también abre. Útil para mirarlo o para guardarlo en git; ocupa algo más.</li>
       <li><b>Eje vertical</b>: <b>Z arriba</b> para CAD e impresión 3D; <b>Y arriba</b> para Blender o three.js.</li>
       <li><b>Escala 1:</b> 1 es tamaño real. Para imprimir una maqueta, 10 o 20 (si la maqueta está activa, propone su escala). Abajo se ven las medidas que tendrá el modelo.</li>
       <li><b>Incluir varillas, tubos y rastreles</b>: quítalo si solo quieres las piezas de tablero.</li>
     </ul>
   </div>
 </div>
+<div class="caja">Todas las piezas salen como <b>sólidos cerrados</b> (sin agujeros ni caras sueltas), también las lamas partidas en trozos, los módulos y las lamas con texto hundido o en relieve: Meshmixer, SolidCraft o el programa de la impresora no tienen que repararlas.</div>
 <div class="caja taller">Para imprimir en 3D a escala, comprueba que las lamas o costillas no queden demasiado finas: a 1:10 un tablero de 12 mm se queda en 1,2 mm.</div>
 
 <h2 id="fabricar">18. Paso 5 · Fabricar: tableros, DXF y SVG</h2>
