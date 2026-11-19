@@ -75,6 +75,8 @@ window.MADE_EJEMPLOS = [
     params: {}, costillas: { grosor: 18, material: 'abedul' } },
   { nombre: 'Banco de lamas de pino', plantilla: 'banco_lamas', desc: 'Piezas planas: 1,2 m, nueve lamas de canto encajadas en los laterales y un travesaño pasante.',
     params: { largo: 1200, lamas: 9, margen: 110 }, costillas: { grosor: 18, material: 'pino_ply' } },
+  { nombre: 'Silla de piezas solapadas', plantilla: 'silla_solapada', desc: 'Piezas planas: laterales de dos capas (pata trasera y lateral del asiento) unidos con tacos, travesaños a media madera y pasantes.',
+    params: {}, costillas: { grosor: 18, material: 'abedul' } },
   { nombre: 'Silla de tableros de roble', plantilla: 'silla_plana', desc: 'Piezas planas: laterales con espigas por el asiento, respaldo y travesaños a media madera y pasantes.',
     params: {}, costillas: { grosor: 18, material: 'roble' } },
 ];

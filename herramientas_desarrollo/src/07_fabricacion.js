@@ -51,7 +51,7 @@ function geoFab(c) {
   return {
     c, poly, interiores, caja: cajaDe(poly), r: radioFab(), area: Math.abs(c.area) * k * k, huesosMal, nHuesos, nEsq: esq.length,
     // agujeros [x, y, radio]: los de las varillas y los propios de la pieza (el tubo en los discos)
-    agujeros: c.agujeros.map(j => [P.varillas.lista[j][0] * k, P.varillas.lista[j][1] * k, radioFab()]).concat((c.huecos || []).map(h => [h.x * k, h.y * k, h.r * k])),
+    agujeros: c.agujeros.map(j => [P.varillas.lista[j][0] * k, P.varillas.lista[j][1] * k, radioFab()]).concat((c.huecos || []).map(h => [h.x * k, h.y * k, h.r * k])).concat((c.taladros || []).map(t => [t[0] * k, t[1] * k, t[2] * k])),
     etiqueta: puntoEtiqueta(c).map(v => v * k),
   };
 }
@@ -369,9 +369,13 @@ function listaCompra() {
     L.push(['Superficie de las piezas', `${fmt(cm.area / 1e6, 2)} m² en total`]);
   } else L.push([tablero, `${cm.nTableros} tablero${cm.nTableros === 1 ? '' : 's'} de ${fmt(cm.tablero[0])} × ${fmt(cm.tablero[1])} mm (${maq ? fmt(cm.area / 100, 0) + ' cm²' : fmt(cm.area / 1e6, 2) + ' m²'} de piezas)`]);
   if (esPlano()) {
-    L.push(['Piezas', `${R.costillas.filter(c => c.ok).length}, con ${R.uniones.filter(u => u.tipo === 'media').length} uniones a media madera y ${R.uniones.filter(u => u.tipo === 'caja').length} espigas en caja pasante`]);
+    const nSo = R.uniones.filter(u => u.tipo === 'solape').length;
+    L.push(['Piezas', `${R.costillas.filter(c => c.ok).length}, con ${R.uniones.filter(u => u.tipo === 'media').length} uniones a media madera, ${R.uniones.filter(u => u.tipo === 'caja').length} espigas en caja pasante` + (nSo ? ` y ${nSo} solapes` : '')]);
     L.push(['Ranuras y cajas', `${fmt(grosorFab() + holguraRanuraFab(), 2)} mm de ancho`]);
-    L.push(['Herrajes', 'ninguno (cola en las uniones, si se quiere fijo)']);
+    const nF = R.uniones.reduce((s, u) => s + (u.puntos || []).length, 0), So = solapeP(), lt = largoTaco(grosorFab());
+    if (nF && So.tipo === 'tornillos') L.push([`Tornillos para madera Ø ${fmt(So.diam, 1)} mm, de unos ${fmt(Math.round(grosorFab() * 1.7))} mm (cabeza avellanada)`, String(nF)]);
+    else if (nF) { L.push([`Tacos de madera Ø ${fmt(So.diam, 1)} × ${fmt(lt.largo)} mm (taladros ciegos de ${fmt(lt.prof)} mm)`, String(nF)]); L.push(['Cola blanca', 'para los tacos y los solapes']); }
+    L.push(['Herrajes', nF && So.tipo === 'tornillos' ? 'solo los tornillos de los solapes' : 'ninguno (cola en las uniones, si se quiere fijo)']);
     return L;
   }
   if (P.tipo === 'reticula') {

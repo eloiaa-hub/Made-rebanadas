@@ -249,7 +249,8 @@ function construir3DPlano() {
   const e = grosor(), mats = materialesTablero(), bb = R.bbox || [[0, 1], [0, 1], [0, 1]];
   R.costillas.forEach(c => {
     if (!c.ok) { G.costillas.push(null); return; }
-    const m = new T.Mesh(extruir(polyVista(c.poly), [], e, (c.int || []).map(polyVista)), mats); m.castShadow = m.receiveShadow = true;
+    const hs = (c.taladros || []).filter(t => t[3] === 'pasante').map(t => ({ x: t[0], y: t[1], r: t[2] }));   // los tacos van escondidos; los tornillos se ven
+    const m = new T.Mesh(extruir(polyVista(c.poly), hs, e, (c.int || []).map(polyVista)), mats); m.castShadow = m.receiveShadow = true;
     m.userData = { i: c.i, x: c.x, plano: c.plano };
     G.modelo.add(m); G.costillas.push(m);
   });

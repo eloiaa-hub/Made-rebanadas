@@ -110,6 +110,9 @@ function iniciarPanel() {
   $('#bVarQuitar').onclick = () => { if (!V().lista.length) return; V().lista = []; UI.varilla = -1; cambio('Varillas quitadas'); };
   // piezas planas
   enlazar('#plHolgura', () => { planoP().holgura = clamp(+$('#plHolgura').value || 0, 0, 3); cambio('Holgura de las uniones ' + fmt(planoP().holgura, 2) + ' mm'); });
+  enlazar('#plSolTipo', () => { solapeP().tipo = $('#plSolTipo').value; if (solapeP().tipo === 'tornillos' && solapeP().diam > 6) { solapeP().diam = 4; $('#plSolDiam').value = 4; } else if (solapeP().tipo === 'tacos' && solapeP().diam < 6) { solapeP().diam = 8; $('#plSolDiam').value = 8; } cambio('Solapes con ' + solapeP().tipo); });
+  enlazar('#plSolDiam', () => { solapeP().diam = clamp(+$('#plSolDiam').value || 8, 2, 30); cambio('Ø ' + fmt(solapeP().diam, 1) + ' mm'); });
+  enlazar('#plSolN', () => { solapeP().n = clamp(Math.round(+$('#plSolN').value || 0), 0, 20); cambio(solapeP().n ? solapeP().n + ' fijaciones por solape' : 'Fijaciones automáticas'); });
   iniciarPiezas();
   // tipo de mueble y retícula
   enlazar('#sTipo', () => {
@@ -400,7 +403,7 @@ function ponerControles() {
   const Pl = P.planta; $('#plForma').value = Pl.forma; $('#plRadio').value = Pl.radio; $('#plSentido').value = String(Pl.sentido === -1 ? -1 : 1); $('#plAmp').value = Pl.amplitud; $('#plOndas').value = Pl.ondas;
   const Ra = P.radial; $('#raNum').value = P.costillas.numero; $('#raTubo').value = Ra.tubo; $('#raHolTubo').value = Ra.holguraTubo; $('#raDiscos').value = Ra.discos; $('#raRDisco').value = Ra.rDisco; $('#raHolgura').value = Ra.holgura;
   ponerPartir();
-  $('#plHolgura').value = planoP().holgura; $('#pzRejilla').value = $('#kRejilla').value;
+  $('#plHolgura').value = planoP().holgura; $('#plSolTipo').value = solapeP().tipo; $('#plSolDiam').value = solapeP().diam; $('#plSolN').value = solapeP().n; $('#pzRejilla').value = $('#kRejilla').value;
   const Pa = P.pared; $('#paNum').value = Pa.rastreles; $('#paAlto').value = Pa.alto; $('#paGrueso').value = Pa.grueso; $('#paMargen').value = Pa.margen; $('#paHolgura').value = Pa.holgura; $('#paVer').checked = Pa.verPared;
   $('#cClaves3d').checked = P.vista.claves !== false;
   const Fg = P.figura; $('#fgAlto').value = Fg.alto; $('#fgEje').value = Fg.eje; $('#fgGiro').value = String(Fg.giro || 0); $('#fgMin').value = Fg.minArea; $('#fgUnir').checked = Fg.unir !== false;
@@ -449,7 +452,8 @@ function refrescarClaves() {
 function refrescarListas() {
   // resumen del reparto
   if (esPlano()) { const nM = R.uniones.filter(u => u.tipo === 'media').length, nC = R.uniones.filter(u => u.tipo === 'caja').length;
-    $('#plResumen').innerHTML = `<b>${R.n}</b> piezas · <b>${nM}</b> a media madera · <b>${nC}</b> en caja pasante · ranuras y cajas de <b>${fmt(grosor() + planoP().holgura, 2)}</b> mm`; }
+    const nS = R.uniones.filter(u => u.tipo === 'solape').length, nF = R.uniones.reduce((s, u) => s + (u.puntos || []).length, 0);
+    $('#plResumen').innerHTML = `<b>${R.n}</b> piezas · <b>${nM}</b> a media madera · <b>${nC}</b> en caja pasante` + (nS ? ` · <b>${nS}</b> solapes con <b>${nF}</b> ${solapeP().tipo}` : '') + ` · ranuras y cajas de <b>${fmt(grosor() + planoP().holgura, 2)}</b> mm`; }
   $('#resCost').innerHTML = P.tipo === 'radial' ? `<b>${R.n}</b> costillas cada <b>${fmt(R.sep, 1)}°</b> · junto al tubo quedan <b>${fmt(Math.max(0, R.hueco), 1)}</b> mm entre ellas`
     : `<b>${R.n}</b> ${P.tipo === 'pared' ? 'lamas' : 'costillas'} · separación <b>${fmt(R.sep, 1)}</b> mm · hueco <b>${fmt(Math.max(0, R.hueco), 1)}</b> mm`;
   // costillas y largueros

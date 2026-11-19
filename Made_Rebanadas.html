@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Made-rebanadas — Por Eloi A.A.</title>
-<link rel="stylesheet" href="assets/css/estilo.css?v=202611192340">
+<link rel="stylesheet" href="assets/css/estilo.css?v=202611192351">
 </head>
 <body>
 <header class="barra">
@@ -81,6 +81,10 @@
       <div class="sec-cuerpo">
         <p class="nota">Las uniones salen solas donde dos piezas se cruzan: <b>a media madera</b> (una ranura en cada pieza, hasta la mitad del cruce), o con una <b>caja pasante</b> cuando una pieza (una espiga, un travesaño) queda entera dentro de la otra.</p>
         <label class="fila" title="Lo que las ranuras y las cajas son más anchas que el tablero, para que entren a mano">Holgura de las uniones (mm) <input type="number" id="plHolgura" min="0" max="3" step="0.05" value="0.3"></label>
+        <p class="nota">Dos piezas paralelas pegadas cara con cara (a un grosor de distancia) que se pisan se unen por <b>solape</b>:</p>
+        <label class="fila">Solapes con <select id="plSolTipo"><option value="tacos">Tacos de madera (encolados)</option><option value="tornillos">Tornillos</option></select></label>
+        <label class="fila" title="Taco: Ø del taco (8 es el normal). Tornillo: Ø del agujero pasante">Ø del taco o tornillo (mm) <input type="number" id="plSolDiam" min="2" max="30" step="0.5" value="8"></label>
+        <label class="fila" title="Cuántos en cada solape; 0 = según su tamaño (al menos 2)">Fijaciones por solape (0 = auto) <input type="number" id="plSolN" min="0" max="20" step="1" value="0"></label>
         <div class="resumenCost" id="plResumen"></div>
       </div>
     </section>
@@ -461,15 +465,15 @@
 <input type="file" id="fLetra" class="oculto" accept=".ttf,.otf,.woff,.woff2">
 <div id="aviso" class="aviso"></div>
 
-<script src="assets/js/three-bundle.js?v=202611192340"></script>
-<script src="assets/texturas/texturas.js?v=202611192340"></script>
+<script src="assets/js/three-bundle.js?v=202611192351"></script>
+<script src="assets/texturas/texturas.js?v=202611192351"></script>
 <script src="assets/texturas/pbr/roble.js"></script>
 <script src="assets/texturas/pbr/nogal.js"></script>
 <script src="assets/texturas/pbr/fresno.js"></script>
 <script src="assets/texturas/pbr/haya.js"></script>
 <script src="assets/texturas/pbr/pino.js"></script>
-<script src="assets/ejemplos/ejemplos.js?v=202611192340"></script>
-<script src="assets/js/clipper.js?v=202611192340"></script>
-<script src="assets/js/app.js?v=202611192340"></script>
+<script src="assets/ejemplos/ejemplos.js?v=202611192351"></script>
+<script src="assets/js/clipper.js?v=202611192351"></script>
+<script src="assets/js/app.js?v=202611192351"></script>
 </body>
 </html>

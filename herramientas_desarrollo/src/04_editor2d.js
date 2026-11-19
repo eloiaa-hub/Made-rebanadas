@@ -331,6 +331,16 @@ function dibujarPerfilPlano(ctx, V) {
     ctx.fillText(otra.etq + (u.tipo === 'caja' ? (u.en === c.i ? ' (caja)' : ' (espiga)') : ''), (x0 + x1) / 2, Math.min(y0, y1) - 4);
   });
   ctx.textAlign = 'left';
+  // piezas paralelas pegadas cara con cara: la zona común y los tacos o tornillos
+  (c.uniones || []).filter(u => u.tipo === 'solape').forEach(u => {
+    const otra = R.costillas[u.a === c.i ? u.b : u.a];
+    ctx.fillStyle = 'rgba(95,107,120,.22)'; ctx.strokeStyle = '#5f6b78'; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+    u.zonas.forEach(z => { V.camino(ctx, z.poly); ctx.fill(); ctx.stroke(); });
+    ctx.setLineDash([]);
+    const b = cajaDe(u.zonas[0].poly), [lx, ly] = V.aPantalla(b.x0 + b.w / 2, b.y1);
+    ctx.fillStyle = '#5f6b78'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center'; ctx.fillText(`${otra.etq} (solape)`, lx, ly - 4); ctx.textAlign = 'left';
+  });
+  (c.taladros || []).forEach(t => { const [x, y] = V.aPantalla(t[0], t[1]); ctx.strokeStyle = '#5f6b78'; ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(x, y, Math.max(3, t[2] * V.sc), 0, PI2); ctx.fill(); ctx.stroke(); });
   // la pieza como se corta (con ranuras y cajas)
   if (c.ok) {
     ctx.fillStyle = conAlfa(acento, .12); ctx.beginPath();
@@ -352,7 +362,7 @@ function dibujarPerfilPlano(ctx, V) {
   V.cota(ctx, [b.x1, b.y0], [b.x1, b.y1], 26, fmt(b.h) + ' mm', true);
   const pl = PLANOS[c.plano];
   ctx.fillStyle = cssVar('--suave'); ctx.font = '11.5px system-ui';
-  ctx.fillText(`${c.nombre} (${c.etq}) · ${pl.nombre.toLowerCase()}, en ${pl.normal} = ${fmt(c.x)} mm · horizontal: ${pl.ejes[0]} · vertical: ${pl.ejes[1]}` + (k.pieza && k.pieza !== planoP().piezas[UI.costilla] ? ` · igual que «${k.pieza.nombre}»` : ''), 8, 62);
+  ctx.fillText(`${c.nombre} (${c.etq}) · ${pl.nombre.toLowerCase()}, en ${pl.normal} = ${fmt(c.x)} mm · horizontal: ${pl.ejes[0]} · vertical: ${pl.ejes[1]}` + (k.pieza && k.pieza !== planoP().piezas[UI.costilla] ? ` · igual que «${k.pieza.nombre}»` : ''), 8, 72);
 }
 // con relieve (texto o modelo) no hay perfiles clave: se ven las lamas y la seleccionada
 function dibujarPerfilRelieve(ctx, V) {
@@ -391,6 +401,7 @@ function dibujarCostilla(ctx, V) {
   // los otros trozos de la misma lama o costilla, en claro
   const pad = c.padre || c; (pad.partes || []).forEach(q => { if (q === c || !q.ok) return; ctx.save(); ctx.globalAlpha = .35; ctx.setLineDash([4, 3]); V.camino(ctx, q.poly); ctx.stroke(); ctx.restore(); });
   const r = radioAgujero();
+  (c.taladros || []).forEach(t => { const [x, y] = V.aPantalla(t[0], t[1]); ctx.fillStyle = cssVar('--vista'); ctx.beginPath(); ctx.arc(x, y, Math.max(2, t[2] * V.sc), 0, PI2); ctx.fill(); ctx.stroke(); });
   c.agujeros.forEach(k => {
     const [x, y] = V.aPantalla(P.varillas.lista[k][0], P.varillas.lista[k][1]);
     ctx.fillStyle = cssVar('--vista'); ctx.beginPath(); ctx.arc(x, y, Math.max(2, r * V.sc), 0, PI2); ctx.fill(); ctx.stroke();

@@ -90,6 +90,7 @@ function validarProyecto(o) {
   p.huecos = Array.isArray(o.huecos) ? o.huecos.map(h => { const b = huecoNuevo(h.forma || 'rect'); return Object.assign(b, h, { mueble: Object.assign(b.mueble, h.mueble || {}) }); }) : [];
   if (!['reticula', 'radial', 'pared', 'plano'].includes(p.tipo)) p.tipo = 'costillas';
   p.plano = Object.assign(proyectoBase().plano, o.plano || {});
+  p.plano.solape = Object.assign(proyectoBase().plano.solape, (o.plano || {}).solape || {});
   p.plano.piezas = (Array.isArray(p.plano.piezas) ? p.plano.piezas : []).filter(z => z && (z.igualA != null || (Array.isArray(z.pts) && z.pts.length >= 3)))
     .map(z => Object.assign({ nombre: 'Pieza', plano: 'frente', c: 0 }, z, { plano: PLANOS[z.plano] ? z.plano : 'frente', c: isFinite(+z.c) ? +z.c : 0 }));
   if (!PLANTILLAS[p.plantilla]) p.plantilla = 'libre';

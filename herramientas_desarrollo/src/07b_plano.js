@@ -148,6 +148,7 @@ function planoPDF() {
     ['Material', maq ? `Maqueta de ${fmt(P.maqueta.grosor, 1)} mm` : MATERIALES[P.costillas.material].nombre],
     ['Uniones a media madera', String(R.uniones.filter(u => u.tipo === 'media').length)],
     ['Espigas en caja pasante', String(R.uniones.filter(u => u.tipo === 'caja').length)],
+    ...(R.uniones.some(u => u.tipo === 'solape') ? [['Piezas solapadas', `${R.uniones.filter(u => u.tipo === 'solape').length}, con ${R.uniones.reduce((s, u) => s + (u.puntos || []).length, 0)} ${solapeP().tipo} de Ø ${fmt(solapeP().diam, 1)} mm`]] : []),
     ['Ancho de ranuras y cajas', `${fmt(grosorFab() + holguraRanuraFab(), 2)} mm`],
   ]) : tabla(x2, M + 18, a2, [
     { titulo: 'Datos' },
@@ -547,6 +548,7 @@ function hojaPlano(D, cabecera, tabla, o) {
   const nom = i => R.costillas[i].etq + ' ' + R.costillas[i].nombre;
   const fU = [{ titulo: 'Uniones' }];
   R.uniones.forEach(u => {
+    if (u.tipo === 'solape') { const So = solapeP(), lt = largoTaco(grosorFab()); fU.push([`${nom(u.a)} + ${nom(u.b)}`, So.tipo === 'tornillos' ? `solapadas: ${u.puntos.length} tornillos Ø ${fmt(So.diam, 1)} desde la ${R.costillas[u.fuera].etq}` : `solapadas: ${u.puntos.length} tacos Ø ${fmt(So.diam, 1)} × ${fmt(lt.largo)} mm`]); return; }
     if (u.tipo === 'caja') fU.push([`${nom(u.pasa)} en ${nom(u.en)}`, `espiga en caja de ${fmt((u.hi - u.lo + holguraRanuraFab()) * k, 1)} × ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm`]);
     else { const arriba = u.aArriba ? u.a : u.b, abajo = u.aArriba ? u.b : u.a; fU.push([`${nom(arriba)} × ${nom(abajo)}`, `media madera de ${fmt((u.hi - u.lo) / 2 * k, 1)} mm (la ${R.costillas[arriba].etq} desde arriba)`]); }
   });
@@ -563,6 +565,11 @@ function pasosPlano(k, maq) {
     'Lija los cantos (sin redondear los de las ranuras y las espigas) y marca cada pieza con su número en una cara que no se vea.',
   ];
   const horiz = i => R.costillas[i].plano === 'horizontal';
+  // 0) piezas solapadas: se unen antes que nada (cada lateral de dos capas es un subconjunto)
+  const So = solapeP(), lt = largoTaco(grosorFab());
+  R.uniones.filter(u => u.tipo === 'solape' && u.puntos.length).forEach(u => pasos.push(So.tipo === 'tornillos'
+    ? `Une ${nom(u.a)} y ${nom(u.b)} cara con cara, en su sitio (las zonas grises de la hoja 3): ${u.puntos.length} tornillos de Ø ${fmt(So.diam, 1)} desde ${nom(u.fuera)}, por sus agujeros avellanados; la otra lleva un agujero guía. Un poco de cola entre las dos caras lo deja más firme.`
+    : `Une ${nom(u.a)} y ${nom(u.b)} cara con cara: taladra los ${u.puntos.length} agujeros de Ø ${fmt(So.diam, 1)} a ${fmt(lt.prof)} mm de profundidad en las dos piezas (marcados en el DXF, capa de taladros; usa un tope en la broca), encola, mete los tacos de ${fmt(lt.largo)} mm y aprieta con sargentos hasta que seque.`));
   // 1) travesaños y espigas que pasan por cajas de piezas no horizontales
   const pasan = {}; R.uniones.filter(u => u.tipo === 'caja' && !horiz(u.en)).forEach(u => { (pasan[u.pasa] = pasan[u.pasa] || []).push(u.en); });
   Object.entries(pasan).forEach(([p, en]) => pasos.push(`Pasa ${nom(+p)} por ${en.length > 1 ? 'las cajas de' : 'la caja de'} ${lista2([...new Set(en)].map(nom))}.`));

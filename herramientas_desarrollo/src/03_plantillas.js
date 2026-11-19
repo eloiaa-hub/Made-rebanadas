@@ -439,6 +439,43 @@ PLANTILLAS.silla_plana = {
     ] });
   },
 };
+PLANTILLAS.silla_solapada = {
+  nombre: 'Silla de piezas solapadas', grupo: 'plano',
+  desc: 'Cada lateral es de dos capas: la pata trasera (que sube hasta el respaldo) y el lateral del asiento con la pata delantera, solapadas y unidas con tacos.',
+  params: [
+    { id: 'ancho', nombre: 'Ancho', min: 320, max: 700, paso: 5, valor: 440 },
+    { id: 'fondo', nombre: 'Fondo', min: 300, max: 650, paso: 5, valor: 430 },
+    { id: 'asiento', nombre: 'Altura del asiento', min: 250, max: 600, paso: 5, valor: 450 },
+    { id: 'alto', nombre: 'Altura del respaldo', min: 550, max: 1200, paso: 5, valor: 820 },
+    { id: 'respaldo', nombre: 'Alto del travesaño de arriba', min: 40, max: 250, paso: 5, valor: 70 },
+    { id: 'pata', nombre: 'Ancho de las patas', min: 40, max: 120, paso: 1, valor: 46 },
+    { id: 'faldon', nombre: 'Alto del lateral del asiento', min: 50, max: 200, paso: 1, valor: 85 },
+    { id: 'espiga', nombre: 'Ancho de las espigas', min: 20, max: 100, paso: 1, valor: 40 },
+  ],
+  generar(p, e) {
+    const W = p.ancho, hs = p.asiento, pa = Math.max(p.pata, 2 * e + 8), te = p.espiga, H = Math.max(p.alto, hs + p.respaldo + 120);
+    const xo = W / 2 - e / 2, xi = W / 2 - 1.5 * e, zb = -p.fondo / 2 + pa / 2, zf = p.fondo / 2 - pa / 2, yr = hs - e - p.faldon;
+    const t2 = zf - pa / 2 - te / 2 - 20, t1 = zb + pa / 2 + te / 2 + 30;
+    // pata trasera (capa de fuera): sube recta hasta arriba, un poco más estrecha en el pie
+    const pata = ptsPlano([[zb - pa / 2 + 4, 0], [zb + pa / 2 - 4, 0], [zb + pa / 2, yr - 40], [zb + pa / 2, H - 14], [zb + pa / 2 - 4, H - 3, false], [zb + pa / 2 - 14, H], [zb - pa / 2, H], [zb - pa / 2, yr - 40]]);
+    // lateral del asiento (capa de dentro): llega por detrás hasta cubrir la pata trasera y baja delante como pata
+    const lat = ptsPlano([[zb - pa / 2, yr], [(zb + zf) / 2, yr + p.faldon * 0.3, false], [zf - pa / 2, yr], [zf - pa / 2 + 4, 0], [zf + pa / 2 - 4, 0], [zf + pa / 2, hs - e],
+      [t2 + te / 2, hs - e], [t2 + te / 2, hs], [t2 - te / 2, hs], [t2 - te / 2, hs - e], [t1 + te / 2, hs - e], [t1 + te / 2, hs], [t1 - te / 2, hs], [t1 - te / 2, hs - e], [zb - pa / 2, hs - e]]);
+    const yM = Math.min(hs + 150, H - p.respaldo - 90);
+    // asiento: llega a los lados por encima de los laterales y por detrás se estrecha entre las patas traseras
+    const r0 = rectPlano(-(W / 2 - 1), zb + pa / 2 + 1, W / 2 - 1, p.fondo / 2 + 15, 30, [0, 0, 1, 1]), aa = W / 2 - e - 1, y0 = zb + pa / 2 + 1;
+    const ap = [r0.pts[0], [-aa, y0], [-aa, zb - pa / 2], [aa, zb - pa / 2], [aa, y0], ...r0.pts.slice(1)];
+    const asiento = { pts: redondeaPts(ap), esq: ap.map(() => true) };
+    return Object.assign({}, CLAVE_PLANO, { piezas: [
+      piezaPlana('Pata trasera izquierda', 'lado', -xo, pata), igualQue('Pata trasera derecha', 'lado', xo, 0),
+      piezaPlana('Lateral del asiento izquierdo', 'lado', -xi, lat), igualQue('Lateral del asiento derecho', 'lado', xi, 2),
+      piezaPlana('Asiento', 'horizontal', hs - e / 2, asiento),
+      piezaPlana('Travesaño de arriba', 'frente', zb, rectPlano(-W / 2 - 15, H - p.respaldo, W / 2 + 15, H, 14, [0, 0, 1, 1])),
+      piezaPlana('Travesaño del respaldo', 'frente', zb, rectPlano(-W / 2 - 10, yM, W / 2 + 10, yM + 50, 4)),
+      piezaPlana('Travesaño delantero', 'frente', zf, rectPlano(-(xi + e / 2 + 12), yr + 10, xi + e / 2 + 12, hs - e, 0)),
+    ] });
+  },
+};
 PLANTILLAS.plano_vacio = {
   nombre: 'Vacío: piezas planas', grupo: 'plano',
   desc: 'Un tablero de frente y otro de lado que se cruzan, para construir el mueble pieza a pieza o traer los contornos de un DXF o SVG.',

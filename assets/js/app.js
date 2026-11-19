@@ -108,7 +108,7 @@ function proyectoBase() {
       capa: { activa: false, texto: 'Hola', letra: 'Arial Black', negrita: true, tamLetra: 160, relieve: 30, x: 50, y: 15, modo: 'sale' } },
     huecos: [],
     figura: { activa: false, malla: null, alto: 800, eje: 'x', giro: 0, minArea: 2, unir: true },
-    plano: { holgura: 0.3, piezas: [] },
+    plano: { holgura: 0.3, piezas: [], solape: { tipo: 'tacos', diam: 8, n: 0 } },
   };
 }
 
@@ -2459,14 +2459,17 @@ function dialogoPerfilDXF() {
    Las uniones salen solas donde dos piezas de distinta dirección se cruzan:
    - media madera: cada pieza con una ranura hasta la mitad del cruce (una desde arriba y otra desde abajo)
    - caja pasante: si una pieza queda entera dentro de la otra a lo largo del cruce (una espiga, un
-     travesaño), la otra lleva un agujero rectangular por el que pasa. */
+     travesaño), la otra lleva un agujero rectangular por el que pasa.
+   - solape: dos piezas paralelas que se tocan cara con cara (a un grosor de distancia) y se pisan en su
+     plano; se unen con tacos de madera (taladros ciegos en las dos) o con tornillos. */
 const PLANOS = {
   lado:       { n: 0, a: 2, b: 1, nombre: 'De lado', ejes: ['fondo (z)', 'alto (y)'], normal: 'x' },
   frente:     { n: 2, a: 0, b: 1, nombre: 'De frente', ejes: ['ancho (x)', 'alto (y)'], normal: 'z' },
   horizontal: { n: 1, a: 0, b: 2, nombre: 'Horizontal', ejes: ['ancho (x)', 'fondo (z)'], normal: 'y' },
 };
 const esPlano = () => P && P.tipo === 'plano';
-const planoP = () => P.plano || (P.plano = { holgura: 0.3, piezas: [] });
+const planoP = () => P.plano || (P.plano = { holgura: 0.3, piezas: [], solape: { tipo: 'tacos', diam: 8, n: 0 } });
+const solapeP = () => { const Pp = planoP(); return Pp.solape || (Pp.solape = { tipo: 'tacos', diam: 8, n: 0 }); };
 // la pieza de la que se toma el contorno (las simétricas usan el de su pareja)
 function piezaFuente(k) {
   const ps = planoP().piezas, p = ps[k];
@@ -2500,14 +2503,15 @@ function calcularPlano() {
     if (poly.length >= 3) { poly = limpiarContorno(poly); if (areaFirmada(poly) < 0) poly.reverse(); }
     const ok = poly.length >= 3 && Math.abs(areaFirmada(poly)) > 25;
     res.costillas.push({ i: k, x: +pz.c || 0, plano: pl, poly, base: poly, ok, caja: ok ? cajaDe(poly) : { x0: 0, y0: 0, x1: 0, y1: 0, w: 0, h: 0 }, area: ok ? areaFirmada(poly) : 0,
-      agujeros: [], nVar: 0, ranuras: [], cajas: [], uniones: [], int: [], etq: String(k + 1), nombre: pz.nombre || 'Pieza ' + (k + 1) });
+      agujeros: [], nVar: 0, ranuras: [], cajas: [], uniones: [], int: [], taladros: [], etq: String(k + 1), nombre: pz.nombre || 'Pieza ' + (k + 1) });
   });
   res.n = res.costillas.length;
-  const ps = res.costillas, tol = 0.05;
+  const ps = res.costillas, tol = 0.05, solapes = [];
   for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) {
     const A = ps[i], B = ps[j]; if (!A.ok || !B.ok) continue;
     const pa = PLANOS[A.plano], pb = PLANOS[B.plano];
-    if (pa.n === pb.n) {   // paralelas: ¿ocupan el mismo sitio?
+    if (pa.n === pb.n) {   // paralelas: ¿se tocan cara con cara (solape) u ocupan el mismo sitio?
+      if (Math.abs(Math.abs(A.x - B.x) - e) < 0.05 && A.caja.x0 < B.caja.x1 && B.caja.x0 < A.caja.x1 && A.caja.y0 < B.caja.y1 && B.caja.y0 < A.caja.y1) { solapes.push([i, j]); continue; }
       if (Math.abs(A.x - B.x) < e - 0.01 && A.caja.x0 < B.caja.x1 && B.caja.x0 < A.caja.x1 && A.caja.y0 < B.caja.y1 && B.caja.y0 < A.caja.y1
         && (A.poly.some(p => dentro(B.poly, p[0], p[1])) || B.poly.some(p => dentro(A.poly, p[0], p[1])))) res.pisan.push([i, j]);
       continue;
@@ -2546,6 +2550,23 @@ function calcularPlano() {
     p.int = p.generarInt(w);
     p.caja = cajaDe(p.poly); p.area = areaFirmada(p.poly) - p.int.reduce((s, h) => s + Math.abs(areaFirmada(h)), 0);
   });
+  // solapes: la zona común de las dos piezas (ya con sus ranuras) y los tacos o tornillos repartidos en ella
+  const So = solapeP(), dT = clamp(+So.diam || 8, 2, 30);
+  solapes.forEach(([i, j]) => {
+    const A = ps[i], B = ps[j]; if (!window.ClipperLib) return;
+    const zonas = booleana(A.poly, [B.poly], 'interseccion').filter(z => z.area > 150); if (!zonas.length) return;
+    // la de fuera (más lejos del centro del mueble) lleva la cabeza del tornillo
+    const pl = PLANOS[A.plano], ctr = (Math.min(...ps.filter(p => p.ok).map(p => PLANOS[p.plano].n === pl.n ? p.x : Infinity)) + Math.max(...ps.filter(p => p.ok).map(p => PLANOS[p.plano].n === pl.n ? p.x : -Infinity))) / 2;
+    const fuera = Math.abs(A.x - ctr) >= Math.abs(B.x - ctr) ? i : j;
+    const u = { tipo: 'solape', a: i, b: j, zonas, puntos: [], fuera, area: zonas.reduce((s, z) => s + z.area, 0) };
+    zonas.forEach(z => u.puntos.push(...puntosFijacion(z, dT, So.n)));
+    const rT = dT / 2;
+    u.puntos.forEach(q => {
+      if (So.tipo === 'tornillos') { ps[fuera].taladros.push([q[0], q[1], rT, 'pasante']); ps[fuera === i ? j : i].taladros.push([q[0], q[1], Math.max(1, rT * 0.6), 'guia']); }
+      else { A.taladros.push([q[0], q[1], rT, 'ciego']); B.taladros.push([q[0], q[1], rT, 'ciego']); }
+    });
+    res.uniones.push(u); A.uniones.push(u); B.uniones.push(u);
+  });
   // caja del mueble (para las medidas y el largo)
   const bb = [[Infinity, -Infinity], [Infinity, -Infinity], [Infinity, -Infinity]];
   ps.forEach(p => { if (!p.ok) return; const pl = PLANOS[p.plano];
@@ -2557,6 +2578,28 @@ function calcularPlano() {
   avisosPlano(res);
   res.otras = []; return res;
 }
+// reparte n tacos o tornillos en una zona (0 = según su tamaño): lejos del borde y lo más separados posible
+function puntosFijacion(z, d, nPedido) {
+  const poly = z.poly, b = cajaDe(poly), margen = Math.max(1.5 * d, 10);
+  const val = (x, y) => { if (!dentro(poly, x, y)) return -1; let m = distBorde(poly, x, y); (z.int || []).forEach(h => { m = Math.min(m, dentro(h, x, y) ? -1 : distBorde(h, x, y)); }); return m; };
+  const paso = Math.max(1, Math.min(b.w, b.h) / 24, Math.sqrt(b.w * b.h / 900)), cand = [];
+  for (let y = b.y0 + paso / 2; y < b.y1; y += paso) for (let x = b.x0 + paso / 2; x < b.x1; x += paso) { const v = val(x, y); if (v > 0) cand.push([x, y, v]); }
+  if (!cand.length) return [];
+  let buenos = cand.filter(c => c[2] >= margen);
+  if (!buenos.length) { const mx = Math.max(...cand.map(c => c[2])); if (mx < d * 0.9) return []; buenos = cand.filter(c => c[2] >= mx * 0.95); }
+  const n = nPedido > 0 ? Math.round(nPedido) : clamp(Math.round(Math.sqrt(z.area) / 40), 2, 8), sep = 2.5 * d;
+  const cx = buenos.reduce((s, c) => s + c[0], 0) / buenos.length, cy = buenos.reduce((s, c) => s + c[1], 0) / buenos.length;
+  const elegidos = [];
+  let pri = buenos[0], md = -1; buenos.forEach(c => { const dd = Math.hypot(c[0] - cx, c[1] - cy); if (dd > md) { md = dd; pri = c; } });
+  elegidos.push(pri);
+  while (elegidos.length < n) {
+    let mej = null, mm = -1;
+    buenos.forEach(c => { let dmin = Infinity; elegidos.forEach(e2 => { dmin = Math.min(dmin, Math.hypot(c[0] - e2[0], c[1] - e2[1])); }); if (dmin >= sep && dmin > mm) { mm = dmin; mej = c; } });
+    if (!mej) break; elegidos.push(mej);
+  }
+  return elegidos.map(c => [Math.round(c[0] * 10) / 10, Math.round(c[1] * 10) / 10]);
+}
+const largoTaco = e => { const p = clamp(Math.round(e - 4), 6, 25); return { prof: p, largo: 2 * p - 2 }; };
 const nomP = (res, i) => res.costillas[i] ? res.costillas[i].nombre : 'pieza ' + (i + 1);
 function avisosPlano(res) {
   const A = res.avisos, e = grosor(), add = (tipo, txt, cost) => A.push({ tipo, txt, cost });
@@ -2567,6 +2610,8 @@ function avisosPlano(res) {
   sueltas.forEach(p => add('atencion', `${p.nombre} no se cruza con ninguna otra pieza: quedaría suelta (o hay que atornillarla o encolarla).`, p.i));
   res.ranurasMal.forEach(p => add('error', `No se pudo hacer alguna ranura en ${p.nombre}: el borde no es recto en el cruce o la ranura sale de la pieza.`, p.i));
   res.uniones.forEach(u => {
+    if (u.tipo === 'solape' && !u.puntos.length) add('atencion', `${nomP(res, u.a)} y ${nomP(res, u.b)} se solapan, pero la zona común es demasiado estrecha para un ${solapeP().tipo === 'tornillos' ? 'tornillo' : 'taco'} de Ø ${fmt(solapeP().diam, 1)} mm: agranda el solape o encólalas.`, u.a);
+    else if (u.tipo === 'solape' && u.puntos.length < 2) add('atencion', `Solape de ${nomP(res, u.a)} y ${nomP(res, u.b)} con una sola fijación: puede girar. Agranda la zona común.`, u.a);
     if (u.tipo === 'media' && u.hi - u.lo < 2 * e) add('atencion', `Media madera corta entre ${nomP(res, u.a)} y ${nomP(res, u.b)} (${fmt(u.hi - u.lo)} mm de cruce): unión floja.`, u.a);
     if (u.tipo === 'caja' && u.hi - u.lo < 1.5 * e) add('atencion', `Espiga estrecha de ${nomP(res, u.pasa)} en ${nomP(res, u.en)} (${fmt(u.hi - u.lo)} mm): se puede partir.`, u.pasa);
   });
@@ -2579,15 +2624,16 @@ function avisosPlano(res) {
   const M = P.maqueta;
   if (M && M.activa && Math.abs(M.grosor * M.escala - e) > e * 0.2) add('info', `Maqueta 1:${M.escala}: ${fmt(M.grosor, 1)} mm equivalen a ${fmt(M.grosor * M.escala)} mm reales (el tablero real es de ${fmt(e, 1)} mm): las ranuras y las cajas de la maqueta se hacen con el grosor de la maqueta.`);
   if (!A.some(a => a.tipo === 'error' || a.tipo === 'atencion')) {
-    const nM = res.uniones.filter(u => u.tipo === 'media').length, nC = res.uniones.filter(u => u.tipo === 'caja').length;
-    add('ok', `Todo correcto: ${res.n} piezas con ${res.uniones.length} ${res.uniones.length === 1 ? 'unión' : 'uniones'}` + (nM || nC ? ` (${[nM ? nM + ' a media madera' : '', nC ? nC + (nC > 1 ? ' espigas en caja pasante' : ' espiga en caja pasante') : ''].filter(Boolean).join(' y ')})` : '') + '.');
+    const nM = res.uniones.filter(u => u.tipo === 'media').length, nC = res.uniones.filter(u => u.tipo === 'caja').length, nS = res.uniones.filter(u => u.tipo === 'solape').length;
+    const partes = [nM ? nM + ' a media madera' : '', nC ? nC + (nC > 1 ? ' espigas en caja pasante' : ' espiga en caja pasante') : '', nS ? nS + (nS > 1 ? ' solapes' : ' solape') + ` con ${solapeP().tipo}` : ''].filter(Boolean);
+    add('ok', `Todo correcto: ${res.n} piezas con ${res.uniones.length} ${res.uniones.length === 1 ? 'unión' : 'uniones'}` + (partes.length ? ` (${partes.length > 1 ? partes.slice(0, -1).join(', ') + ' y ' + partes[partes.length - 1] : partes[0]})` : '') + '.');
   }
 }
 // texto de las uniones de una pieza (para la vista de la pieza, el plano y el despiece)
 function textoUnionesPieza(c) {
   if (!R || !c.uniones) return '';
-  const m = c.uniones.filter(u => u.tipo === 'media').length, cj = c.uniones.filter(u => u.tipo === 'caja' && u.en === c.i).length, es = c.uniones.filter(u => u.tipo === 'caja' && u.pasa === c.i).length;
-  return [m ? m + ' a media madera' : '', cj ? cj + (cj > 1 ? ' cajas' : ' caja') : '', es ? es + (es > 1 ? ' espigas' : ' espiga') : ''].filter(Boolean).join(' · ') || 'sin uniones';
+  const so = c.uniones.filter(u => u.tipo === 'solape').length, nt = (c.taladros || []).length, m = c.uniones.filter(u => u.tipo === 'media').length, cj = c.uniones.filter(u => u.tipo === 'caja' && u.en === c.i).length, es = c.uniones.filter(u => u.tipo === 'caja' && u.pasa === c.i).length;
+  return [so ? `${so} ${so > 1 ? 'solapes' : 'solape'} (${nt} ${solapeP().tipo === 'tornillos' ? 'taladros' : 'tacos'})` : '', m ? m + ' a media madera' : '', cj ? cj + (cj > 1 ? ' cajas' : ' caja') : '', es ? es + (es > 1 ? ' espigas' : ' espiga') : ''].filter(Boolean).join(' · ') || 'sin uniones';
 }
 // matriz 3D de una pieza: el contorno (a, b) en su plano, el grosor centrado en la posición c
 function basePieza(c) {
@@ -3038,6 +3084,43 @@ PLANTILLAS.silla_plana = {
     ] });
   },
 };
+PLANTILLAS.silla_solapada = {
+  nombre: 'Silla de piezas solapadas', grupo: 'plano',
+  desc: 'Cada lateral es de dos capas: la pata trasera (que sube hasta el respaldo) y el lateral del asiento con la pata delantera, solapadas y unidas con tacos.',
+  params: [
+    { id: 'ancho', nombre: 'Ancho', min: 320, max: 700, paso: 5, valor: 440 },
+    { id: 'fondo', nombre: 'Fondo', min: 300, max: 650, paso: 5, valor: 430 },
+    { id: 'asiento', nombre: 'Altura del asiento', min: 250, max: 600, paso: 5, valor: 450 },
+    { id: 'alto', nombre: 'Altura del respaldo', min: 550, max: 1200, paso: 5, valor: 820 },
+    { id: 'respaldo', nombre: 'Alto del travesaño de arriba', min: 40, max: 250, paso: 5, valor: 70 },
+    { id: 'pata', nombre: 'Ancho de las patas', min: 40, max: 120, paso: 1, valor: 46 },
+    { id: 'faldon', nombre: 'Alto del lateral del asiento', min: 50, max: 200, paso: 1, valor: 85 },
+    { id: 'espiga', nombre: 'Ancho de las espigas', min: 20, max: 100, paso: 1, valor: 40 },
+  ],
+  generar(p, e) {
+    const W = p.ancho, hs = p.asiento, pa = Math.max(p.pata, 2 * e + 8), te = p.espiga, H = Math.max(p.alto, hs + p.respaldo + 120);
+    const xo = W / 2 - e / 2, xi = W / 2 - 1.5 * e, zb = -p.fondo / 2 + pa / 2, zf = p.fondo / 2 - pa / 2, yr = hs - e - p.faldon;
+    const t2 = zf - pa / 2 - te / 2 - 20, t1 = zb + pa / 2 + te / 2 + 30;
+    // pata trasera (capa de fuera): sube recta hasta arriba, un poco más estrecha en el pie
+    const pata = ptsPlano([[zb - pa / 2 + 4, 0], [zb + pa / 2 - 4, 0], [zb + pa / 2, yr - 40], [zb + pa / 2, H - 14], [zb + pa / 2 - 4, H - 3, false], [zb + pa / 2 - 14, H], [zb - pa / 2, H], [zb - pa / 2, yr - 40]]);
+    // lateral del asiento (capa de dentro): llega por detrás hasta cubrir la pata trasera y baja delante como pata
+    const lat = ptsPlano([[zb - pa / 2, yr], [(zb + zf) / 2, yr + p.faldon * 0.3, false], [zf - pa / 2, yr], [zf - pa / 2 + 4, 0], [zf + pa / 2 - 4, 0], [zf + pa / 2, hs - e],
+      [t2 + te / 2, hs - e], [t2 + te / 2, hs], [t2 - te / 2, hs], [t2 - te / 2, hs - e], [t1 + te / 2, hs - e], [t1 + te / 2, hs], [t1 - te / 2, hs], [t1 - te / 2, hs - e], [zb - pa / 2, hs - e]]);
+    const yM = Math.min(hs + 150, H - p.respaldo - 90);
+    // asiento: llega a los lados por encima de los laterales y por detrás se estrecha entre las patas traseras
+    const r0 = rectPlano(-(W / 2 - 1), zb + pa / 2 + 1, W / 2 - 1, p.fondo / 2 + 15, 30, [0, 0, 1, 1]), aa = W / 2 - e - 1, y0 = zb + pa / 2 + 1;
+    const ap = [r0.pts[0], [-aa, y0], [-aa, zb - pa / 2], [aa, zb - pa / 2], [aa, y0], ...r0.pts.slice(1)];
+    const asiento = { pts: redondeaPts(ap), esq: ap.map(() => true) };
+    return Object.assign({}, CLAVE_PLANO, { piezas: [
+      piezaPlana('Pata trasera izquierda', 'lado', -xo, pata), igualQue('Pata trasera derecha', 'lado', xo, 0),
+      piezaPlana('Lateral del asiento izquierdo', 'lado', -xi, lat), igualQue('Lateral del asiento derecho', 'lado', xi, 2),
+      piezaPlana('Asiento', 'horizontal', hs - e / 2, asiento),
+      piezaPlana('Travesaño de arriba', 'frente', zb, rectPlano(-W / 2 - 15, H - p.respaldo, W / 2 + 15, H, 14, [0, 0, 1, 1])),
+      piezaPlana('Travesaño del respaldo', 'frente', zb, rectPlano(-W / 2 - 10, yM, W / 2 + 10, yM + 50, 4)),
+      piezaPlana('Travesaño delantero', 'frente', zf, rectPlano(-(xi + e / 2 + 12), yr + 10, xi + e / 2 + 12, hs - e, 0)),
+    ] });
+  },
+};
 PLANTILLAS.plano_vacio = {
   nombre: 'Vacío: piezas planas', grupo: 'plano',
   desc: 'Un tablero de frente y otro de lado que se cruzan, para construir el mueble pieza a pieza o traer los contornos de un DXF o SVG.',
@@ -3404,6 +3487,16 @@ function dibujarPerfilPlano(ctx, V) {
     ctx.fillText(otra.etq + (u.tipo === 'caja' ? (u.en === c.i ? ' (caja)' : ' (espiga)') : ''), (x0 + x1) / 2, Math.min(y0, y1) - 4);
   });
   ctx.textAlign = 'left';
+  // piezas paralelas pegadas cara con cara: la zona común y los tacos o tornillos
+  (c.uniones || []).filter(u => u.tipo === 'solape').forEach(u => {
+    const otra = R.costillas[u.a === c.i ? u.b : u.a];
+    ctx.fillStyle = 'rgba(95,107,120,.22)'; ctx.strokeStyle = '#5f6b78'; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+    u.zonas.forEach(z => { V.camino(ctx, z.poly); ctx.fill(); ctx.stroke(); });
+    ctx.setLineDash([]);
+    const b = cajaDe(u.zonas[0].poly), [lx, ly] = V.aPantalla(b.x0 + b.w / 2, b.y1);
+    ctx.fillStyle = '#5f6b78'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center'; ctx.fillText(`${otra.etq} (solape)`, lx, ly - 4); ctx.textAlign = 'left';
+  });
+  (c.taladros || []).forEach(t => { const [x, y] = V.aPantalla(t[0], t[1]); ctx.strokeStyle = '#5f6b78'; ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(x, y, Math.max(3, t[2] * V.sc), 0, PI2); ctx.fill(); ctx.stroke(); });
   // la pieza como se corta (con ranuras y cajas)
   if (c.ok) {
     ctx.fillStyle = conAlfa(acento, .12); ctx.beginPath();
@@ -3425,7 +3518,7 @@ function dibujarPerfilPlano(ctx, V) {
   V.cota(ctx, [b.x1, b.y0], [b.x1, b.y1], 26, fmt(b.h) + ' mm', true);
   const pl = PLANOS[c.plano];
   ctx.fillStyle = cssVar('--suave'); ctx.font = '11.5px system-ui';
-  ctx.fillText(`${c.nombre} (${c.etq}) · ${pl.nombre.toLowerCase()}, en ${pl.normal} = ${fmt(c.x)} mm · horizontal: ${pl.ejes[0]} · vertical: ${pl.ejes[1]}` + (k.pieza && k.pieza !== planoP().piezas[UI.costilla] ? ` · igual que «${k.pieza.nombre}»` : ''), 8, 62);
+  ctx.fillText(`${c.nombre} (${c.etq}) · ${pl.nombre.toLowerCase()}, en ${pl.normal} = ${fmt(c.x)} mm · horizontal: ${pl.ejes[0]} · vertical: ${pl.ejes[1]}` + (k.pieza && k.pieza !== planoP().piezas[UI.costilla] ? ` · igual que «${k.pieza.nombre}»` : ''), 8, 72);
 }
 // con relieve (texto o modelo) no hay perfiles clave: se ven las lamas y la seleccionada
 function dibujarPerfilRelieve(ctx, V) {
@@ -3464,6 +3557,7 @@ function dibujarCostilla(ctx, V) {
   // los otros trozos de la misma lama o costilla, en claro
   const pad = c.padre || c; (pad.partes || []).forEach(q => { if (q === c || !q.ok) return; ctx.save(); ctx.globalAlpha = .35; ctx.setLineDash([4, 3]); V.camino(ctx, q.poly); ctx.stroke(); ctx.restore(); });
   const r = radioAgujero();
+  (c.taladros || []).forEach(t => { const [x, y] = V.aPantalla(t[0], t[1]); ctx.fillStyle = cssVar('--vista'); ctx.beginPath(); ctx.arc(x, y, Math.max(2, t[2] * V.sc), 0, PI2); ctx.fill(); ctx.stroke(); });
   c.agujeros.forEach(k => {
     const [x, y] = V.aPantalla(P.varillas.lista[k][0], P.varillas.lista[k][1]);
     ctx.fillStyle = cssVar('--vista'); ctx.beginPath(); ctx.arc(x, y, Math.max(2, r * V.sc), 0, PI2); ctx.fill(); ctx.stroke();
@@ -4033,7 +4127,8 @@ function construir3DPlano() {
   const e = grosor(), mats = materialesTablero(), bb = R.bbox || [[0, 1], [0, 1], [0, 1]];
   R.costillas.forEach(c => {
     if (!c.ok) { G.costillas.push(null); return; }
-    const m = new T.Mesh(extruir(polyVista(c.poly), [], e, (c.int || []).map(polyVista)), mats); m.castShadow = m.receiveShadow = true;
+    const hs = (c.taladros || []).filter(t => t[3] === 'pasante').map(t => ({ x: t[0], y: t[1], r: t[2] }));   // los tacos van escondidos; los tornillos se ven
+    const m = new T.Mesh(extruir(polyVista(c.poly), hs, e, (c.int || []).map(polyVista)), mats); m.castShadow = m.receiveShadow = true;
     m.userData = { i: c.i, x: c.x, plano: c.plano };
     G.modelo.add(m); G.costillas.push(m);
   });
@@ -4336,6 +4431,9 @@ function iniciarPanel() {
   $('#bVarQuitar').onclick = () => { if (!V().lista.length) return; V().lista = []; UI.varilla = -1; cambio('Varillas quitadas'); };
   // piezas planas
   enlazar('#plHolgura', () => { planoP().holgura = clamp(+$('#plHolgura').value || 0, 0, 3); cambio('Holgura de las uniones ' + fmt(planoP().holgura, 2) + ' mm'); });
+  enlazar('#plSolTipo', () => { solapeP().tipo = $('#plSolTipo').value; if (solapeP().tipo === 'tornillos' && solapeP().diam > 6) { solapeP().diam = 4; $('#plSolDiam').value = 4; } else if (solapeP().tipo === 'tacos' && solapeP().diam < 6) { solapeP().diam = 8; $('#plSolDiam').value = 8; } cambio('Solapes con ' + solapeP().tipo); });
+  enlazar('#plSolDiam', () => { solapeP().diam = clamp(+$('#plSolDiam').value || 8, 2, 30); cambio('Ø ' + fmt(solapeP().diam, 1) + ' mm'); });
+  enlazar('#plSolN', () => { solapeP().n = clamp(Math.round(+$('#plSolN').value || 0), 0, 20); cambio(solapeP().n ? solapeP().n + ' fijaciones por solape' : 'Fijaciones automáticas'); });
   iniciarPiezas();
   // tipo de mueble y retícula
   enlazar('#sTipo', () => {
@@ -4626,7 +4724,7 @@ function ponerControles() {
   const Pl = P.planta; $('#plForma').value = Pl.forma; $('#plRadio').value = Pl.radio; $('#plSentido').value = String(Pl.sentido === -1 ? -1 : 1); $('#plAmp').value = Pl.amplitud; $('#plOndas').value = Pl.ondas;
   const Ra = P.radial; $('#raNum').value = P.costillas.numero; $('#raTubo').value = Ra.tubo; $('#raHolTubo').value = Ra.holguraTubo; $('#raDiscos').value = Ra.discos; $('#raRDisco').value = Ra.rDisco; $('#raHolgura').value = Ra.holgura;
   ponerPartir();
-  $('#plHolgura').value = planoP().holgura; $('#pzRejilla').value = $('#kRejilla').value;
+  $('#plHolgura').value = planoP().holgura; $('#plSolTipo').value = solapeP().tipo; $('#plSolDiam').value = solapeP().diam; $('#plSolN').value = solapeP().n; $('#pzRejilla').value = $('#kRejilla').value;
   const Pa = P.pared; $('#paNum').value = Pa.rastreles; $('#paAlto').value = Pa.alto; $('#paGrueso').value = Pa.grueso; $('#paMargen').value = Pa.margen; $('#paHolgura').value = Pa.holgura; $('#paVer').checked = Pa.verPared;
   $('#cClaves3d').checked = P.vista.claves !== false;
   const Fg = P.figura; $('#fgAlto').value = Fg.alto; $('#fgEje').value = Fg.eje; $('#fgGiro').value = String(Fg.giro || 0); $('#fgMin').value = Fg.minArea; $('#fgUnir').checked = Fg.unir !== false;
@@ -4675,7 +4773,8 @@ function refrescarClaves() {
 function refrescarListas() {
   // resumen del reparto
   if (esPlano()) { const nM = R.uniones.filter(u => u.tipo === 'media').length, nC = R.uniones.filter(u => u.tipo === 'caja').length;
-    $('#plResumen').innerHTML = `<b>${R.n}</b> piezas · <b>${nM}</b> a media madera · <b>${nC}</b> en caja pasante · ranuras y cajas de <b>${fmt(grosor() + planoP().holgura, 2)}</b> mm`; }
+    const nS = R.uniones.filter(u => u.tipo === 'solape').length, nF = R.uniones.reduce((s, u) => s + (u.puntos || []).length, 0);
+    $('#plResumen').innerHTML = `<b>${R.n}</b> piezas · <b>${nM}</b> a media madera · <b>${nC}</b> en caja pasante` + (nS ? ` · <b>${nS}</b> solapes con <b>${nF}</b> ${solapeP().tipo}` : '') + ` · ranuras y cajas de <b>${fmt(grosor() + planoP().holgura, 2)}</b> mm`; }
   $('#resCost').innerHTML = P.tipo === 'radial' ? `<b>${R.n}</b> costillas cada <b>${fmt(R.sep, 1)}°</b> · junto al tubo quedan <b>${fmt(Math.max(0, R.hueco), 1)}</b> mm entre ellas`
     : `<b>${R.n}</b> ${P.tipo === 'pared' ? 'lamas' : 'costillas'} · separación <b>${fmt(R.sep, 1)}</b> mm · hueco <b>${fmt(Math.max(0, R.hueco), 1)}</b> mm`;
   // costillas y largueros
@@ -4904,7 +5003,7 @@ function geoFab(c) {
   return {
     c, poly, interiores, caja: cajaDe(poly), r: radioFab(), area: Math.abs(c.area) * k * k, huesosMal, nHuesos, nEsq: esq.length,
     // agujeros [x, y, radio]: los de las varillas y los propios de la pieza (el tubo en los discos)
-    agujeros: c.agujeros.map(j => [P.varillas.lista[j][0] * k, P.varillas.lista[j][1] * k, radioFab()]).concat((c.huecos || []).map(h => [h.x * k, h.y * k, h.r * k])),
+    agujeros: c.agujeros.map(j => [P.varillas.lista[j][0] * k, P.varillas.lista[j][1] * k, radioFab()]).concat((c.huecos || []).map(h => [h.x * k, h.y * k, h.r * k])).concat((c.taladros || []).map(t => [t[0] * k, t[1] * k, t[2] * k])),
     etiqueta: puntoEtiqueta(c).map(v => v * k),
   };
 }
@@ -5222,9 +5321,13 @@ function listaCompra() {
     L.push(['Superficie de las piezas', `${fmt(cm.area / 1e6, 2)} m² en total`]);
   } else L.push([tablero, `${cm.nTableros} tablero${cm.nTableros === 1 ? '' : 's'} de ${fmt(cm.tablero[0])} × ${fmt(cm.tablero[1])} mm (${maq ? fmt(cm.area / 100, 0) + ' cm²' : fmt(cm.area / 1e6, 2) + ' m²'} de piezas)`]);
   if (esPlano()) {
-    L.push(['Piezas', `${R.costillas.filter(c => c.ok).length}, con ${R.uniones.filter(u => u.tipo === 'media').length} uniones a media madera y ${R.uniones.filter(u => u.tipo === 'caja').length} espigas en caja pasante`]);
+    const nSo = R.uniones.filter(u => u.tipo === 'solape').length;
+    L.push(['Piezas', `${R.costillas.filter(c => c.ok).length}, con ${R.uniones.filter(u => u.tipo === 'media').length} uniones a media madera, ${R.uniones.filter(u => u.tipo === 'caja').length} espigas en caja pasante` + (nSo ? ` y ${nSo} solapes` : '')]);
     L.push(['Ranuras y cajas', `${fmt(grosorFab() + holguraRanuraFab(), 2)} mm de ancho`]);
-    L.push(['Herrajes', 'ninguno (cola en las uniones, si se quiere fijo)']);
+    const nF = R.uniones.reduce((s, u) => s + (u.puntos || []).length, 0), So = solapeP(), lt = largoTaco(grosorFab());
+    if (nF && So.tipo === 'tornillos') L.push([`Tornillos para madera Ø ${fmt(So.diam, 1)} mm, de unos ${fmt(Math.round(grosorFab() * 1.7))} mm (cabeza avellanada)`, String(nF)]);
+    else if (nF) { L.push([`Tacos de madera Ø ${fmt(So.diam, 1)} × ${fmt(lt.largo)} mm (taladros ciegos de ${fmt(lt.prof)} mm)`, String(nF)]); L.push(['Cola blanca', 'para los tacos y los solapes']); }
+    L.push(['Herrajes', nF && So.tipo === 'tornillos' ? 'solo los tornillos de los solapes' : 'ninguno (cola en las uniones, si se quiere fijo)']);
     return L;
   }
   if (P.tipo === 'reticula') {
@@ -5448,6 +5551,7 @@ function planoPDF() {
     ['Material', maq ? `Maqueta de ${fmt(P.maqueta.grosor, 1)} mm` : MATERIALES[P.costillas.material].nombre],
     ['Uniones a media madera', String(R.uniones.filter(u => u.tipo === 'media').length)],
     ['Espigas en caja pasante', String(R.uniones.filter(u => u.tipo === 'caja').length)],
+    ...(R.uniones.some(u => u.tipo === 'solape') ? [['Piezas solapadas', `${R.uniones.filter(u => u.tipo === 'solape').length}, con ${R.uniones.reduce((s, u) => s + (u.puntos || []).length, 0)} ${solapeP().tipo} de Ø ${fmt(solapeP().diam, 1)} mm`]] : []),
     ['Ancho de ranuras y cajas', `${fmt(grosorFab() + holguraRanuraFab(), 2)} mm`],
   ]) : tabla(x2, M + 18, a2, [
     { titulo: 'Datos' },
@@ -5847,6 +5951,7 @@ function hojaPlano(D, cabecera, tabla, o) {
   const nom = i => R.costillas[i].etq + ' ' + R.costillas[i].nombre;
   const fU = [{ titulo: 'Uniones' }];
   R.uniones.forEach(u => {
+    if (u.tipo === 'solape') { const So = solapeP(), lt = largoTaco(grosorFab()); fU.push([`${nom(u.a)} + ${nom(u.b)}`, So.tipo === 'tornillos' ? `solapadas: ${u.puntos.length} tornillos Ø ${fmt(So.diam, 1)} desde la ${R.costillas[u.fuera].etq}` : `solapadas: ${u.puntos.length} tacos Ø ${fmt(So.diam, 1)} × ${fmt(lt.largo)} mm`]); return; }
     if (u.tipo === 'caja') fU.push([`${nom(u.pasa)} en ${nom(u.en)}`, `espiga en caja de ${fmt((u.hi - u.lo + holguraRanuraFab()) * k, 1)} × ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm`]);
     else { const arriba = u.aArriba ? u.a : u.b, abajo = u.aArriba ? u.b : u.a; fU.push([`${nom(arriba)} × ${nom(abajo)}`, `media madera de ${fmt((u.hi - u.lo) / 2 * k, 1)} mm (la ${R.costillas[arriba].etq} desde arriba)`]); }
   });
@@ -5863,6 +5968,11 @@ function pasosPlano(k, maq) {
     'Lija los cantos (sin redondear los de las ranuras y las espigas) y marca cada pieza con su número en una cara que no se vea.',
   ];
   const horiz = i => R.costillas[i].plano === 'horizontal';
+  // 0) piezas solapadas: se unen antes que nada (cada lateral de dos capas es un subconjunto)
+  const So = solapeP(), lt = largoTaco(grosorFab());
+  R.uniones.filter(u => u.tipo === 'solape' && u.puntos.length).forEach(u => pasos.push(So.tipo === 'tornillos'
+    ? `Une ${nom(u.a)} y ${nom(u.b)} cara con cara, en su sitio (las zonas grises de la hoja 3): ${u.puntos.length} tornillos de Ø ${fmt(So.diam, 1)} desde ${nom(u.fuera)}, por sus agujeros avellanados; la otra lleva un agujero guía. Un poco de cola entre las dos caras lo deja más firme.`
+    : `Une ${nom(u.a)} y ${nom(u.b)} cara con cara: taladra los ${u.puntos.length} agujeros de Ø ${fmt(So.diam, 1)} a ${fmt(lt.prof)} mm de profundidad en las dos piezas (marcados en el DXF, capa de taladros; usa un tope en la broca), encola, mete los tacos de ${fmt(lt.largo)} mm y aprieta con sargentos hasta que seque.`));
   // 1) travesaños y espigas que pasan por cajas de piezas no horizontales
   const pasan = {}; R.uniones.filter(u => u.tipo === 'caja' && !horiz(u.en)).forEach(u => { (pasan[u.pasa] = pasan[u.pasa] || []).push(u.en); });
   Object.entries(pasan).forEach(([p, en]) => pasos.push(`Pasa ${nom(+p)} por ${en.length > 1 ? 'las cajas de' : 'la caja de'} ${lista2([...new Set(en)].map(nom))}.`));
@@ -6520,6 +6630,7 @@ function validarProyecto(o) {
   p.huecos = Array.isArray(o.huecos) ? o.huecos.map(h => { const b = huecoNuevo(h.forma || 'rect'); return Object.assign(b, h, { mueble: Object.assign(b.mueble, h.mueble || {}) }); }) : [];
   if (!['reticula', 'radial', 'pared', 'plano'].includes(p.tipo)) p.tipo = 'costillas';
   p.plano = Object.assign(proyectoBase().plano, o.plano || {});
+  p.plano.solape = Object.assign(proyectoBase().plano.solape, (o.plano || {}).solape || {});
   p.plano.piezas = (Array.isArray(p.plano.piezas) ? p.plano.piezas : []).filter(z => z && (z.igualA != null || (Array.isArray(z.pts) && z.pts.length >= 3)))
     .map(z => Object.assign({ nombre: 'Pieza', plano: 'frente', c: 0 }, z, { plano: PLANOS[z.plano] ? z.plano : 'frente', c: isFinite(+z.c) ? +z.c : 0 }));
   if (!PLANTILLAS[p.plantilla]) p.plantilla = 'libre';
