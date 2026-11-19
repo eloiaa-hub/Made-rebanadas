@@ -2,7 +2,7 @@
 /* ===================== RELIEVE DESDE TEXTO O MODELO 3D (paneles de pared) =====================
    La forma de las lamas no sale de los perfiles clave sino de un «mapa de profundidad» del panel:
    - texto: se dibuja con una fuente del sistema, se suaviza y sus letras salen (o se hunden)
-   - modelo: un STL u OBJ proyectado desde un lado; lo más cercano sale más
+   - modelo: un STL, OBJ, GLB o PLY proyectado desde un lado; lo más cercano sale más
    - imagen: una foto o dibujo en escala de grises (mapa de alturas); lo claro sale más
    El mapa cubre el panel (ancho × alto, en mm) y vale de 0 (fondo) a 1 (lo que más sale). */
 const relieveActivo = () => P.tipo === 'pared' && P.relieve && ['texto', 'modelo', 'imagen'].includes(P.relieve.fuente);
@@ -139,10 +139,12 @@ function suavizarMapa(m, rad) {
 }
 
 /* ---------- modelo 3D ---------- */
-// lee un STL (binario o de texto) o un OBJ y devuelve los triángulos [[x,y,z]×3]
+// lee un STL (binario o de texto), un OBJ, un GLB / glTF o un PLY y devuelve los triángulos [[x,y,z]×3]
 function leerMalla(buf, nombre) {
   const u8 = new Uint8Array(buf), tri = [];
-  const txt = () => new TextDecoder().decode(u8);
+  const txt = () => new TextDecoder().decode(u8), cab = String.fromCharCode(...u8.subarray(0, 4));
+  if (/\.(glb|gltf)$/i.test(nombre) || cab === 'glTF') return leerGLTF(buf).filter(t => t.every(p => p && p.every(isFinite)));
+  if (/\.ply$/i.test(nombre) || cab.slice(0, 3) === 'ply') return leerPLY(buf).filter(t => t.every(p => p && p.every(isFinite)));
   if (/\.obj$/i.test(nombre)) {
     const vs = [];
     txt().split(/\r?\n/).forEach(l => {
@@ -160,6 +162,107 @@ function leerMalla(buf, nombre) {
     }
   }
   return tri.filter(t => t.every(p => p && p.every(isFinite)));
+}
+/* GLB (glTF binario) o .gltf con los datos dentro: recorre la escena con las matrices de cada nodo.
+   Las mallas comprimidas (Draco, Meshopt) no se leen. */
+function leerGLTF(buf) {
+  const u8 = new Uint8Array(buf), dv = new DataView(buf); let js = null, bin = null;
+  if (u8.length >= 20 && dv.getUint32(0, true) === 0x46546C67) {
+    for (let o = 12; o + 8 <= u8.length;) {
+      const len = dv.getUint32(o, true), tipo = dv.getUint32(o + 4, true), d = u8.subarray(o + 8, o + 8 + len);
+      if (tipo === 0x4E4F534A) js = JSON.parse(new TextDecoder().decode(d)); else if (tipo === 0x004E4942 && !bin) bin = d;
+      o += 8 + len;
+    }
+  } else { try { js = JSON.parse(new TextDecoder().decode(u8)); } catch (e) { /* abajo */ } }
+  if (!js || !js.asset) throw new Error('No parece un archivo glTF / GLB.');
+  const req = js.extensionsRequired || [];
+  if (req.some(x => /draco|meshopt/i.test(x))) throw new Error('El modelo está comprimido (Draco o Meshopt). Vuelve a exportarlo sin compresión (en Blender: Exportar glTF → desmarca «Compresión»).');
+  const bufs = (js.buffers || []).map(b => {
+    if (b.uri == null) return bin;
+    const m = /^data:[^,]*;base64,(.*)$/.exec(b.uri);
+    if (!m) throw new Error('Este .gltf guarda los datos en un archivo .bin aparte: guárdalo como .glb (un solo archivo).');
+    const t = atob(m[1]), out = new Uint8Array(t.length); for (let i = 0; i < t.length; i++) out[i] = t.charCodeAt(i); return out;
+  });
+  const COMP = { 5120: [1, 'getInt8', 127], 5121: [1, 'getUint8', 255], 5122: [2, 'getInt16', 32767], 5123: [2, 'getUint16', 65535], 5125: [4, 'getUint32', 0], 5126: [4, 'getFloat32', 0] };
+  const NC = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
+  const accesor = i => {
+    const a = js.accessors[i], [tam, fn, max] = COMP[a.componentType] || [], nc = NC[a.type] || 1, out = [];
+    if (!tam) throw new Error('Tipo de datos glTF no admitido.');
+    if (a.bufferView == null) { for (let k = 0; k < a.count; k++) out.push(new Array(nc).fill(0)); return out; }
+    const bv = js.bufferViews[a.bufferView], b = bufs[bv.buffer]; if (!b) throw new Error('Al glTF le faltan datos.');
+    const d = new DataView(b.buffer, b.byteOffset, b.byteLength), paso = bv.byteStride || tam * nc, base = (bv.byteOffset || 0) + (a.byteOffset || 0);
+    for (let k = 0; k < a.count; k++) {
+      const v = []; for (let c = 0; c < nc; c++) { let x = d[fn](base + k * paso + c * tam, true); if (a.normalized && max) x = Math.max(x / max, -1); v.push(x); }
+      out.push(v);
+    }
+    return out;
+  };
+  const mul4 = (A, B) => { const C = new Array(16).fill(0); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) C[c * 4 + r] += A[k * 4 + r] * B[c * 4 + k]; return C; };
+  const local = n => {
+    if (n.matrix) return n.matrix.slice();
+    const [tx, ty, tz] = n.translation || [0, 0, 0], [x, y, z, w] = n.rotation || [0, 0, 0, 1], [sx, sy, sz] = n.scale || [1, 1, 1];
+    return [(1 - 2 * (y * y + z * z)) * sx, 2 * (x * y + z * w) * sx, 2 * (x * z - y * w) * sx, 0,
+      2 * (x * y - z * w) * sy, (1 - 2 * (x * x + z * z)) * sy, 2 * (y * z + x * w) * sy, 0,
+      2 * (x * z + y * w) * sz, 2 * (y * z - x * w) * sz, (1 - 2 * (x * x + y * y)) * sz, 0, tx, ty, tz, 1];
+  };
+  const tri = [], nodos = js.nodes || [], cache = {};
+  const malla = (mi, M) => {
+    (js.meshes[mi].primitives || []).forEach(pr => {
+      const modo = pr.mode == null ? 4 : pr.mode; if (modo < 4 || pr.attributes.POSITION == null) return;
+      const ck = pr.attributes.POSITION, P0 = cache[ck] || (cache[ck] = accesor(ck));
+      const V = P0.map(p => [M[0] * p[0] + M[4] * p[1] + M[8] * p[2] + M[12], M[1] * p[0] + M[5] * p[1] + M[9] * p[2] + M[13], M[2] * p[0] + M[6] * p[1] + M[10] * p[2] + M[14]]);
+      const I = pr.indices != null ? accesor(pr.indices).map(v => v[0]) : V.map((_, k) => k);
+      if (modo === 4) for (let k = 0; k + 2 < I.length; k += 3) tri.push([V[I[k]], V[I[k + 1]], V[I[k + 2]]]);
+      else if (modo === 5) for (let k = 0; k + 2 < I.length; k++) tri.push(k % 2 ? [V[I[k + 1]], V[I[k]], V[I[k + 2]]] : [V[I[k]], V[I[k + 1]], V[I[k + 2]]]);
+      else if (modo === 6) for (let k = 1; k + 1 < I.length; k++) tri.push([V[I[0]], V[I[k]], V[I[k + 1]]]);
+    });
+  };
+  const visitar = (ni, M, prof) => {
+    const n = nodos[ni]; if (!n || prof > 64) return;
+    const M2 = mul4(M, local(n));
+    if (n.mesh != null && js.meshes[n.mesh]) malla(n.mesh, M2);
+    (n.children || []).forEach(h => visitar(h, M2, prof + 1));
+  };
+  const I4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+  let raices = js.scenes && js.scenes.length ? (js.scenes[js.scene || 0] || js.scenes[0]).nodes || [] : null;
+  if (!raices) { const hijos = new Set(); nodos.forEach(n => (n.children || []).forEach(h => hijos.add(h))); raices = nodos.map((_, i) => i).filter(i => !hijos.has(i)); }
+  raices.forEach(r => visitar(r, I4, 0));
+  if (!nodos.length && js.meshes) js.meshes.forEach((_, i) => malla(i, I4));
+  if (!tri.length) throw new Error('El glTF no tiene ninguna malla de triángulos.');
+  return tri;
+}
+/* PLY de texto o binario (escáneres, fotogrametría, MeshLab) */
+function leerPLY(buf) {
+  const u8 = new Uint8Array(buf), cab = new TextDecoder('latin1').decode(u8.subarray(0, Math.min(u8.length, 1 << 16)));
+  const fin = cab.indexOf('end_header');
+  if (!/^ply\s/.test(cab) || fin < 0) throw new Error('No parece un archivo PLY.');
+  let o = fin + 10; if (cab[o] === '\r') o++; if (cab[o] === '\n') o++;
+  const TIPOS = { char: [1, 'getInt8'], int8: [1, 'getInt8'], uchar: [1, 'getUint8'], uint8: [1, 'getUint8'], short: [2, 'getInt16'], int16: [2, 'getInt16'], ushort: [2, 'getUint16'], uint16: [2, 'getUint16'], int: [4, 'getInt32'], int32: [4, 'getInt32'], uint: [4, 'getUint32'], uint32: [4, 'getUint32'], float: [4, 'getFloat32'], float32: [4, 'getFloat32'], double: [8, 'getFloat64'], float64: [8, 'getFloat64'] };
+  let formato = 'ascii'; const els = [];
+  cab.slice(0, fin).split(/\r?\n/).forEach(l => {
+    const t = l.trim().split(/\s+/);
+    if (t[0] === 'format') formato = t[1];
+    else if (t[0] === 'element') els.push({ nombre: t[1], n: +t[2], props: [] });
+    else if (t[0] === 'property' && els.length) els[els.length - 1].props.push(t[1] === 'list' ? { lista: true, tn: t[2], tv: t[3], nombre: t[4] } : { tipo: t[1], nombre: t[2] });
+  });
+  const V = [], F = [];
+  const guardar = (el, fila) => {
+    if (el.nombre === 'vertex') { const ix = k => el.props.findIndex(p => p.nombre === k); V.push([+fila[ix('x')], +fila[ix('y')], +fila[ix('z')]]); }
+    else if (el.nombre === 'face') { const li = el.props.findIndex(p => p.lista && /vertex_ind/.test(p.nombre)); const L = fila[li >= 0 ? li : el.props.findIndex(p => p.lista)]; if (L) F.push(L); }
+  };
+  if (formato === 'ascii') {
+    const tk = new TextDecoder('latin1').decode(u8.subarray(o)).trim().split(/\s+/); let k = 0;
+    els.forEach(el => { for (let r = 0; r < el.n; r++) { const fila = el.props.map(p => { if (!p.lista) return +tk[k++]; const n = +tk[k++], L = []; for (let j = 0; j < n; j++) L.push(+tk[k++]); return L; }); guardar(el, fila); } });
+  } else {
+    const le = formato === 'binary_little_endian'; if (!le && formato !== 'binary_big_endian') throw new Error('Formato PLY desconocido: ' + formato);
+    const d = new DataView(buf);
+    const leer = tipo => { const T2 = TIPOS[tipo]; if (!T2) throw new Error('Tipo PLY desconocido: ' + tipo); const v = d[T2[1]](o, le); o += T2[0]; return v; };
+    els.forEach(el => { for (let r = 0; r < el.n; r++) { const fila = el.props.map(p => { if (!p.lista) return leer(p.tipo); const n = leer(p.tn), L = []; for (let j = 0; j < n; j++) L.push(leer(p.tv)); return L; }); guardar(el, fila); } });
+  }
+  if (!F.length) throw new Error(V.length ? 'Este PLY solo tiene puntos (una nube de puntos), sin caras: conviértelo antes en una malla (en MeshLab, «Surface Reconstruction»).' : 'El PLY no tiene ninguna malla.');
+  const tri = [];
+  F.forEach(L => { for (let j = 1; j + 1 < L.length; j++) { const a = V[L[0]], b = V[L[j]], c = V[L[j + 1]]; if (a && b && c) tri.push([a, b, c]); } });
+  return tri;
 }
 // proyecta los triángulos desde una vista: devuelve [x imagen, y imagen, profundidad (más = más cerca)]
 const VISTAS = {

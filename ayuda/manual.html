@@ -151,7 +151,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <tr><td>Añadir un punto</td><td><b>Doble clic sobre la línea</b> del perfil. Se añade en todos los perfiles clave, en el mismo sitio de la curva.</td></tr>
   <tr><td>Esquina o curva</td><td><b>Doble clic sobre el punto</b>, tecla <kbd>E</kbd> o botón <b>◇ Esquina</b>.</td></tr>
   <tr><td>Borrar un punto</td><td><b>Clic derecho</b> sobre él, o selecciónalo y pulsa <kbd>Supr</kbd> (mínimo 3 puntos).</td></tr>
-  <tr><td>Traer un perfil de un DXF</td><td><b>📐 Perfil desde un DXF…</b> (panel derecho): lee un contorno cerrado dibujado en LibreCAD, Inkscape o el CAD de clase y lo pone en el perfil seleccionado o en todos. El contorno se reparte en los puntos que ya tienen los perfiles; en cada esquina viva cae un punto (y se marca como esquina si va a todos). Las medidas pueden ser las del DXF o escalarse al alto del perfil de ahora.</td></tr>
+  <tr><td>Traer un perfil de un DXF o SVG</td><td><b>📐 Perfil desde un DXF o SVG…</b> (panel derecho): lee un contorno cerrado dibujado en LibreCAD, Inkscape o el CAD de clase (DXF de texto o SVG) y lo pone en el perfil seleccionado o en todos. El contorno se reparte en los puntos que ya tienen los perfiles; en cada esquina viva cae un punto (y se marca como esquina si va a todos). Las medidas pueden ser las del dibujo o escalarse al alto del perfil de ahora.</td></tr>
   <tr><td>Moverte por el dibujo</td><td>Arrastra en vacío para desplazar y usa la rueda para acercar. <b>⤢</b> o <kbd>F</kbd> encuadra.</td></tr>
 </table>
 <figure><img src="img/claves3d.jpg" alt="Perfiles clave en el 3D"><figcaption>En la vista 3D, los perfiles clave son líneas azules: pincha una para editarla (se pone naranja). La casilla <b>Perfiles</b> de la vista 3D las muestra u oculta.</figcaption></figure>
@@ -334,7 +334,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <li><b>Plantilla</b>: la de siempre, con perfiles clave que se editan a mano.</li>
   <li><b>Texto en relieve</b>: escribe un nombre o un logo de texto (puede tener varias líneas). El programa lo dibuja con la letra que elijas, lo redondea con el <b>suavizado</b> y lo convierte en el canto de las lamas. Sirve para rótulos de tienda, nombres en la habitación o números de casa.</li>
   <li><b>Imagen en grises</b>: carga una foto, un dibujo o un mapa de alturas (png, jpg…). <b>Lo blanco sale más y lo negro queda en el fondo</b>; los grises, a medias. Es la forma más fácil de hacer una figura: se dibuja en cualquier programa de dibujo, con pincel difuminado.</li>
-  <li><b>Modelo 3D (STL / OBJ)</b>: carga una cara, un busto, unos labios o cualquier figura. El programa la mira desde la <b>vista</b> que elijas (frente, lado, arriba…) con el <b>giro</b> que quieras y saca un mapa de alturas: lo más cercano sale más de la pared. Así se hacen las caras y figuras de «arte mural paramétrico».</li>
+  <li><b>Modelo 3D (STL / OBJ / GLB / PLY)</b>: carga una cara, un busto, unos labios o cualquier figura. El programa la mira desde la <b>vista</b> que elijas (frente, lado, arriba…) con el <b>giro</b> que quieras y saca un mapa de alturas: lo más cercano sale más de la pared. Así se hacen las caras y figuras de «arte mural paramétrico».</li>
 </ul>
 <div class="dos">
   <img src="img/relieve_panel.png" alt="Apartado Relieve" class="estrecha">
@@ -354,6 +354,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <figure><img src="img/rotulo.jpg" alt="Rótulo de texto"><figcaption>Ejemplo «Rótulo de texto en relieve»: «Hola» en nogal, con onda de fondo.</figcaption></figure>
   <figure><img src="img/arte_ondas.jpg" alt="Arte mural"><figcaption>Ejemplo «Arte mural ondas»: el modelo «Ondas en el agua» en lamas horizontales.</figcaption></figure>
 </div>
+<p>Formatos que lee: <b>STL</b> (de texto o binario), <b>OBJ</b>, <b>GLB</b> o <b>.gltf</b> en un solo archivo (lo que dan Sketchfab, Blender y las apps de escaneo con el móvil, como Polycam o Scaniverse) y <b>PLY</b> (escáneres, fotogrametría, MeshLab). Un GLB comprimido (Draco) no se lee: en Blender, expórtalo sin «Compresión»; un PLY que solo tiene puntos (nube de puntos) hay que pasarlo antes a malla. Lo mismo vale para las figuras de pie (apartado 14).</p>
 <div class="caja">El proyecto guarda el mapa de alturas del modelo, no el modelo entero: se abre igual en otro ordenador. Pero si quieres cambiar la <b>vista</b> o el <b>giro</b> después de abrirlo, vuelve a cargar el STL. Para caras, busca modelos de «bas-relief» o un escaneo con el móvil; un modelo de 50 000 triángulos tarda un segundo.</div>
 <h3>Modelos 3D de ejemplo</h3>
 <p>Para ver cómo funciona antes de buscar tus propios modelos, en <b>Relieve → 🗿 Modelos de ejemplo…</b> hay cuatro STL preparados: <b>Busto de mujer</b>, <b>Labios</b>, <b>Ondas en el agua</b> y <b>Anomalía (burbuja)</b>. Al elegir uno se carga con su vista y unas medidas de panel adecuadas (si no estabas en un panel de pared, empieza uno nuevo). Después prueba a cambiar la vista, el giro, el relieve, el suavizado, la separación o las lamas, y mira cómo cambian las piezas.</p>
@@ -453,7 +454,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <img src="img/fig_panel.png" alt="Apartado Figura" class="estrecha">
   <div>
     <ul>
-      <li><b>📂 Cargar modelo 3D…</b> (STL u OBJ) o <b>🗿 Modelos de ejemplo…</b> (busto de mujer…). El modelo <b>se guarda dentro del proyecto</b>, reducido a 60 000 triángulos como mucho.</li>
+      <li><b>📂 Cargar modelo 3D…</b> (STL, OBJ, GLB o PLY) o <b>🗿 Modelos de ejemplo…</b> (busto de mujer…). El modelo <b>se guarda dentro del proyecto</b>, reducido a 60 000 triángulos como mucho.</li>
       <li><b>Alto de la figura</b>: lo que mide terminada. El largo y el fondo salen solos, con las proporciones del modelo.</li>
       <li><b>Cortes</b>: <b>de lado a lado</b> (cada costilla es un perfil de la cara) o <b>de delante a atrás</b> (cada costilla es un frente).</li>
       <li><b>Giro</b>: gira el modelo sobre el eje vertical antes de cortarlo (45°, 90°…).</li>
@@ -479,7 +480,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <img src="img/huecos_panel.png" alt="Apartado Huecos" class="estrecha">
   <div>
     <ul>
-      <li>En el apartado <b>Huecos</b> (panel izquierdo) se añade uno con su forma: <b>▭ Rectángulo</b>, <b>▢ Redondeado</b>, <b>⌒ Arco</b> (medio punto arriba), <b>◯ Círculo u óvalo</b>, <b>✎ Libre</b>, <b>📐 DXF…</b> (un contorno dibujado en otro programa) o, en los paneles de pared, <b>🔤 Texto</b> (unas letras que salen o se hunden; ver más abajo).</li>
+      <li>En el apartado <b>Huecos</b> (panel izquierdo) se añade uno con su forma: <b>▭ Rectángulo</b>, <b>▢ Redondeado</b>, <b>⌒ Arco</b> (medio punto arriba), <b>◯ Círculo u óvalo</b>, <b>✎ Libre</b>, <b>📐 DXF / SVG…</b> (un contorno dibujado en otro programa) o, en los paneles de pared, <b>🔤 Texto</b> (unas letras que salen o se hunden; ver más abajo).</li>
       <li>Al añadir el primero se abre la vista <b>▦ Huecos</b> (en el sitio del editor de perfil; el mismo botón vuelve al perfil).</li>
       <li>Cada hueco tiene su <b>posición</b> (X, Y de la esquina de abajo a la izquierda), <b>ancho</b>, <b>alto</b>, <b>giro</b> (grados, alrededor de su centro) y, si es redondeado, <b>radio</b>. Se puede <b>apagar</b> sin borrarlo, <b>duplicar</b> o <b>borrar</b> (🗑 en la lista, el botón 🗑 Borrar o <kbd>Supr</kbd> en la vista ▦ Huecos; se recupera con ↶).</li>
       <li><b>Tipo de hueco</b>:
@@ -527,8 +528,9 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <li>Lo que sale o se hunde va en las piezas de verdad: en el plano, el DXF, el SVG, el Anidador, el 3D y el STL.</li>
 </ul>
 
-<h3>Traer un hueco desde un DXF</h3>
-<p>Con <b>📐 DXF…</b> puedes dibujar la forma del hueco en <b>LibreCAD, QCAD, Inkscape, AutoCAD</b> o el CAD de clase y traerla como <b>forma libre</b>. El programa lee DXF <b>de texto</b> (R12 o 2000) con líneas, arcos, círculos, elipses, polilíneas (con arcos) y splines, en mm; junta los trazos sueltos por sus extremos y usa el <b>contorno cerrado</b> más grande. Antes de crearlo eliges el tamaño (el del DXF o ajustado a un ancho) y cuántos puntos dejar. Después se mueve, se estira y se gira como cualquier forma libre. Los <b>bloques (INSERT)</b> no se leen: explótalos antes de guardar; si el DXF solo tiene trazos abiertos, ciérralos en el CAD.</p>
+<h3>Traer un hueco desde un DXF o un SVG</h3>
+<p>Con <b>📐 DXF / SVG…</b> puedes dibujar la forma del hueco en <b>LibreCAD, QCAD, Inkscape, AutoCAD</b> o el CAD de clase y traerla como <b>forma libre</b>. El programa lee DXF <b>de texto</b> (R12 o 2000) con líneas, arcos, círculos, elipses, polilíneas (con arcos) y splines, en mm; junta los trazos sueltos por sus extremos y usa el <b>contorno cerrado</b> más grande. Antes de crearlo eliges el tamaño (el del DXF o ajustado a un ancho) y cuántos puntos dejar. Después se mueve, se estira y se gira como cualquier forma libre. Los <b>bloques (INSERT)</b> no se leen: explótalos antes de guardar; si el DXF solo tiene trazos abiertos, ciérralos en el CAD.</p>
+<p>También lee <b>SVG</b> (Inkscape, Illustrator, Affinity, Canva…), que suele ser más cómodo si dibujas en Inkscape: trayectos con curvas y arcos, rectángulos (también redondeados), círculos, elipses, polígonos y líneas, con sus transformaciones (grupos movidos, girados o escalados). Las medidas salen en mm según el tamaño del documento (en Inkscape, <i>Propiedades del documento</i> en mm). Los <b>textos</b> no se leen: pásalos antes a trayecto (<i>Trayecto → Objeto a trayecto</i>); los <b>clones</b> tampoco: desenlázalos. Sirve igual para el <b>perfil clave</b>.</p>
 <h3>Lo que hace el programa con las piezas</h3>
 <ul>
   <li>Una lama o costilla cortada por un hueco puede quedar en <b>varios trozos</b>: se numeran <b>12a, 12b…</b> y salen así en el DXF, el SVG, el Anidador, el despiece y el plano. Si el hueco queda por dentro, la pieza lleva un <b>agujero</b> (se corta primero el de dentro y luego el contorno).</li>
@@ -566,7 +568,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <li><b>Luz rasante</b>: una luz muy baja, casi paralela a la superficie, como la de una ventana a media tarde. Es la que hace que se lean los relieves de pared y los volúmenes de las figuras. La barra de al lado gira la dirección de la luz. Se recuerda en el proyecto.</li>
 </ul>
 <figure><img src="img/fig_busto_rasante.jpg" alt="Luz rasante en el busto" style="max-width:420px"><figcaption>El «Busto de rebanadas» con luz rasante.</figcaption></figure>
-<h3>Guardar el modelo 3D (STL, OBJ o SolidCraft)</h3>
+<h3>Guardar el modelo 3D (STL, OBJ, GLB o SolidCraft)</h3>
 <div class="dos">
   <img src="img/guardar3d.png" alt="Guardar el modelo 3D">
   <div>
@@ -574,6 +576,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
     <ul>
       <li><b>STL</b>: una sola malla con todas las piezas. Es el formato de la impresión 3D.</li>
       <li><b>OBJ + MTL</b>: cada pieza es un objeto aparte con su nombre (Lama 1, Costilla 3, Larguero A, Rastrel 2…) y el color de su material. Se guardan dos archivos: el <b>.obj</b> y el <b>.mtl</b> (los colores); guárdalos juntos.</li>
+      <li><b>GLB (Blender, con texturas)</b>: el formato glTF en un solo archivo. En <b>Blender</b>: <i>Archivo → Importar → glTF 2.0 (.glb/.gltf)</i>. Llegan las piezas con su nombre, agrupadas en <b>Tablero</b>, <b>Rastreles</b> y <b>Herrajes</b>, y los <b>materiales de la vista 3D</b>: con <b>Incluir las texturas de madera</b>, la veta (color, relieve y rugosidad) va dentro del archivo y se ve en Cycles o Eevee sin tocar nada. Sin texturas, cada pieza con su color liso y un archivo más pequeño. Va en <b>metros</b> (lo que usa Blender) y con Y arriba: Blender lo pone solo con Z arriba, así que aquí no se elige el eje. También lo abren los visores 3D de Windows, PowerPoint y las webs de modelos.</li>
       <li><b>SolidCraft (.sc)</b>: el formato propio de <a href="https://solidcraft.io/">SolidCraft</a>. Se abre directamente con <i>Abrir</i> y cada pieza es un <b>cuerpo aparte</b> con su nombre y su color, dentro de una importación de malla. Es el recomendado para SolidCraft: más pequeño y más rápido de abrir.</li>
       <li><b>SolidCraft (JSON plano)</b>: lo mismo, pero en un único archivo de texto <b>.json</b> que SolidCraft también abre. Útil para mirarlo o para guardarlo en git; ocupa algo más.</li>
       <li><b>Eje vertical</b>: <b>Z arriba</b> para CAD e impresión 3D; <b>Y arriba</b> para Blender o three.js.</li>

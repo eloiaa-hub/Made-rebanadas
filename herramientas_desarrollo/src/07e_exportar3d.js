@@ -1,11 +1,12 @@
 
-/* ===================== GUARDAR EL MODELO 3D (STL / OBJ) =====================
+/* ===================== GUARDAR EL MODELO 3D (STL / OBJ / GLB / SolidCraft) =====================
    Recorre las mallas del mueble montado (sin explosión) y las escribe en mm.
    - STL binario: una sola malla, para imprimir en 3D o abrir en cualquier programa.
    - OBJ + MTL: un objeto por pieza (Lama 1, Costilla 2, Larguero A…) con el color de su material.
    No se guardan la pared, el volumen de ayuda, las líneas de los perfiles ni el suelo. */
-function piezasMalla3D(opc) {
-  const out = [], e = P.vista.explosion;
+// recorre las mallas que se guardan, con su nombre, color y grupo: fn(malla, nombre, color, grupo)
+function recorrerPiezas3D(opc, fn) {
+  const e = P.vista.explosion;
   if (e) { P.vista.explosion = 0; colocarExplosion(); }
   G.modelo.updateMatrixWorld(true);
   const nomOtra = i => { const o = R.otras.find(z => z.i === i); return o ? o.nombre : 'Pieza ' + (i + 1); };
@@ -22,6 +23,13 @@ function piezasMalla3D(opc) {
     else if (ud.z || ud.disco || ud.trozoX != null || ud.modulo) { nombre = nomOtra(ud.i); color = hexTablero(); grupo = 'tablero'; }   // también los trozos de lama y los muebles de los huecos
     else if (ud.x != null) { const c = R.costillas[ud.i]; nombre = c ? c.nombre : 'Costilla ' + (ud.i + 1); color = hexTablero(); grupo = 'tablero'; }
     else return;
+    fn(m, nombre, color, grupo);
+  });
+  if (e) { P.vista.explosion = e; colocarExplosion(); }
+}
+function piezasMalla3D(opc) {
+  const out = [];
+  recorrerPiezas3D(opc, (m, nombre, color, grupo) => {
     const g = m.geometry, pos = g.attributes.position, idx = g.index, M = m.matrixWorld, v = new THREE.Vector3(), V = [];
     for (let k = 0; k < pos.count; k++) { v.fromBufferAttribute(pos, k).applyMatrix4(M); V.push([v.x, v.y, v.z]); }
     const F = [];
@@ -30,7 +38,6 @@ function piezasMalla3D(opc) {
     if (M.determinant() < 0) F.forEach(f => f.reverse());
     out.push({ nombre, color, grupo, V, F });
   });
-  if (e) { P.vista.explosion = e; colocarExplosion(); }
   // ejes y escala: Y arriba (Three.js) → Z arriba si se pide; el mueble se apoya en z = 0
   const s = 1 / (opc.escala || 1);
   const tr = opc.zArriba ? q => [q[0] * s, -q[2] * s, q[1] * s] : q => [q[0] * s, q[1] * s, q[2] * s];
@@ -82,6 +89,126 @@ function exportarOBJ(opc) {
   descargar(base + '.obj', obj, 'model/obj');
   setTimeout(() => descargar(base + '.mtl', mtl, 'text/plain'), 400);
   return { piezas: ps.length, triangulos: nT };
+}
+
+/* ===================== GLB (glTF 2.0 binario) =====================
+   Para Blender (Archivo → Importar → glTF 2.0) y visores: un nodo por pieza, agrupadas en Tablero / Rastreles /
+   Herrajes, con los materiales de la vista 3D (color, y si se pide las texturas de madera: color, relieve y
+   rugosidad). glTF va en metros y con Y hacia arriba (Blender lo pasa solo a Z arriba). */
+function bytesImagen(img) {
+  const src = img && (img.currentSrc || img.src) || '';
+  const m = /^data:(image\/(?:jpeg|png));base64,(.*)$/s.exec(src);
+  let mime, b64;
+  if (m) { mime = m[1]; b64 = m[2]; }
+  else {   // otro formato (webp…) o una imagen dibujada: se pasa por un lienzo
+    const w = img && (img.naturalWidth || img.width), h = img && (img.naturalHeight || img.height); if (!w || !h) return null;
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    try { cv.getContext('2d').drawImage(img, 0, 0); const u = cv.toDataURL('image/jpeg', 0.9); mime = 'image/jpeg'; b64 = u.slice(u.indexOf(',') + 1); } catch (e) { return null; }
+  }
+  const t = atob(b64), u8 = new Uint8Array(t.length); for (let i = 0; i < t.length; i++) u8[i] = t.charCodeAt(i);
+  return { mime, u8 };
+}
+function exportarGLB(opc) {
+  const s = 1 / (1000 * (opc.escala || 1)), conTex = opc.texturas !== false;
+  const js = { asset: { version: '2.0', generator: 'Made-rebanadas ' + VERSION }, scene: 0, scenes: [], nodes: [], meshes: [], materials: [], accessors: [], bufferViews: [], buffers: [] };
+  const trozos = []; let largo = 0;
+  const vista = (u8, objetivo) => { while (largo % 4) { trozos.push(new Uint8Array(1)); largo++; } js.bufferViews.push(Object.assign({ buffer: 0, byteOffset: largo, byteLength: u8.byteLength }, objetivo ? { target: objetivo } : {})); trozos.push(u8); largo += u8.byteLength; return js.bufferViews.length - 1; };
+  const accesor = (arr, tipo, nc, objetivo, mm) => {
+    const bv = vista(new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength), objetivo);
+    const a = { bufferView: bv, componentType: arr instanceof Float32Array ? 5126 : arr instanceof Uint16Array ? 5123 : 5125, count: arr.length / nc, type: tipo };
+    if (mm) { const mn = new Array(nc).fill(Infinity), mx = new Array(nc).fill(-Infinity); for (let i = 0; i < arr.length; i++) { const c = i % nc; if (arr[i] < mn[c]) mn[c] = arr[i]; if (arr[i] > mx[c]) mx[c] = arr[i]; } a.min = mn; a.max = mx; }
+    js.accessors.push(a); return js.accessors.length - 1;
+  };
+  // texturas e imágenes (cada imagen una vez)
+  const imgs = new Map(), texs = new Map();
+  const textura = tx => {
+    if (!conTex || !tx || !tx.image) return null;
+    if (texs.has(tx.image)) return texs.get(tx.image);
+    let im = imgs.get(tx.image);
+    if (im == null) { const b = bytesImagen(tx.image); if (!b) { texs.set(tx.image, null); return null; } (js.images = js.images || []).push({ bufferView: vista(b.u8), mimeType: b.mime }); im = js.images.length - 1; imgs.set(tx.image, im); }
+    js.samplers = js.samplers || [{ magFilter: 9729, minFilter: 9987, wrapS: 10497, wrapT: 10497 }];
+    (js.textures = js.textures || []).push({ sampler: 0, source: im }); const ti = js.textures.length - 1; texs.set(tx.image, ti); return ti;
+  };
+  // materiales: los de la vista 3D (sin el resaltado de la pieza seleccionada)
+  const mats = new Map();
+  const material = (mt, colorPieza) => {
+    const conMapa = conTex && mt.map && mt.map.image;
+    const col = conMapa || !colorPieza || !mt.map ? mt.color : new THREE.Color(colorPieza);
+    const clave = [col ? col.getHexString() : '', conMapa ? mt.map.uuid : '', conTex && mt.normalMap ? mt.normalMap.uuid : '', conTex && mt.roughnessMap ? mt.roughnessMap.uuid : '', mt.roughness, mt.metalness, mt.opacity].join('|');
+    if (mats.has(clave)) return mats.get(clave);
+    const pbr = { baseColorFactor: col ? [col.r, col.g, col.b, mt.transparent ? mt.opacity : 1] : [1, 1, 1, 1], metallicFactor: mt.metalness || 0, roughnessFactor: Math.min(1, mt.roughness == null ? 0.6 : mt.roughness) };
+    const ma = { name: 'Material ' + (js.materials.length + 1), pbrMetallicRoughness: pbr };
+    if (conMapa) { const t = textura(mt.map); if (t != null) pbr.baseColorTexture = { index: t }; }
+    if (conTex && mt.roughnessMap) { const t = textura(mt.roughnessMap); if (t != null) { pbr.metallicRoughnessTexture = { index: t }; pbr.metallicFactor = 0; } }   // la rugosidad va en el canal verde; el metal (azul) se anula
+    if (conTex && mt.normalMap) { const t = textura(mt.normalMap); if (t != null) ma.normalTexture = { index: t, scale: mt.normalScale ? mt.normalScale.x : 1 }; }
+    if (mt.transparent && mt.opacity < 1) ma.alphaMode = 'BLEND';
+    if (mt.side === THREE.DoubleSide) ma.doubleSided = true;
+    js.materials.push(ma); mats.set(clave, js.materials.length - 1); return js.materials.length - 1;
+  };
+  const piezas = []; let minY = Infinity, nT = 0;
+  recorrerPiezas3D(opc, (m, nombre, color, grupo) => {
+    const g = m.geometry, pos = g.attributes.position, nor = g.attributes.normal, uv = g.attributes.uv, idx = g.index, M = m.matrixWorld;
+    const Nm = new THREE.Matrix3().getNormalMatrix(M), v = new THREE.Vector3(), espejo = M.determinant() < 0;
+    const lista = Array.isArray(m.material) ? m.material : [m.material];
+    const total = idx ? idx.count : pos.count, grupos = g.groups && g.groups.length ? g.groups : [{ start: 0, count: total, materialIndex: 0 }];
+    const prims = new Map();
+    grupos.forEach(gr => {
+      const mt = lista[gr.materialIndex] || lista[0]; if (!mt) return;
+      const base = mt;   // el resaltado de la pieza seleccionada (emissive) no se copia
+      const mi = material(base, grupo === 'tablero' ? color : null);
+      let pr = prims.get(mi); if (!pr) prims.set(mi, pr = { mapa: new Map(), P: [], N: [], U: [], I: [], rep: base.map ? base.map.repeat : null, off: base.map ? base.map.offset : null });
+      const fin = Math.min(total, gr.start + gr.count);
+      for (let k = gr.start; k + 2 < fin + 0; k += 3) {
+        const t = [0, 1, 2].map(j => idx ? idx.getX(k + j) : k + j); if (espejo) t.reverse();
+        t.forEach(vi => {
+          let ni = pr.mapa.get(vi);
+          if (ni == null) {
+            ni = pr.P.length / 3; pr.mapa.set(vi, ni);
+            v.fromBufferAttribute(pos, vi).applyMatrix4(M); pr.P.push(v.x * s, v.y * s, v.z * s); if (v.y * s < minY) minY = v.y * s;
+            if (nor) { v.fromBufferAttribute(nor, vi).applyMatrix3(Nm).normalize(); pr.N.push(v.x, v.y, v.z); }
+            if (uv) { const rx = pr.rep ? pr.rep.x : 1, ry = pr.rep ? pr.rep.y : 1, ox = pr.off ? pr.off.x : 0, oy = pr.off ? pr.off.y : 0; pr.U.push(uv.getX(vi) * rx + ox, 1 - (uv.getY(vi) * ry + oy)); }
+          }
+          pr.I.push(ni);
+        });
+        nT++;
+      }
+    });
+    if (prims.size) piezas.push({ nombre, grupo, prims });
+  });
+  if (!piezas.length) throw new Error('No hay piezas que guardar.');
+  // el mueble apoyado en el suelo (y = 0); grupos de nodos
+  const nombresGrupo = { tablero: 'Tablero', rastreles: 'Rastreles', herrajes: 'Herrajes' }, hijos = {}, usados = {};
+  piezas.forEach(p => {
+    const primitives = [];
+    p.prims.forEach((pr, mi) => {
+      for (let k = 1; k < pr.P.length; k += 3) pr.P[k] -= minY;
+      const at = { POSITION: accesor(new Float32Array(pr.P), 'VEC3', 3, 34962, true) };
+      if (pr.N.length === pr.P.length) at.NORMAL = accesor(new Float32Array(pr.N), 'VEC3', 3, 34962);
+      if (pr.U.length && pr.U.length / 2 === pr.P.length / 3) at.TEXCOORD_0 = accesor(new Float32Array(pr.U), 'VEC2', 2, 34962);
+      const nV = pr.P.length / 3, I = nV < 65536 ? new Uint16Array(pr.I) : new Uint32Array(pr.I);
+      primitives.push({ attributes: at, indices: accesor(I, 'SCALAR', 1, 34963), material: mi, mode: 4 });
+    });
+    let nom = p.nombre; usados[nom] = (usados[nom] || 0) + 1; if (usados[nom] > 1) nom += ' (' + usados[nom] + ')';
+    js.meshes.push({ name: nom, primitives });
+    js.nodes.push({ name: nom, mesh: js.meshes.length - 1 });
+    (hijos[p.grupo] = hijos[p.grupo] || []).push(js.nodes.length - 1);
+  });
+  const grupos = Object.keys(hijos).map(gk => { js.nodes.push({ name: nombresGrupo[gk] || gk, children: hijos[gk] }); return js.nodes.length - 1; });
+  js.nodes.push({ name: P.nombre || 'Mueble', children: grupos, extras: { programa: 'Made-rebanadas ' + VERSION, escala: opc.escala > 1 ? '1:' + opc.escala : '1:1' } });
+  js.scenes.push({ name: P.nombre || 'Mueble', nodes: [js.nodes.length - 1] });
+  while (largo % 4) { trozos.push(new Uint8Array(1)); largo++; }
+  js.buffers.push({ byteLength: largo });
+  ['images', 'samplers', 'textures'].forEach(k => { if (js[k] && !js[k].length) delete js[k]; });
+  // empaquetado GLB: cabecera, trozo JSON (relleno con espacios) y trozo binario
+  let jt = new TextEncoder().encode(JSON.stringify(js)); const pj = (4 - jt.length % 4) % 4;
+  if (pj) { const t = new Uint8Array(jt.length + pj); t.set(jt); t.fill(32, jt.length); jt = t; }
+  const totalB = 12 + 8 + jt.length + 8 + largo, out = new Uint8Array(totalB), dv = new DataView(out.buffer);
+  dv.setUint32(0, 0x46546C67, true); dv.setUint32(4, 2, true); dv.setUint32(8, totalB, true);
+  dv.setUint32(12, jt.length, true); dv.setUint32(16, 0x4E4F534A, true); out.set(jt, 20);
+  let o = 20 + jt.length; dv.setUint32(o, largo, true); dv.setUint32(o + 4, 0x004E4942, true); o += 8;
+  trozos.forEach(t => { out.set(t, o); o += t.byteLength; });
+  descargar(nombreArchivo(P.nombre) + sufijo3D(opc) + '.glb', new Blob([out], { type: 'model/gltf-binary' }));
+  return { piezas: piezas.length, triangulos: nT, bytes: totalB, texturas: (js.images || []).length };
 }
 const sufijo3D = opc => (opc.escala > 1 ? '_1a' + opc.escala : '');
 
@@ -201,22 +328,25 @@ function dialogo3D() {
   const esc0 = enMaqueta() ? P.maqueta.escala : 1, opc0 = (() => { try { return JSON.parse(lsGet('made-rebanadas.exp3d', '{}')); } catch (e) { return {}; } })();
   modal('🧊 Guardar el modelo 3D', `
     <p class="nota">Guarda el mueble montado (sin explosión), en milímetros, para abrirlo en otro programa (SketchUp, Fusion, Blender, FreeCAD…) o imprimir una maqueta en 3D.</p>
-    <label class="fila">Formato <select id="x3Formato"><option value="stl">STL</option><option value="obj">OBJ + MTL</option><option value="sc">SolidCraft (.sc)</option><option value="scjson">SolidCraft (JSON plano)</option></select></label>
-    <label class="fila" title="La mayoría de programas de CAD e impresión 3D usan Z hacia arriba">Eje vertical <select id="x3Eje"><option value="z">Z arriba</option><option value="y">Y arriba</option></select></label>
+    <label class="fila">Formato <select id="x3Formato"><option value="stl">STL</option><option value="obj">OBJ + MTL</option><option value="glb">GLB (Blender, con texturas)</option><option value="sc">SolidCraft (.sc)</option><option value="scjson">SolidCraft (JSON plano)</option></select></label>
+    <label class="fila chk oculto" id="filaX3Tex" title="Las maderas de la vista 3D (color, relieve y rugosidad). Sin ellas, cada pieza con su color liso y un archivo mucho más pequeño"><input type="checkbox" id="x3Tex" ${opc0.texturas === false ? '' : 'checked'}> Incluir las texturas de madera</label>
+    <label class="fila" id="filaX3Eje" title="La mayoría de programas de CAD e impresión 3D usan Z hacia arriba">Eje vertical <select id="x3Eje"><option value="z">Z arriba</option><option value="y">Y arriba</option></select></label>
     <label class="fila" title="1 = tamaño real. Para imprimir una maqueta: 10, 20…">Escala 1: <input type="number" id="x3Escala" min="1" step="1" value="${opc0.escala || esc0}"></label>
     <label class="fila chk"><input type="checkbox" id="x3Herrajes" ${opc0.herrajes === false ? '' : 'checked'}> Incluir varillas, tubos y rastreles</label>
-    <ul class="nota" style="margin:4px 0 0 18px;padding:0"><li><b>STL</b>: una sola malla; para imprimir en 3D o ver la forma.</li><li><b>OBJ + MTL</b>: cada pieza aparte con su nombre (Lama 1, Larguero A…) y el color de su material.</li><li><b>SolidCraft</b>: el diseño listo para abrir, con cada pieza como un cuerpo con su nombre y color. El <b>.sc</b> es su archivo de siempre (más pequeño y rápido); el <b>JSON plano</b> es texto, se puede leer y comparar.</li><li><b>Z arriba</b> para CAD e impresión 3D; <b>Y arriba</b> para Blender o three.js.</li></ul>
+    <ul class="nota" style="margin:4px 0 0 18px;padding:0"><li><b>STL</b>: una sola malla; para imprimir en 3D o ver la forma.</li><li><b>OBJ + MTL</b>: cada pieza aparte con su nombre (Lama 1, Larguero A…) y el color de su material.</li><li><b>GLB</b> (glTF): para <b>Blender</b> (<i>Archivo → Importar → glTF 2.0</i>) y visores 3D; cada pieza con su nombre y los materiales de la vista 3D, con las texturas de madera dentro. Va en metros y Blender lo pone con Z arriba solo.</li><li><b>SolidCraft</b>: el diseño listo para abrir, con cada pieza como un cuerpo con su nombre y color. El <b>.sc</b> es su archivo de siempre (más pequeño y rápido); el <b>JSON plano</b> es texto, se puede leer y comparar.</li><li><b>Z arriba</b> para CAD e impresión 3D; <b>Y arriba</b> para Blender o three.js.</li></ul>
     <p class="nota" id="x3Info"></p>`,
     [['💾 Guardar', () => {
-      const opc = { formato: $('#x3Formato').value, zArriba: $('#x3Eje').value === 'z', escala: Math.max(1, +$('#x3Escala').value || 1), herrajes: $('#x3Herrajes').checked };
+      const opc = { formato: $('#x3Formato').value, zArriba: $('#x3Eje').value === 'z', escala: Math.max(1, +$('#x3Escala').value || 1), herrajes: $('#x3Herrajes').checked, texturas: $('#x3Tex').checked };
       lsSet('made-rebanadas.exp3d', JSON.stringify(opc));
       try {
-        const r = opc.formato === 'obj' ? exportarOBJ(opc) : opc.formato === 'sc' || opc.formato === 'scjson' ? exportarSolidcraft(opc) : exportarSTL(opc);
-        cerrarModal(); aviso(`Modelo 3D guardado: ${r.piezas} piezas, ${r.triangulos.toLocaleString('es-ES')} triángulos${opc.formato === 'obj' ? ' (.obj y .mtl)' : ''}`, 4000);
+        const r = opc.formato === 'glb' ? exportarGLB(opc) : opc.formato === 'obj' ? exportarOBJ(opc) : opc.formato === 'sc' || opc.formato === 'scjson' ? exportarSolidcraft(opc) : exportarSTL(opc);
+        cerrarModal(); aviso(`Modelo 3D guardado: ${r.piezas} piezas, ${r.triangulos.toLocaleString('es-ES')} triángulos${opc.formato === 'obj' ? ' (.obj y .mtl)' : ''}${r.bytes ? ` · ${fmt(r.bytes / 1048576, 1)} MB${r.texturas ? ` con ${r.texturas} textura${r.texturas > 1 ? 's' : ''}` : ''}` : ''}`, 4000);
       } catch (e) { aviso('⚠ ' + esc(e.message), 5000); }
     }, true]]);
   if (opc0.formato) $('#x3Formato').value = opc0.formato;
   if (opc0.zArriba === false) $('#x3Eje').value = 'y';
+  const verFormato = () => { const glb = $('#x3Formato').value === 'glb'; $('#filaX3Tex').classList.toggle('oculto', !glb); $('#filaX3Eje').classList.toggle('oculto', glb); };
+  $('#x3Formato').onchange = verFormato; verFormato();
   const info = () => { const k = Math.max(1, +$('#x3Escala').value || 1), d = G.dims || [0, 0, 0]; $('#x3Info').textContent = `Medidas del modelo guardado: ${fmt(d[0] / k)} × ${fmt(d[1] / k)} × ${fmt(d[2] / k)} mm (largo × fondo × alto).`; };
   $('#x3Escala').oninput = info; info();
 }

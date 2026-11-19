@@ -1,5 +1,5 @@
 
-/* ===================== LEER UN DXF =====================
+/* ===================== LEER UN DXF (y un SVG, más abajo) =====================
    Lee un DXF de texto (LibreCAD, Inkscape, QCAD, AutoCAD…) y saca sus contornos cerrados,
    para usarlos como forma libre de un hueco o como perfil clave.
    Entiende LINE, ARC, CIRCLE, ELLIPSE, LWPOLYLINE y POLYLINE (con bulge) y SPLINE (NURBS).
@@ -116,7 +116,12 @@ function leerDXF(texto) {
     }
     i++;
   }
-  // encadena los trazos abiertos por sus extremos (con tolerancia)
+  let aviso2 = '';
+  if (hayInsert) aviso2 = `Tiene ${hayInsert} bloque${hayInsert > 1 ? 's' : ''} (INSERT) que no se leen: explótalos antes de guardar el DXF.`;
+  return Object.assign(lazosDeTrazos(trazos, factor), { factor, aviso: aviso2 });
+}
+/* encadena los trazos abiertos por sus extremos (con tolerancia) y devuelve { lazos (de mayor a menor área), abiertos } */
+function lazosDeTrazos(trazos, factor) {
   const lazos = trazos.filter(t => t.cerrado).map(t => t.pts);
   let abiertos = trazos.filter(t => !t.cerrado).map(t => t.pts.slice());
   for (const tol of [0.01, 0.5]) {
@@ -143,9 +148,143 @@ function leerDXF(texto) {
   const limpios = lazos.map(L => L.filter((p, k) => { const q = L[(k - 1 + L.length) % L.length]; return Math.hypot(p[0] - q[0], p[1] - q[1]) > 1e-6; }))
     .filter(L => L.length >= 3 && areaL(L) > 1e-4).sort((a, b) => areaL(b) - areaL(a));
   limpios.forEach(L => L.forEach(p => { p[0] *= factor; p[1] *= factor; }));
-  let aviso2 = '';
-  if (hayInsert) aviso2 = `Tiene ${hayInsert} bloque${hayInsert > 1 ? 's' : ''} (INSERT) que no se leen: explótalos antes de guardar el DXF.`;
-  return { lazos: limpios, abiertos: abiertos.length, factor, aviso: aviso2 };
+  return { lazos: limpios, abiertos: abiertos.length };
+}
+
+/* ===================== LEER UN SVG =====================
+   Inkscape, Illustrator, Affinity… Lee path (con curvas y arcos), rect (también redondeados), circle, ellipse,
+   polygon, polyline y line, con sus transform. Las medidas salen en mm según width/height y viewBox
+   (sin unidades: 96 px por pulgada). Los textos y los <use> no se leen. Y hacia arriba, como en el DXF. */
+function longitudMM(v) {
+  const m = /^\s*([-+]?[\d.]+(?:e[-+]?\d+)?)\s*(mm|cm|in|pt|pc|px|q)?\s*$/i.exec(v || '');
+  if (!m) return null;
+  return +m[1] * ({ mm: 1, cm: 10, in: 25.4, pt: 25.4 / 72, pc: 25.4 / 6, px: 25.4 / 96, q: 0.25 }[(m[2] || 'px').toLowerCase()]);
+}
+const mulM = (A, B) => [A[0] * B[0] + A[2] * B[1], A[1] * B[0] + A[3] * B[1], A[0] * B[2] + A[2] * B[3], A[1] * B[2] + A[3] * B[3], A[0] * B[4] + A[2] * B[5] + A[4], A[1] * B[4] + A[3] * B[5] + A[5]];
+function matrizTransform(t) {
+  let M = [1, 0, 0, 1, 0, 0];
+  String(t || '').replace(/(matrix|translate|scale|rotate|skewX|skewY)\s*\(([^)]*)\)/g, (_, f, a) => {
+    const n = (a.match(/[-+]?(?:\d*\.\d+|\d+\.?\d*)(?:e[-+]?\d+)?/gi) || []).map(Number), r = g => g * Math.PI / 180;
+    let T2 = [1, 0, 0, 1, 0, 0];
+    if (f === 'matrix' && n.length >= 6) T2 = n.slice(0, 6);
+    else if (f === 'translate') T2 = [1, 0, 0, 1, n[0] || 0, n[1] || 0];
+    else if (f === 'scale') T2 = [n[0] == null ? 1 : n[0], 0, 0, n[1] == null ? (n[0] == null ? 1 : n[0]) : n[1], 0, 0];
+    else if (f === 'rotate') { const c = Math.cos(r(n[0] || 0)), s = Math.sin(r(n[0] || 0)), x = n[1] || 0, y = n[2] || 0; T2 = mulM(mulM([1, 0, 0, 1, x, y], [c, s, -s, c, 0, 0]), [1, 0, 0, 1, -x, -y]); }
+    else if (f === 'skewX') T2 = [1, 0, Math.tan(r(n[0] || 0)), 1, 0, 0];
+    else if (f === 'skewY') T2 = [1, Math.tan(r(n[0] || 0)), 0, 1, 0, 0];
+    M = mulM(M, T2); return '';
+  });
+  return M;
+}
+// arco elíptico de SVG (de x1,y1 a x2,y2), sin el punto inicial
+function arcoSVG(x1, y1, rx, ry, phi, fa, fs, x2, y2) {
+  rx = Math.abs(rx); ry = Math.abs(ry);
+  if (rx < 1e-9 || ry < 1e-9 || (x1 === x2 && y1 === y2)) return [[x2, y2]];
+  const c = Math.cos(phi), s = Math.sin(phi), dx = (x1 - x2) / 2, dy = (y1 - y2) / 2, xp = c * dx + s * dy, yp = -s * dx + c * dy;
+  const L = xp * xp / (rx * rx) + yp * yp / (ry * ry); if (L > 1) { rx *= Math.sqrt(L); ry *= Math.sqrt(L); }
+  const num = rx * rx * ry * ry - rx * rx * yp * yp - ry * ry * xp * xp, den = rx * rx * yp * yp + ry * ry * xp * xp;
+  const co = Math.sqrt(Math.max(0, num / (den || 1))) * (fa === fs ? -1 : 1), cxp = co * rx * yp / ry, cyp = -co * ry * xp / rx;
+  const cx = c * cxp - s * cyp + (x1 + x2) / 2, cy = s * cxp + c * cyp + (y1 + y2) / 2;
+  const ang = (ux, uy, vx, vy) => Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy);
+  const t1 = ang(1, 0, (xp - cxp) / rx, (yp - cyp) / ry);
+  let dt = ang((xp - cxp) / rx, (yp - cyp) / ry, (-xp - cxp) / rx, (-yp - cyp) / ry);
+  if (!fs && dt > 0) dt -= 2 * Math.PI; else if (fs && dt < 0) dt += 2 * Math.PI;
+  const n = Math.max(4, Math.ceil(Math.abs(dt) / 0.08)), out = [];
+  for (let k = 1; k <= n; k++) { const t = t1 + dt * k / n, ct = Math.cos(t) * rx, st = Math.sin(t) * ry; out.push([cx + ct * c - st * s, cy + ct * s + st * c]); }
+  out[out.length - 1] = [x2, y2];
+  return out;
+}
+// el atributo d de un <path>: devuelve trazos { pts, cerrado } (uno por subtrazo)
+function trazosPathSVG(d) {
+  const s = String(d || ''), reNum = /[-+]?(?:\d*\.\d+|\d+\.?\d*)(?:[eE][-+]?\d+)?/y, trazos = [];
+  let i = 0, cmd = '', x = 0, y = 0, sx = 0, sy = 0, qx = null, qy = null, ant = '', cur = null;
+  const ws = () => { while (i < s.length && /[\s,]/.test(s[i])) i++; };
+  const num = () => { ws(); reNum.lastIndex = i; const m = reNum.exec(s); if (!m) throw new Error('Trayecto SVG mal formado.'); i = reNum.lastIndex; return +m[0]; };
+  const bandera = () => { ws(); const c = s[i++]; if (c !== '0' && c !== '1') throw new Error('Trayecto SVG mal formado.'); return c === '1'; };
+  const hayNum = () => { ws(); return i < s.length && /[-+.\d]/.test(s[i]); };
+  const cerrarCur = () => { if (cur && cur.pts.length > 1) trazos.push(cur); cur = null; };
+  const ir = (nx, ny) => { if (!cur) cur = { pts: [[x, y]], cerrado: false }; cur.pts.push([nx, ny]); x = nx; y = ny; };
+  const curva = (P0, P1, P2, P3) => {   // Bézier cúbica
+    const lg = Math.hypot(P1[0] - P0[0], P1[1] - P0[1]) + Math.hypot(P2[0] - P1[0], P2[1] - P1[1]) + Math.hypot(P3[0] - P2[0], P3[1] - P2[1]);
+    const n = clamp(Math.ceil(lg / 2), 6, 64);
+    for (let k = 1; k <= n; k++) { const t = k / n, u = 1 - t; ir(u * u * u * P0[0] + 3 * u * u * t * P1[0] + 3 * u * t * t * P2[0] + t * t * t * P3[0], u * u * u * P0[1] + 3 * u * u * t * P1[1] + 3 * u * t * t * P2[1] + t * t * t * P3[1]); }
+  };
+  while (true) {
+    ws(); if (i >= s.length) break;
+    if (/[a-zA-Z]/.test(s[i])) cmd = s[i++];
+    else if (!cmd || /[zZ]/.test(cmd)) break;
+    const rel = cmd !== cmd.toUpperCase(), C = cmd.toUpperCase(), ox = rel ? x : 0, oy = rel ? y : 0;
+    if (C === 'M') { const nx = num() + ox, ny = num() + oy; cerrarCur(); x = sx = nx; y = sy = ny; cur = { pts: [[x, y]], cerrado: false }; cmd = rel ? 'l' : 'L'; }
+    else if (C === 'L') { const nx = num() + ox, ny = num() + oy; ir(nx, ny); }
+    else if (C === 'H') ir(num() + ox, y);
+    else if (C === 'V') ir(x, num() + oy);
+    else if (C === 'C' || C === 'S') {
+      let c1;
+      if (C === 'C') c1 = [num() + ox, num() + oy];
+      else c1 = /[CS]/.test(ant) && qx != null ? [2 * x - qx, 2 * y - qy] : [x, y];
+      const c2 = [num() + ox, num() + oy], p = [num() + ox, num() + oy];
+      curva([x, y], c1, c2, p); qx = c2[0]; qy = c2[1];
+    } else if (C === 'Q' || C === 'T') {
+      let c1;
+      if (C === 'Q') c1 = [num() + ox, num() + oy];
+      else c1 = /[QT]/.test(ant) && qx != null ? [2 * x - qx, 2 * y - qy] : [x, y];
+      const p = [num() + ox, num() + oy], P0 = [x, y];
+      curva(P0, [P0[0] + 2 / 3 * (c1[0] - P0[0]), P0[1] + 2 / 3 * (c1[1] - P0[1])], [p[0] + 2 / 3 * (c1[0] - p[0]), p[1] + 2 / 3 * (c1[1] - p[1])], p); qx = c1[0]; qy = c1[1];
+    } else if (C === 'A') {
+      const rx = num(), ry = num(), rot = num() * Math.PI / 180, fa = bandera(), fs = bandera(), nx = num() + ox, ny = num() + oy;
+      arcoSVG(x, y, rx, ry, rot, fa, fs, nx, ny).forEach(p => ir(p[0], p[1]));
+    } else if (C === 'Z') {
+      if (cur) { cur.cerrado = true; const p0 = cur.pts[0], pf = cur.pts[cur.pts.length - 1]; if (cur.pts.length > 1 && Math.hypot(p0[0] - pf[0], p0[1] - pf[1]) < 1e-9) cur.pts.pop(); }
+      cerrarCur(); x = sx; y = sy;
+    } else throw new Error('Orden de trayecto SVG desconocida: ' + cmd);
+    ant = C;
+    if (!/[CS]/.test(C) && !/[QT]/.test(C)) qx = qy = null;
+    if (C !== 'Z' && !hayNum() && i < s.length && !/[a-zA-Z]/.test(s[i])) break;
+  }
+  cerrarCur();
+  return trazos;
+}
+function leerSVG(texto) {
+  const doc = new DOMParser().parseFromString(texto, 'image/svg+xml'), raiz = doc.documentElement;
+  if (!raiz || raiz.nodeName.toLowerCase() !== 'svg' || doc.getElementsByTagName('parsererror').length) throw new Error('No parece un SVG.');
+  // milímetros por unidad del dibujo
+  const vb = (raiz.getAttribute('viewBox') || '').trim().split(/[\s,]+/).map(Number), ancho = longitudMM(raiz.getAttribute('width')), alto = longitudMM(raiz.getAttribute('height'));
+  let k = 25.4 / 96;
+  if (vb.length === 4 && vb[2] > 0) { if (ancho) k = ancho / vb[2]; else if (alto && vb[3] > 0) k = alto / vb[3]; }
+  const trazos = []; let nTexto = 0, nUse = 0;
+  const n = v => parseFloat(v) || 0;
+  const recorrer = (el, M) => {
+    const tag = (el.localName || el.nodeName || '').toLowerCase();
+    if (/^(defs|clippath|mask|symbol|marker|pattern|style|title|desc|metadata|script|lineargradient|radialgradient|filter)$/.test(tag)) return;
+    if (el.getAttribute && (el.getAttribute('display') === 'none' || /display\s*:\s*none/.test(el.getAttribute('style') || ''))) return;
+    const M2 = el.getAttribute && el.getAttribute('transform') ? mulM(M, matrizTransform(el.getAttribute('transform'))) : M;
+    const a = q => el.getAttribute(q), pon = (ts) => ts.forEach(t => trazos.push({ pts: t.pts.map(p => [(M2[0] * p[0] + M2[2] * p[1] + M2[4]) * k, -(M2[1] * p[0] + M2[3] * p[1] + M2[5]) * k]), cerrado: t.cerrado }));
+    if (tag === 'path') pon(trazosPathSVG(a('d')));
+    else if (tag === 'rect') {
+      const x = n(a('x')), y = n(a('y')), w = n(a('width')), h = n(a('height'));
+      if (w > 0 && h > 0) {
+        let rx = a('rx') != null ? n(a('rx')) : a('ry') != null ? n(a('ry')) : 0, ry = a('ry') != null ? n(a('ry')) : rx;
+        rx = Math.min(rx, w / 2); ry = Math.min(ry, h / 2);
+        pon(rx > 0 && ry > 0 ? trazosPathSVG(`M${x + rx},${y}H${x + w - rx}A${rx},${ry} 0 0 1 ${x + w},${y + ry}V${y + h - ry}A${rx},${ry} 0 0 1 ${x + w - rx},${y + h}H${x + rx}A${rx},${ry} 0 0 1 ${x},${y + h - ry}V${y + ry}A${rx},${ry} 0 0 1 ${x + rx},${y}Z`)
+          : [{ pts: [[x, y], [x + w, y], [x + w, y + h], [x, y + h]], cerrado: true }]);
+      }
+    } else if (tag === 'circle' || tag === 'ellipse') {
+      const cx = n(a('cx')), cy = n(a('cy')), rx = tag === 'circle' ? n(a('r')) : n(a('rx')), ry = tag === 'circle' ? rx : n(a('ry'));
+      if (rx > 0 && ry > 0) { const N = 96, pts = []; for (let j = 0; j < N; j++) { const t = 2 * Math.PI * j / N; pts.push([cx + rx * Math.cos(t), cy + ry * Math.sin(t)]); } pon([{ pts, cerrado: true }]); }
+    } else if (tag === 'polygon' || tag === 'polyline') {
+      const v = (a('points') || '').match(/[-+]?(?:\d*\.\d+|\d+\.?\d*)(?:e[-+]?\d+)?/gi) || [], pts = [];
+      for (let j = 0; j + 1 < v.length; j += 2) pts.push([+v[j], +v[j + 1]]);
+      if (pts.length > 1) pon([{ pts, cerrado: tag === 'polygon' }]);
+    } else if (tag === 'line') pon([{ pts: [[n(a('x1')), n(a('y1'))], [n(a('x2')), n(a('y2'))]], cerrado: false }]);
+    else if (tag === 'text') { nTexto++; return; }
+    else if (tag === 'use') { nUse++; return; }
+    [...(el.children || [])].forEach(h => recorrer(h, M2));
+  };
+  recorrer(raiz, [1, 0, 0, 1, 0, 0]);
+  const av = [];
+  if (nTexto) av.push(`Tiene ${nTexto} texto${nTexto > 1 ? 's que no se leen' : ' que no se lee'}: pásalos a trayecto (en Inkscape, Trayecto → Objeto a trayecto).`);
+  if (nUse) av.push(`Tiene ${nUse} clon${nUse > 1 ? 'es (<use>) que no se leen' : ' (<use>) que no se lee'}: desenlázalos antes de guardar.`);
+  return Object.assign(lazosDeTrazos(trazos, 1), { factor: k, aviso: av.join(' ') });
 }
 /* quita puntos de un lazo hasta dejar n, primero los que menos cambian la forma (área del triángulo) */
 function simplificarLazo(poly, n) {
@@ -182,8 +321,8 @@ function pedirDXF(fn) {
     const rd = new FileReader();
     rd.onload = () => {
       try {
-        const r = leerDXF(rd.result);
-        if (!r.lazos.length) throw new Error('No hay ningún contorno cerrado en el DXF.' + (r.aviso ? ' ' + r.aviso : r.abiertos ? ` Hay ${r.abiertos} trazos abiertos: ciérralos (une sus extremos) en el CAD.` : ''));
+        const esSVG = /\.svg$/i.test(a.name) || /^\s*(<\?xml|<svg|<!DOCTYPE svg)/i.test(String(rd.result).slice(0, 200)), r = esSVG ? leerSVG(rd.result) : leerDXF(rd.result);
+        if (!r.lazos.length) throw new Error(`No hay ningún contorno cerrado en el ${esSVG ? 'SVG' : 'DXF'}.` + (r.aviso ? ' ' + r.aviso : r.abiertos ? ` Hay ${r.abiertos} trazos abiertos: ciérralos (une sus extremos) en el ${esSVG ? 'programa de dibujo' : 'CAD'}.` : ''));
         fn(r, a.name);
       } catch (e) { aviso('⚠ ' + esc(e.message), 7000); }
     };
@@ -195,9 +334,9 @@ const cajaLazo = L => cajaDe(L);
 function dialogoHuecoDXF() {
   pedirDXF((r, nombre) => {
     const L0 = r.lazos[0], cb = cajaLazo(L0);
-    modal('📐 Hueco desde un DXF', `
+    modal('📐 Hueco desde un DXF o SVG', `
       <p class="nota"><b>${esc(nombre)}</b>: contorno de ${fmt(cb.w, 1)} × ${fmt(cb.h, 1)} mm con ${L0.length.toLocaleString('es-ES')} puntos${r.lazos.length > 1 ? ` (hay ${r.lazos.length} contornos cerrados: se usa el mayor)` : ''}.${r.aviso ? `<br>⚠ ${esc(r.aviso)}` : ''}</p>
-      <label class="fila">Tamaño <select id="dxTam"><option value="real">El del DXF (mm reales)</option><option value="ancho">Ajustar el ancho a…</option></select></label>
+      <label class="fila">Tamaño <select id="dxTam"><option value="real">El del dibujo (mm reales)</option><option value="ancho">Ajustar el ancho a…</option></select></label>
       <label class="fila oculto" id="filaDxAncho">Ancho (mm) <input type="number" id="dxAncho" value="${Math.min(600, Math.round(cb.w))}" min="10" step="10"></label>
       <label class="fila" title="Si el contorno tiene muchos puntos, se quitan primero los que menos cambian la forma">Dejar como mucho (puntos) <input type="number" id="dxPts" value="${Math.min(120, L0.length)}" min="4" max="2000" step="10"></label>
       <p class="nota">El hueco sale como <b>forma libre</b>, centrado, y se puede mover, escalar y girar en la vista ▦ Huecos.</p>`,
@@ -220,11 +359,11 @@ function dialogoPerfilDXF() {
   if (!P.claves.length) { aviso('Este mueble no tiene perfiles clave.'); return; }
   pedirDXF((r, nombre) => {
     const L0 = r.lazos[0], cb = cajaLazo(L0), M = P.claves[0].pts.length, kSel = clamp(UI.clave, 0, P.claves.length - 1);
-    modal('📐 Perfil clave desde un DXF', `
+    modal('📐 Perfil clave desde un DXF o SVG', `
       <p class="nota"><b>${esc(nombre)}</b>: contorno de ${fmt(cb.w, 1)} × ${fmt(cb.h, 1)} mm${r.lazos.length > 1 ? ` (hay ${r.lazos.length} contornos cerrados: se usa el mayor)` : ''}.${r.aviso ? `<br>⚠ ${esc(r.aviso)}` : ''}</p>
       <p class="nota">El contorno se reparte en los <b>${M} puntos</b> que tienen los perfiles de este mueble (con ✂ Simplificar o añadiendo puntos puedes cambiarlos antes). En cada esquina viva del dibujo cae un punto; si lo pones en todos los perfiles, esos puntos se marcan como esquinas.</p>
       <label class="fila">Ponerlo en <select id="dxDest"><option value="una">El perfil seleccionado (clave ${kSel + 1})</option><option value="todas">Todos los perfiles</option></select></label>
-      <label class="fila">Medidas <select id="dxEsc"><option value="real">Las del DXF (mm reales)</option><option value="alto">Escalar al alto del perfil de ahora</option></select></label>
+      <label class="fila">Medidas <select id="dxEsc"><option value="real">Las del dibujo (mm reales)</option><option value="alto">Escalar al alto del perfil de ahora</option></select></label>
       <label class="fila chk"><input type="checkbox" id="dxCentrar" checked> Centrarlo sobre el perfil de ahora (mismo centro y misma base)</label>`,
       [['✔ Traer el perfil', () => {
         const act = P.claves[kSel].pts, cbA = cajaDe(act);
@@ -241,7 +380,7 @@ function dialogoPerfilDXF() {
         let mejor = 0, min = Infinity;
         for (let o = 0; o < M; o++) { let s = 0; for (let i2 = 0; i2 < M; i2++) { const p = nuevo[(i2 + o) % M]; s += (p[0] - act[i2][0]) ** 2 + (p[1] - act[i2][1]) ** 2; } if (s < min) { min = s; mejor = o; } }
         nuevo = nuevo.map((_, i2) => { const p = nuevo[(i2 + mejor) % M]; return [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]; });
-        // en cada esquina viva del DXF, clava el punto más cercano (y márcala si va a todos los perfiles)
+        // en cada esquina viva del dibujo, clava el punto más cercano (y márcala si va a todos los perfiles)
         const esqIdx = [];
         esquinasLazo(L).forEach(iv => {
           let mi = 0, md = Infinity;

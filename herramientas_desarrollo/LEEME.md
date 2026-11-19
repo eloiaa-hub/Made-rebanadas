@@ -20,10 +20,10 @@ No hacen falta para usar el programa: solo para cambiarlo.
 | `fuentes/` | Modelos de fuera ya reducidos y orientados (Y arriba, mirando a +Z): `busto_mujer.stl`; `modelos.py` lo incluye |
 | `modelos.py` | Genera los STL y las imágenes en grises de ejemplo (`assets/modelos/modelos.js`, `assets/imagenes/imagenes.js`) (numpy y scikit-image) |
 | `02f_huecos.js` | Huecos: formas, restas con Clipper, trozos (12a, 12b), muebles insertados (tableros), rastreles cortados y avisos |
-| `02g_dxf.js` | Lectura de DXF de texto (LINE, ARC, CIRCLE, ELLIPSE, LWPOLYLINE y POLYLINE con bulge, SPLINE): contornos cerrados para huecos libres y perfiles clave |
+| `02g_dxf.js` | Lectura de DXF de texto (LINE, ARC, CIRCLE, ELLIPSE, LWPOLYLINE y POLYLINE con bulge, SPLINE): contornos cerrados para huecos libres y perfiles clave; también SVG (`leerSVG`: path con curvas y arcos, rect, circle, ellipse, polygon, polyline, line, transform) |
 | `04b_huecos.js` | Vista ▦ Huecos (frente del panel o perfil) y apartado Huecos del panel |
 | `02e_figura.js` | Figuras de pie: malla guardada en el proyecto (int16/uint32 en base64), cortes por planos, unión de trozos con puentes (rejilla) y conversión a perfiles clave |
-| `02d_relieve.js` | Relieve de pared: mapa de alturas desde un texto (canvas) o un modelo STL/OBJ (z-buffer), perfil de cada lama, lamas horizontales |
+| `02d_relieve.js` | Relieve de pared: mapa de alturas desde un texto (canvas) o un modelo STL/OBJ/GLB/PLY (z-buffer; `leerMalla`, `leerGLTF`, `leerPLY`), perfil de cada lama, lamas horizontales |
 | `02c_disposicion.js` | Dónde va cada costilla (recta, curva, radial, pared), varillas curvas, tubo y discos, rastreles, comprobaciones de radial y pared |
 | `03_plantillas.js` | Plantillas paramétricas (banco, tumbona, pouf, mesa, estantería, libre) |
 | `04_editor2d.js` | Editor del perfil clave y vista de la costilla |
@@ -33,7 +33,7 @@ No hacen falta para usar el programa: solo para cambiarlo.
 | `07b_plano.js` | Escritor de PDF propio y plano de montaje |
 | `07c_anidador.js` | Ventana del Anidador y paso de las costillas (formato .json del Calcador) |
 | `07d_cnc.js` | Hueso de perro y ajuste de rectas y arcos (bulge) para el DXF, el SVG y el Anidador |
-| `07e_exportar3d.js` | Guardar el mueble montado en STL binario, OBJ + MTL (una pieza por objeto) o SolidCraft (`.sc`: ZIP sin comprimir con `container.json`, `document.json` y `blobs/<sha256>.mesh` en formato `SCMESH01`; o JSON plano con las mallas dentro). Suelda y cierra las mallas (`soldarMalla`, `taparAgujeros`) |
+| `07e_exportar3d.js` | Guardar el mueble montado en STL binario, OBJ + MTL (una pieza por objeto), GLB (glTF 2.0 con materiales y texturas incrustadas, `exportarGLB`) o SolidCraft (`.sc`: ZIP sin comprimir con `container.json`, `document.json` y `blobs/<sha256>.mesh` en formato `SCMESH01`; o JSON plano con las mallas dentro). Suelda y cierra las mallas (`soldarMalla`, `taparAgujeros`) |
 | `08_archivo.js` | Ventanas, deshacer, guardar, abrir, ejemplos |
 | `09_inicio.js` | Arranque, botones y teclado |
 

@@ -24,9 +24,9 @@ Funciona en el navegador (Chrome, Edge o Firefox), sin instalar nada y **sin con
 - **Módulos a lo ancho** (o a lo alto): el panel en columnas de la misma o distinta medida, con los rastreles cortados entre módulos y, si se quiere, un hueco más ancho entre ellos.
 - **Texto en las lamas** (paneles de pared): un rótulo que sale hacia fuera o se hunde hacia dentro sobre cualquier panel, con la letra que quieras.
 - **Huecos**: ventanas, rebajes, hornacinas, baldas y armarios dentro de las lamas, y túneles en los muebles de costillas (formas rectangulares, redondeadas, en arco, círculos o libres), o un contorno traído de un **DXF**). Los muebles de los huecos pueden llevar **otro grosor de tablero**, con sus tableros aparte.
-- **Figuras de pie desde un STL/OBJ**: el modelo cortado de verdad en costillas o en retícula (bustos, esculturas).
-- **Modelo 3D**: el mueble montado se guarda en STL, OBJ o SolidCraft (.sc o JSON plano), con mallas cerradas (para otros programas o impresión 3D).
-- **Arte mural, rótulos y estanterías**: relieve de pared a partir de un **texto** (nombres, logos) o de una **imagen en escala de grises**, o de una **figura STL/OBJ** (caras, labios, formas; trae cuatro STL de ejemplo en `assets/modelos`, entre ellos un busto de mujer), en lamas verticales u horizontales, y estantería de pared ondulada de lamas.
+- **Figuras de pie desde un STL, OBJ, GLB o PLY**: el modelo cortado de verdad en costillas o en retícula (bustos, esculturas).
+- **Modelo 3D**: el mueble montado se guarda en STL, OBJ, GLB (Blender, con texturas de madera) o SolidCraft (.sc o JSON plano), con mallas cerradas (para otros programas o impresión 3D).
+- **Arte mural, rótulos y estanterías**: relieve de pared a partir de un **texto** (nombres, logos) o de una **imagen en escala de grises**, o de una **figura STL, OBJ, GLB o PLY** (caras, labios, formas; trae cuatro STL de ejemplo en `assets/modelos`, entre ellos un busto de mujer), en lamas verticales u horizontales, y estantería de pared ondulada de lamas.
 - **Perfiles clave en el 3D**: se seleccionan pinchándolos.
 - **Costillas**: grosor del tablero, reparto por separación o por número, base aplanada y corte plano arriba.
 - **Varillas**: roscada, redondo de madera o tubo, con separadores; colocación automática y comprobación de la madera que queda al borde en cada costilla.

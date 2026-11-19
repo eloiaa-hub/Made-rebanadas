@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Made-rebanadas — Por Eloi A.A.</title>
-<link rel="stylesheet" href="assets/css/estilo.css?v=202611191019">
+<link rel="stylesheet" href="assets/css/estilo.css?v=202611192224">
 </head>
 <body>
 <header class="barra">
@@ -27,7 +27,7 @@
     <button id="bAnidador" title="Colocar las costillas por su forma real en el Anidador de tableros"><span>🧩</span><span class="txt"> Anidador</span></button>
     <button id="bFabricar" class="primario" title="Colocar las costillas en tableros y exportar DXF / SVG para la CNC"><span>🪚</span><span class="txt"> Fabricar</span></button>
     <button id="bImagen" title="Guardar la vista 3D como imagen PNG"><span>📷</span><span class="txt"> Imagen</span></button>
-    <button id="b3D" title="Guardar el modelo 3D (STL u OBJ) para otros programas o para imprimirlo"><span>🧊</span><span class="txt"> 3D</span></button>
+    <button id="b3D" title="Guardar el modelo 3D (STL, OBJ, GLB para Blender o SolidCraft) para otros programas o para imprimirlo"><span>🧊</span><span class="txt"> 3D</span></button>
     <span class="sep"></span>
     <button id="bTema" title="Modo claro / oscuro">🌓</button>
     <button id="bAyuda" title="Manual de uso"><span>❓</span><span class="txt"> Ayuda</span></button>
@@ -43,7 +43,7 @@
         <label class="fila" title="Costillas separadas unidas con varillas, o retícula de costillas y largueros que se cruzan con ranuras a media madera">Tipo de mueble
           <select id="sTipo"><option value="costillas">Costillas con varillas</option><option value="reticula">Retícula (ranuras a media madera)</option><option value="radial">Radial (lámparas, columnas)</option><option value="pared">Panel de pared (lamas)</option></select></label>
         <label class="fila oculto" id="filaOrigen" title="De dónde sale la forma de las lamas">Origen de la forma
-          <select id="sOrigen"><option value="plantilla">Plantilla</option><option value="texto">Texto en relieve</option><option value="modelo">Modelo 3D (STL / OBJ)</option><option value="imagen">Imagen en grises</option><option value="figura">Modelo 3D (secciones)</option></select></label>
+          <select id="sOrigen"><option value="plantilla">Plantilla</option><option value="texto">Texto en relieve</option><option value="modelo">Modelo 3D (STL / OBJ / GLB / PLY)</option><option value="imagen">Imagen en grises</option><option value="figura">Modelo 3D (secciones)</option></select></label>
         <button id="bConvertirPerfiles" class="ancho oculto" style="margin:2px 0 8px" title="Pasa la forma a perfiles clave para retocar a mano los puntos de las piezas">✏ Convertir en perfiles editables…</button>
         <label class="fila" id="filaPlantilla">Plantilla <select id="sPlantilla"></select></label>
         <button id="bPlantillaFotos" class="ancho" title="Las mismas plantillas, en cuadrícula y con una foto de cada una">🗔 Ver las plantillas con fotos…</button>
@@ -114,8 +114,8 @@
           <label class="fila">Interlineado <input type="number" id="rlInter" min="0.6" max="3" step="0.05"></label>
         </div>
         <div id="relModelo">
-          <p class="nota" id="rlModeloInfo">Sin modelo. Carga un STL u OBJ (rostro, figura, logo en 3D…).</p>
-          <button id="bCargarModelo" class="ancho" title="Cargar un modelo 3D (.stl o .obj)">📂 Cargar modelo 3D…</button>
+          <p class="nota" id="rlModeloInfo">Sin modelo. Carga un STL, OBJ, GLB o PLY (rostro, figura, logo en 3D…).</p>
+          <button id="bCargarModelo" class="ancho" title="Cargar un modelo 3D (.stl, .obj, .glb o .ply)">📂 Cargar modelo 3D…</button>
           <button id="bModeloEjemplo" class="ancho" title="Cara, labios, ondas… para ver cómo funciona">🗿 Modelos de ejemplo…</button>
           <label class="fila">Vista <select id="rlVista"><option value="frente">De frente</option><option value="atras">De atrás</option><option value="izquierda">Desde la izquierda</option><option value="derecha">Desde la derecha</option><option value="arriba">Desde arriba</option><option value="abajo">Desde abajo</option></select></label>
           <label class="fila">Giro <select id="rlGiro"><option value="0">0°</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></label>
@@ -163,7 +163,7 @@
           <button data-hnuevo="arco" title="Rectángulo con arco de medio punto arriba">⌒ Arco</button>
           <button data-hnuevo="circulo" title="Círculo u óvalo">◯ Círculo</button>
           <button data-hnuevo="libre" title="Forma libre: mueve los vértices en la vista; doble clic en un lado añade uno">✎ Libre</button>
-          <button id="bHuecoDXF" title="Trae un contorno cerrado dibujado en LibreCAD, Inkscape u otro CAD (DXF de texto) como hueco de forma libre">📐 DXF…</button>
+          <button id="bHuecoDXF" title="Trae un contorno cerrado dibujado en LibreCAD, Inkscape u otro programa (DXF de texto o SVG) como hueco de forma libre">📐 DXF / SVG…</button>
           <button data-hnuevo="texto" id="bHuecoTexto" title="Un texto sobre las lamas: las letras salen hacia fuera o se hunden hacia dentro (también se pueden recortar)">🔤 Texto</button>
         </div>
         <ul id="listaHuecos" class="lista corta"></ul>
@@ -212,8 +212,8 @@
     <section id="secFigura">
       <h3>Figura (modelo 3D)</h3>
       <div class="sec-cuerpo">
-        <p class="nota" id="fgInfo">Sin modelo. Carga un STL u OBJ: cada costilla será un corte de verdad del modelo.</p>
-        <button id="bFigCargar" class="ancho" title="Cargar un modelo 3D (.stl o .obj) para cortarlo en costillas">📂 Cargar modelo 3D…</button>
+        <p class="nota" id="fgInfo">Sin modelo. Carga un STL, OBJ, GLB o PLY: cada costilla será un corte de verdad del modelo.</p>
+        <button id="bFigCargar" class="ancho" title="Cargar un modelo 3D (.stl, .obj, .glb o .ply) para cortarlo en costillas">📂 Cargar modelo 3D…</button>
         <button id="bFigEjemplo" class="ancho" title="Busto de mujer, labios, ondas…">🗿 Modelos de ejemplo…</button>
         <label class="fila" title="Alto de la figura terminada">Alto de la figura (mm) <input type="number" id="fgAlto" min="100" step="10"></label>
         <label class="fila" title="Por dónde se corta el modelo">Cortes <select id="fgEje"><option value="x">De lado a lado (perfiles)</option><option value="z">De delante a atrás</option></select></label>
@@ -380,7 +380,7 @@
           <button id="bClaveMenos" class="peligro" title="Quitar este perfil clave">🗑 Quitar</button>
         </div>
         <button id="bSimplificar" class="ancho" title="Quita puntos a todos los perfiles clave a la vez, primero los que menos cambian la forma">✂ Simplificar puntos…</button>
-        <button id="bPerfilDXF" class="ancho" title="Trae un contorno cerrado dibujado en LibreCAD, Inkscape u otro CAD (DXF de texto) como perfil clave">📐 Perfil desde un DXF…</button>
+        <button id="bPerfilDXF" class="ancho" title="Trae un contorno cerrado dibujado en LibreCAD, Inkscape u otro programa (DXF de texto o SVG) como perfil clave">📐 Perfil desde un DXF o SVG…</button>
         <label class="fila chk"><input type="checkbox" id="kTodas"> Al mover un punto, moverlo en todas las claves</label>
         <label class="fila">Rejilla al mover
           <select id="kRejilla"><option value="0">Sin ajuste</option><option value="1">1 mm</option><option value="5" selected>5 mm</option><option value="10">10 mm</option></select></label>
@@ -423,21 +423,21 @@
 </div>
 
 <input type="file" id="fArchivo" class="oculto" accept=".json,application/json">
-<input type="file" id="fModelo" class="oculto" accept=".stl,.obj">
-<input type="file" id="fDXF" class="oculto" accept=".dxf">
+<input type="file" id="fModelo" class="oculto" accept=".stl,.obj,.glb,.gltf,.ply">
+<input type="file" id="fDXF" class="oculto" accept=".dxf,.svg">
 <input type="file" id="fImagen" class="oculto" accept="image/*">
 <input type="file" id="fLetra" class="oculto" accept=".ttf,.otf,.woff,.woff2">
 <div id="aviso" class="aviso"></div>
 
-<script src="assets/js/three-bundle.js?v=202611191019"></script>
-<script src="assets/texturas/texturas.js?v=202611191019"></script>
+<script src="assets/js/three-bundle.js?v=202611192224"></script>
+<script src="assets/texturas/texturas.js?v=202611192224"></script>
 <script src="assets/texturas/pbr/roble.js"></script>
 <script src="assets/texturas/pbr/nogal.js"></script>
 <script src="assets/texturas/pbr/fresno.js"></script>
 <script src="assets/texturas/pbr/haya.js"></script>
 <script src="assets/texturas/pbr/pino.js"></script>
-<script src="assets/ejemplos/ejemplos.js?v=202611191019"></script>
-<script src="assets/js/clipper.js?v=202611191019"></script>
-<script src="assets/js/app.js?v=202611191019"></script>
+<script src="assets/ejemplos/ejemplos.js?v=202611192224"></script>
+<script src="assets/js/clipper.js?v=202611192224"></script>
+<script src="assets/js/app.js?v=202611192224"></script>
 </body>
 </html>

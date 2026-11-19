@@ -2,6 +2,9 @@
 
 ## v1.5
 
+- **Guardar en GLB para Blender** (🧊 3D → *GLB (Blender, con texturas)*): cada pieza con su nombre, agrupadas en Tablero / Rastreles / Herrajes, con los materiales de la vista 3D y, si quieres, las **texturas de madera dentro** (color, relieve y rugosidad). En metros; Blender lo coloca solo con Z arriba. Pasa el validador oficial de glTF.
+- **Importar SVG** para los huecos y los perfiles clave (📐 DXF / SVG…, 📐 Perfil desde un DXF o SVG…): trayectos con curvas y arcos, rectángulos redondeados, círculos, elipses y polígonos, con sus transformaciones, en mm según el tamaño del documento.
+- **Importar GLB / glTF y PLY** en el relieve de pared y en las figuras de pie, además de STL y OBJ: modelos de Sketchfab, de Blender, de apps de escaneo con el móvil o de MeshLab.
 - **Exportar a SolidCraft**: en 🧊 3D, formatos nuevos **SolidCraft (.sc)** (el suyo, recomendado) y **SolidCraft (JSON plano)**. Cada pieza llega como un cuerpo con su nombre y su color.
 - Arreglado: en el STL y el OBJ de un panel con lamas partidas o en módulos **solo salían los trozos de abajo** (Meshmixer, SolidCraft…). Ahora salen todos los trozos y los muebles de los huecos.
 - Las mallas del STL, OBJ y SolidCraft salen **cerradas y bien orientadas** (se sueldan los vértices, se limpian puntos repetidos y se tapan los agujeros diminutos que dejaba el texto hundido).
