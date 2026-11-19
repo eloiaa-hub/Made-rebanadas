@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Made-rebanadas — Por Eloi A.A.</title>
-<link rel="stylesheet" href="assets/css/estilo.css?v=202611192252">
+<link rel="stylesheet" href="assets/css/estilo.css?v=202611192340">
 </head>
 <body>
 <header class="barra">
@@ -41,7 +41,7 @@
       <h3>Forma</h3>
       <div class="sec-cuerpo">
         <label class="fila" title="Costillas separadas unidas con varillas, o retícula de costillas y largueros que se cruzan con ranuras a media madera">Tipo de mueble
-          <select id="sTipo"><option value="costillas">Costillas con varillas</option><option value="reticula">Retícula (ranuras a media madera)</option><option value="radial">Radial (lámparas, columnas)</option><option value="pared">Panel de pared (lamas)</option></select></label>
+          <select id="sTipo"><option value="costillas">Costillas con varillas</option><option value="reticula">Retícula (ranuras a media madera)</option><option value="plano">Piezas planas (sillas, taburetes…)</option><option value="radial">Radial (lámparas, columnas)</option><option value="pared">Panel de pared (lamas)</option></select></label>
         <label class="fila oculto" id="filaOrigen" title="De dónde sale la forma de las lamas">Origen de la forma
           <select id="sOrigen"><option value="plantilla">Plantilla</option><option value="texto">Texto en relieve</option><option value="modelo">Modelo 3D (STL / OBJ / GLB / PLY)</option><option value="imagen">Imagen en grises</option><option value="figura">Modelo 3D (secciones)</option></select></label>
         <button id="bConvertirPerfiles" class="ancho oculto" style="margin:2px 0 8px" title="Pasa la forma a perfiles clave para retocar a mano los puntos de las piezas">✏ Convertir en perfiles editables…</button>
@@ -54,7 +54,7 @@
     </section>
 
     <section>
-      <h3>Costillas</h3>
+      <h3 id="titCostillas">Costillas</h3>
       <div class="sec-cuerpo">
         <label class="fila">Grosor del tablero (mm)
           <select id="cGrosor">
@@ -73,6 +73,15 @@
         <label class="fila">Material
           <select id="cMaterial"></select></label>
         <label class="fila oculto" id="filaColor">Color <input type="color" id="cColor" value="#f2efe8"></label>
+      </div>
+    </section>
+
+    <section id="secPlano">
+      <h3>Piezas planas: uniones</h3>
+      <div class="sec-cuerpo">
+        <p class="nota">Las uniones salen solas donde dos piezas se cruzan: <b>a media madera</b> (una ranura en cada pieza, hasta la mitad del cruce), o con una <b>caja pasante</b> cuando una pieza (una espiga, un travesaño) queda entera dentro de la otra.</p>
+        <label class="fila" title="Lo que las ranuras y las cajas son más anchas que el tablero, para que entren a mano">Holgura de las uniones (mm) <input type="number" id="plHolgura" min="0" max="3" step="0.05" value="0.3"></label>
+        <div class="resumenCost" id="plResumen"></div>
       </div>
     </section>
 
@@ -389,13 +398,36 @@
       </div>
     </section>
 
+    <section id="secPiezas">
+      <h3>Pieza seleccionada</h3>
+      <div class="sec-cuerpo">
+        <p class="nota">Su contorno se dibuja arriba, en su plano, como un perfil: arrastra los puntos, doble clic para añadir uno o para hacerlo esquina. Las zonas grises son las piezas que la cruzan.</p>
+        <label class="fila">Nombre <input type="text" id="pzNombre" style="width:58%"></label>
+        <label class="fila" title="En qué dirección va el tablero">Dirección <select id="pzPlano"><option value="lado">De lado (perfil)</option><option value="frente">De frente</option><option value="horizontal">Horizontal</option></select></label>
+        <label class="fila" title="Dónde está el tablero (su centro): x para las de lado, z para las de frente, y (altura) para las horizontales"><span id="pzPosTit">Posición (mm)</span> <input type="number" id="pzPos" step="1"></label>
+        <p class="nota oculto" id="pzIgual"></p>
+        <div class="col3">
+          <button id="pzNueva" title="Añade un tablero rectangular nuevo">＋ Pieza</button>
+          <button id="pzCopiar" title="Copia esta pieza un poco más allá">⧉ Copiar</button>
+          <button id="pzSimetrica" title="Añade su pareja al otro lado del centro, con el mismo contorno (al editar una cambian las dos)">⇋ Simétrica</button>
+        </div>
+        <div class="col3" style="grid-template-columns:1fr 1fr">
+          <button id="pzSeparar" title="Deja de ser igual que su pareja: desde ahora se edita por separado">✂ Separar</button>
+          <button id="pzQuitar" class="peligro" title="Quitar esta pieza">🗑 Quitar</button>
+        </div>
+        <button id="pzDXF" class="ancho" title="Trae su contorno de un dibujo cerrado en LibreCAD, Inkscape u otro programa (DXF de texto o SVG)">📐 Contorno desde un DXF o SVG…</button>
+        <label class="fila">Rejilla al mover
+          <select id="pzRejilla"><option value="0">Sin ajuste</option><option value="1">1 mm</option><option value="5">5 mm</option><option value="10">10 mm</option></select></label>
+      </div>
+    </section>
+
     <section>
       <h3>Comprobaciones <span id="nAvisos" class="cuenta">0</span></h3>
       <div class="sec-cuerpo"><ul id="avisos" class="avisos"></ul></div>
     </section>
 
     <section class="crece">
-      <h3>Costillas <span id="nCost" class="cuenta">0</span></h3>
+      <h3><span id="titLista">Costillas</span> <span id="nCost" class="cuenta">0</span></h3>
       <div class="sec-cuerpo"><ul id="listaCost" class="lista"></ul></div>
     </section>
 
@@ -429,15 +461,15 @@
 <input type="file" id="fLetra" class="oculto" accept=".ttf,.otf,.woff,.woff2">
 <div id="aviso" class="aviso"></div>
 
-<script src="assets/js/three-bundle.js?v=202611192252"></script>
-<script src="assets/texturas/texturas.js?v=202611192252"></script>
+<script src="assets/js/three-bundle.js?v=202611192340"></script>
+<script src="assets/texturas/texturas.js?v=202611192340"></script>
 <script src="assets/texturas/pbr/roble.js"></script>
 <script src="assets/texturas/pbr/nogal.js"></script>
 <script src="assets/texturas/pbr/fresno.js"></script>
 <script src="assets/texturas/pbr/haya.js"></script>
 <script src="assets/texturas/pbr/pino.js"></script>
-<script src="assets/ejemplos/ejemplos.js?v=202611192252"></script>
-<script src="assets/js/clipper.js?v=202611192252"></script>
-<script src="assets/js/app.js?v=202611192252"></script>
+<script src="assets/ejemplos/ejemplos.js?v=202611192340"></script>
+<script src="assets/js/clipper.js?v=202611192340"></script>
+<script src="assets/js/app.js?v=202611192340"></script>
 </body>
 </html>

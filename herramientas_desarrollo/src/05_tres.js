@@ -155,6 +155,7 @@ function construir3D() {
   if (!G.scene || !R) return;
   limpiar(G.modelo); G.modelo.clear(); G.modelo.position.set(0, 0, 0);
   G.costillas = []; G.largueros = []; G.varillas = []; G.claves3d = [];
+  if (P.tipo === 'plano') { construir3DPlano(); return; }
   const e = grosor(), mats = materialesTablero(), rh = radioAgujero(), V = P.varillas;
   // medidas del mueble montado
   const bb = new T.Box3(), cs = R.costillas.filter(c => c.ok);
@@ -242,6 +243,35 @@ function construir3D() {
   G.suelo.scale.set(tam * 5, tam * 5, 1);
   G.tam = tam;
   luces3D();
+}
+// piezas planas: cada pieza en su plano, con las ranuras y las cajas (y el hueso de perro si está activo)
+function construir3DPlano() {
+  const e = grosor(), mats = materialesTablero(), bb = R.bbox || [[0, 1], [0, 1], [0, 1]];
+  R.costillas.forEach(c => {
+    if (!c.ok) { G.costillas.push(null); return; }
+    const m = new T.Mesh(extruir(polyVista(c.poly), [], e, (c.int || []).map(polyVista)), mats); m.castShadow = m.receiveShadow = true;
+    m.userData = { i: c.i, x: c.x, plano: c.plano };
+    G.modelo.add(m); G.costillas.push(m);
+  });
+  const sz = bb.map(r => r[1] - r[0]);
+  G.dims = [sz[0], sz[2], sz[1]]; G.alto = bb[1][1]; G.fondo = sz[2]; G.rmax = Math.max(sz[0], sz[2]) / 2;
+  G.centro = bb.map(r => (r[0] + r[1]) / 2);
+  const tam = Math.max(sz[0], sz[1], sz[2], 300); G.tam = tam;
+  colocarExplosion(); resaltar3D();
+  G.suelo.scale.set(tam * 5, tam * 5, 1); luces3D();
+}
+// coloca una pieza plana (con la explosión: cada pieza se aparta del centro siguiendo su normal; las horizontales, hacia arriba)
+function colocarPiezaPlana(m) {
+  const c = R && R.costillas[m.userData.i]; if (!c) return;
+  const b = basePieza(c), ex = P.vista.explosion || 0, pl = PLANOS[c.plano], ctr = G.centro || [0, 0, 0], tam = G.tam || 600;
+  const d = b.o.slice();
+  if (ex) {
+    d[pl.n] += (c.x - ctr[pl.n]) * ex * 1.3;   // se separan en proporción a su distancia al centro (mantienen el orden)
+    // las que se montan bajando (horizontales, o con ranuras desde abajo) suben
+    if (pl.n === 1 || (pl.b === 1 && c.ranuras.some(r => !r.alto && r.eje === 'v'))) d[1] += ex * tam * (pl.n === 1 ? 0.6 : 0.4);
+  }
+  const M4 = new T.Matrix4().makeBasis(V3(b.ex), V3(b.ey), V3(b.ez)).setPosition(d[0], d[1], d[2]);
+  m.matrixAutoUpdate = false; m.matrix.copy(M4); m.matrixWorldNeedsUpdate = true;
 }
 // luz normal (de arriba a un lado) o rasante: muy baja, casi paralela a la superficie, y se puede girar
 function luces3D() {
@@ -332,7 +362,7 @@ function construirVarillas3D() {
 function construirClaves3D() {
   (G.claves3d || []).forEach(l => { G.modelo.remove(l); l.geometry.dispose(); l.material.dispose(); });
   G.claves3d = [];
-  if (!P.vista.claves || formaCalculada()) return;
+  if (!P.vista.claves || formaCalculada() || P.tipo === 'plano') return;
   const C = clavesOrdenadas(), acento = cssVar('--acento') || '#1f6fd1';
   C.forEach((k, i) => {
     if (P.tipo === 'radial' && k.x >= 359.999 && C.length > 1) return;     // la de 360° es la misma que la de 0°
@@ -349,6 +379,7 @@ function construirClaves3D() {
 }
 function colocarExplosion() {
   const e = grosor(), ex = P.vista.explosion || 0;
+  if (P.tipo === 'plano') { G.costillas.forEach(m => { if (m) colocarPiezaPlana(m); }); pedirRender(); return; }
   G.costillas.forEach(m => { if (m) ponerEnMarco(m, marcoExpl(m.userData.x)); });
   G.largueros.forEach(m => {
     if (m.userData.modulo) return;
@@ -362,6 +393,7 @@ function colocarExplosion() {
   pedirRender();
 }
 function construirFantasma() {
+  if (P.tipo === 'plano') { if (G.fantasma) { G.modelo.remove(G.fantasma); G.fantasma.geometry.dispose(); G.fantasma = null; } return; }
   if (figuraActiva()) { if (G.fantasma) { G.modelo.remove(G.fantasma); G.fantasma.geometry.dispose(); G.fantasma = null; } return; }
   if (G.fantasma) { G.modelo.remove(G.fantasma); G.fantasma.geometry.dispose(); G.fantasma.material.dispose(); G.fantasma = null; }
   if (!P.vista.fantasma) return;

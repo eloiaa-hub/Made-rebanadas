@@ -108,6 +108,7 @@ function proyectoBase() {
       capa: { activa: false, texto: 'Hola', letra: 'Arial Black', negrita: true, tamLetra: 160, relieve: 30, x: 50, y: 15, modo: 'sale' } },
     huecos: [],
     figura: { activa: false, malla: null, alto: 800, eje: 'x', giro: 0, minArea: 2, unir: true },
+    plano: { holgura: 0.3, piezas: [] },
   };
 }
 
@@ -272,6 +273,7 @@ function reparto() {
 function radioAgujero() { return (P.varillas.diam + P.varillas.holgura) / 2; }
 
 function calcular() {
+  if (P.tipo === 'plano') return calcularPlano();
   if (relieveActivo()) P.largo = P.relieve.orient === 'h' ? P.relieve.alto : P.relieve.ancho;
   else if (figuraActiva()) P.largo = Math.max(50, Math.round(mallaFigura().largo * 10) / 10);
   const e = grosor(), rep = reparto(), V = P.varillas;
@@ -2447,6 +2449,155 @@ function dialogoPerfilDXF() {
   });
 }
 
+/* ===================== PIEZAS PLANAS (FLAT-PACK) =====================
+   Muebles de piezas de tablero con su propia forma (sillas, taburetes, mesitas…), colocadas en tres
+   direcciones. Cada pieza es un contorno en su plano, en las coordenadas del mueble (mm):
+   - lado:       plano perpendicular a X (en x = c); contorno en (z, y): fondo y alto
+   - frente:     plano perpendicular a Z (en z = c); contorno en (x, y): ancho y alto
+   - horizontal: plano perpendicular a Y (en y = c); contorno en (x, z): ancho y fondo
+   X a lo ancho (0 en el centro), Y alto (0 en el suelo), Z fondo (0 en el centro, + hacia delante).
+   Las uniones salen solas donde dos piezas de distinta dirección se cruzan:
+   - media madera: cada pieza con una ranura hasta la mitad del cruce (una desde arriba y otra desde abajo)
+   - caja pasante: si una pieza queda entera dentro de la otra a lo largo del cruce (una espiga, un
+     travesaño), la otra lleva un agujero rectangular por el que pasa. */
+const PLANOS = {
+  lado:       { n: 0, a: 2, b: 1, nombre: 'De lado', ejes: ['fondo (z)', 'alto (y)'], normal: 'x' },
+  frente:     { n: 2, a: 0, b: 1, nombre: 'De frente', ejes: ['ancho (x)', 'alto (y)'], normal: 'z' },
+  horizontal: { n: 1, a: 0, b: 2, nombre: 'Horizontal', ejes: ['ancho (x)', 'fondo (z)'], normal: 'y' },
+};
+const esPlano = () => P && P.tipo === 'plano';
+const planoP = () => P.plano || (P.plano = { holgura: 0.3, piezas: [] });
+// la pieza de la que se toma el contorno (las simétricas usan el de su pareja)
+function piezaFuente(k) {
+  const ps = planoP().piezas, p = ps[k];
+  return p && p.igualA != null && ps[p.igualA] && ps[p.igualA].igualA == null ? ps[p.igualA] : p;
+}
+// ranura recta desde un borde: a lo largo de la recta h = c (eje 'v') o v = c (eje 'h')
+function ranuraEje(poly, eje, c, mid, borde, alto, w) {
+  if (eje === 'v') return hacerRanura(poly, { c, mid, borde, arriba: alto }, w);
+  const tr = poly.map(p => [p[1], p[0]]).reverse();
+  const res = hacerRanura(tr, { c, mid, borde, arriba: alto }, w);
+  if (!res) return null;
+  const out = res.map(p => [p[1], p[0]]).reverse();
+  out.esq = res.esq.map(p => [p[1], p[0]]);
+  return out;
+}
+const tramosEje = (poly, eje, c) => eje === 'v' ? intervalosV(poly, c) : intervalosH(poly, c);
+// agujero rectangular de una caja (en sentido horario, con todas sus esquinas para el hueso de perro)
+function rectCaja(cj, w, hol) {
+  const a0 = cj.lo - hol / 2, a1 = cj.hi + hol / 2, b0 = cj.c - w / 2, b1 = cj.c + w / 2;
+  const r = cj.eje === 'v' ? [[b0, a0], [b0, a1], [b1, a1], [b1, a0]] : [[a0, b0], [a0, b1], [a1, b1], [a1, b0]];
+  r.esq = r.map(p => p);
+  return r;
+}
+function calcularPlano() {
+  const e = grosor(), Pp = planoP(), hol = clamp(+Pp.holgura || 0, 0, 3);
+  const res = { n: 0, sep: 0, hueco: 0, costillas: [], varillas: [], avisos: [], largueros: [], cruces: [], discos: [], rastreles: [], ranurasMal: [], trozos: [], modulos: [], uniones: [], pisan: [], plano: true, uc: 0 };
+  ucActual = 0;
+  Pp.piezas.forEach((pz, k) => {
+    const src = piezaFuente(k), pl = PLANOS[pz.plano] ? pz.plano : 'frente';
+    let poly = src && Array.isArray(src.pts) && src.pts.length >= 3 ? curvaCerrada(src.pts, src.esq && src.esq.length === src.pts.length ? src.esq : src.pts.map(() => true)) : [];
+    if (poly.length >= 3) { poly = limpiarContorno(poly); if (areaFirmada(poly) < 0) poly.reverse(); }
+    const ok = poly.length >= 3 && Math.abs(areaFirmada(poly)) > 25;
+    res.costillas.push({ i: k, x: +pz.c || 0, plano: pl, poly, base: poly, ok, caja: ok ? cajaDe(poly) : { x0: 0, y0: 0, x1: 0, y1: 0, w: 0, h: 0 }, area: ok ? areaFirmada(poly) : 0,
+      agujeros: [], nVar: 0, ranuras: [], cajas: [], uniones: [], int: [], etq: String(k + 1), nombre: pz.nombre || 'Pieza ' + (k + 1) });
+  });
+  res.n = res.costillas.length;
+  const ps = res.costillas, tol = 0.05;
+  for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) {
+    const A = ps[i], B = ps[j]; if (!A.ok || !B.ok) continue;
+    const pa = PLANOS[A.plano], pb = PLANOS[B.plano];
+    if (pa.n === pb.n) {   // paralelas: ¿ocupan el mismo sitio?
+      if (Math.abs(A.x - B.x) < e - 0.01 && A.caja.x0 < B.caja.x1 && B.caja.x0 < A.caja.x1 && A.caja.y0 < B.caja.y1 && B.caja.y0 < A.caja.y1
+        && (A.poly.some(p => dentro(B.poly, p[0], p[1])) || B.poly.some(p => dentro(A.poly, p[0], p[1])))) res.pisan.push([i, j]);
+      continue;
+    }
+    // la recta donde se cortan sus planos: en A es la recta (eje de A) = posición de B, y al revés
+    const ejeA = pa.a === pb.n ? 'v' : 'h', ejeB = pb.a === pa.n ? 'v' : 'h';
+    const IA = tramosEje(A.poly, ejeA, B.x), IB = tramosEje(B.poly, ejeB, A.x);
+    IA.forEach(I => IB.forEach(J => {
+      const lo = Math.max(I[0], J[0]), hi = Math.min(I[1], J[1]);
+      if (hi - lo < 0.5) return;
+      const Alo = Math.abs(I[0] - lo) < tol, Ahi = Math.abs(I[1] - hi) < tol, Blo = Math.abs(J[0] - lo) < tol, Bhi = Math.abs(J[1] - hi) < tol;
+      const u = { a: i, b: j, lo, hi };
+      if (Blo && Bhi && !Alo && !Ahi) { u.tipo = 'caja'; u.en = i; u.pasa = j; A.cajas.push({ eje: ejeA, c: B.x, lo, hi, con: j }); }
+      else if (Alo && Ahi && !Blo && !Bhi) { u.tipo = 'caja'; u.en = j; u.pasa = i; B.cajas.push({ eje: ejeB, c: A.x, lo, hi, con: i }); }
+      else {
+        // media madera: la pieza que termina arriba del cruce lleva la ranura desde arriba
+        const aArriba = Ahi && Blo ? true : !(Alo && Bhi), mid = (lo + hi) / 2;
+        u.tipo = 'media'; u.aArriba = aArriba;
+        A.ranuras.push({ eje: ejeA, c: B.x, mid, borde: aArriba ? hi : lo, alto: aArriba, con: j });
+        B.ranuras.push({ eje: ejeB, c: A.x, mid, borde: aArriba ? lo : hi, alto: !aArriba, con: i });
+      }
+      res.uniones.push(u); A.uniones.push(u); B.uniones.push(u);
+    }));
+  }
+  // contornos con las ranuras y las cajas, con el ancho real
+  const w = e + hol;
+  ps.forEach(p => {
+    if (!p.ok) return;
+    p.generar = ww => {
+      let poly = p.base; const esq = [], fallan = [];
+      p.ranuras.forEach(r => { const n2 = ranuraEje(poly, r.eje, r.c, r.mid, r.borde, r.alto, ww); if (n2) { poly = n2; esq.push(...n2.esq); } else fallan.push(r); });
+      const out = poly === p.base ? p.base.slice() : poly; out.esq = esq; out.fallan = fallan; return out;
+    };
+    p.generarInt = ww => p.cajas.map(cj => rectCaja(cj, ww, hol));
+    p.poly = p.generar(w); if (p.poly.fallan.length) res.ranurasMal.push(p);
+    p.int = p.generarInt(w);
+    p.caja = cajaDe(p.poly); p.area = areaFirmada(p.poly) - p.int.reduce((s, h) => s + Math.abs(areaFirmada(h)), 0);
+  });
+  // caja del mueble (para las medidas y el largo)
+  const bb = [[Infinity, -Infinity], [Infinity, -Infinity], [Infinity, -Infinity]];
+  ps.forEach(p => { if (!p.ok) return; const pl = PLANOS[p.plano];
+    bb[pl.a][0] = Math.min(bb[pl.a][0], p.caja.x0); bb[pl.a][1] = Math.max(bb[pl.a][1], p.caja.x1);
+    bb[pl.b][0] = Math.min(bb[pl.b][0], p.caja.y0); bb[pl.b][1] = Math.max(bb[pl.b][1], p.caja.y1);
+    bb[pl.n][0] = Math.min(bb[pl.n][0], p.x - e / 2); bb[pl.n][1] = Math.max(bb[pl.n][1], p.x + e / 2); });
+  res.bbox = bb.map(r => isFinite(r[0]) ? r : [0, 0]);
+  P.largo = Math.max(1, Math.round(res.bbox[0][1] - res.bbox[0][0]));
+  avisosPlano(res);
+  res.otras = []; return res;
+}
+const nomP = (res, i) => res.costillas[i] ? res.costillas[i].nombre : 'pieza ' + (i + 1);
+function avisosPlano(res) {
+  const A = res.avisos, e = grosor(), add = (tipo, txt, cost) => A.push({ tipo, txt, cost });
+  if (!res.n) { add('error', 'No hay ninguna pieza: elige una plantilla o añade una pieza (＋ Pieza).'); return; }
+  res.costillas.forEach(p => { if (!p.ok) add('error', `${p.nombre}: su contorno no tiene superficie (revisa los puntos).`, p.i); });
+  res.pisan.forEach(([i, j]) => add('error', `${nomP(res, i)} y ${nomP(res, j)} están en el mismo sitio (paralelas a menos de ${fmt(e, 1)} mm): se pisan.`, i));
+  const sueltas = res.costillas.filter(p => p.ok && !p.uniones.length);
+  sueltas.forEach(p => add('atencion', `${p.nombre} no se cruza con ninguna otra pieza: quedaría suelta (o hay que atornillarla o encolarla).`, p.i));
+  res.ranurasMal.forEach(p => add('error', `No se pudo hacer alguna ranura en ${p.nombre}: el borde no es recto en el cruce o la ranura sale de la pieza.`, p.i));
+  res.uniones.forEach(u => {
+    if (u.tipo === 'media' && u.hi - u.lo < 2 * e) add('atencion', `Media madera corta entre ${nomP(res, u.a)} y ${nomP(res, u.b)} (${fmt(u.hi - u.lo)} mm de cruce): unión floja.`, u.a);
+    if (u.tipo === 'caja' && u.hi - u.lo < 1.5 * e) add('atencion', `Espiga estrecha de ${nomP(res, u.pasa)} en ${nomP(res, u.en)} (${fmt(u.hi - u.lo)} mm): se puede partir.`, u.pasa);
+  });
+  // cajas con poca madera alrededor
+  res.costillas.forEach(p => {
+    if (!p.ok) return;
+    const malo = p.int.some(h => h.some(q => distBorde(p.poly, q[0], q[1]) < Math.max(4, e * 0.4) || !dentro(p.poly, q[0], q[1])));
+    if (malo) add('atencion', `${p.nombre}: alguna caja (agujero de una espiga) queda muy cerca del borde y la pieza se puede partir.`, p.i);
+  });
+  const M = P.maqueta;
+  if (M && M.activa && Math.abs(M.grosor * M.escala - e) > e * 0.2) add('info', `Maqueta 1:${M.escala}: ${fmt(M.grosor, 1)} mm equivalen a ${fmt(M.grosor * M.escala)} mm reales (el tablero real es de ${fmt(e, 1)} mm): las ranuras y las cajas de la maqueta se hacen con el grosor de la maqueta.`);
+  if (!A.some(a => a.tipo === 'error' || a.tipo === 'atencion')) {
+    const nM = res.uniones.filter(u => u.tipo === 'media').length, nC = res.uniones.filter(u => u.tipo === 'caja').length;
+    add('ok', `Todo correcto: ${res.n} piezas con ${res.uniones.length} ${res.uniones.length === 1 ? 'unión' : 'uniones'}` + (nM || nC ? ` (${[nM ? nM + ' a media madera' : '', nC ? nC + (nC > 1 ? ' espigas en caja pasante' : ' espiga en caja pasante') : ''].filter(Boolean).join(' y ')})` : '') + '.');
+  }
+}
+// texto de las uniones de una pieza (para la vista de la pieza, el plano y el despiece)
+function textoUnionesPieza(c) {
+  if (!R || !c.uniones) return '';
+  const m = c.uniones.filter(u => u.tipo === 'media').length, cj = c.uniones.filter(u => u.tipo === 'caja' && u.en === c.i).length, es = c.uniones.filter(u => u.tipo === 'caja' && u.pasa === c.i).length;
+  return [m ? m + ' a media madera' : '', cj ? cj + (cj > 1 ? ' cajas' : ' caja') : '', es ? es + (es > 1 ? ' espigas' : ' espiga') : ''].filter(Boolean).join(' · ') || 'sin uniones';
+}
+// matriz 3D de una pieza: el contorno (a, b) en su plano, el grosor centrado en la posición c
+function basePieza(c) {
+  const pl = PLANOS[c.plano], ex = [0, 0, 0], ey = [0, 0, 0]; ex[pl.a] = 1; ey[pl.b] = 1;
+  const ez = [ex[1] * ey[2] - ex[2] * ey[1], ex[2] * ey[0] - ex[0] * ey[2], ex[0] * ey[1] - ex[1] * ey[0]], o = [0, 0, 0]; o[pl.n] = c.x;
+  return { ex, ey, ez, o };
+}
+// punto del contorno de una pieza en el espacio (mm)
+function puntoPieza(c, a, b) { const pl = PLANOS[c.plano], q = [0, 0, 0]; q[pl.a] = a; q[pl.b] = b; q[pl.n] = c.x; return q; }
+
 /* ===================== PLANTILLAS PARAMÉTRICAS =====================
    Cada plantilla genera el largo, las esquinas y los perfiles clave a partir de sus parámetros.
    Todos los perfiles de un mueble tienen el mismo número de puntos de control. */
@@ -2782,8 +2933,128 @@ PLANTILLAS.pared_estante = {
     return { largo: p.largo, esquinas, claves };
   },
 };
+// ---------- piezas planas (flat-pack): cada plantilla da la lista de piezas ----------
+// rectángulo con las esquinas redondeadas que se pidan (radio r): [abajo-izq, abajo-dcha, arriba-dcha, arriba-izq]
+function rectPlano(x0, y0, x1, y1, r = 0, cuales = [1, 1, 1, 1]) {
+  const pts = [], rr = Math.max(0, Math.min(r, (x1 - x0) / 2 - 0.1, (y1 - y0) / 2 - 0.1));
+  const vert = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]], cen = [[x0 + rr, y0 + rr], [x1 - rr, y0 + rr], [x1 - rr, y1 - rr], [x0 + rr, y1 - rr]], ang = [Math.PI, -Math.PI / 2, 0, Math.PI / 2];
+  for (let k = 0; k < 4; k++) {
+    if (!cuales[k] || rr < 0.5) pts.push(vert[k]);
+    else for (let j = 0; j <= 4; j++) { const a = ang[k] + Math.PI / 2 * j / 4; pts.push([cen[k][0] + rr * Math.cos(a), cen[k][1] + rr * Math.sin(a)]); }
+  }
+  return { pts: redondeaPts(pts), esq: pts.map(() => true) };
+}
+// puntos con su marca de esquina: [[x, y, esquina?]…]
+const ptsPlano = L => ({ pts: redondeaPts(L.map(q => [q[0], q[1]])), esq: L.map(q => q[2] !== false) });
+const piezaPlana = (nombre, plano, c, forma, extra) => Object.assign({ nombre, plano, c: Math.round(c * 10) / 10, pts: forma.pts, esq: forma.esq }, extra || {});
+const igualQue = (nombre, plano, c, k) => ({ nombre, plano, c: Math.round(c * 10) / 10, igualA: k });
+const CLAVE_PLANO = { largo: 100, esquinas: [true, true, true], claves: [{ x: 0, pts: [[0, 0], [100, 0], [100, 100]] }] };
+PLANTILLAS.taburete_plano = {
+  nombre: 'Taburete de patas cruzadas', grupo: 'plano',
+  desc: 'Dos patas con arco y dos travesaños cruzados a media madera; las espigas de las patas pasan por el asiento.',
+  params: [
+    { id: 'ancho', nombre: 'Ancho del asiento', min: 250, max: 900, paso: 5, valor: 400 },
+    { id: 'fondo', nombre: 'Fondo del asiento', min: 200, max: 700, paso: 5, valor: 320 },
+    { id: 'alto', nombre: 'Altura', min: 200, max: 900, paso: 5, valor: 460 },
+    { id: 'vuelo', nombre: 'Vuelo del asiento', min: 0, max: 80, paso: 1, valor: 25 },
+    { id: 'arco', nombre: 'Altura del arco de las patas', min: 0, max: 500, paso: 5, valor: 170 },
+    { id: 'pie', nombre: 'Ancho de cada pie', min: 30, max: 200, paso: 1, valor: 60 },
+    { id: 'faldon', nombre: 'Alto de los travesaños', min: 40, max: 200, paso: 1, valor: 80 },
+    { id: 'espiga', nombre: 'Ancho de las espigas', min: 20, max: 120, paso: 1, valor: 40 },
+  ],
+  generar(p, e) {
+    const W = p.ancho - 2 * p.vuelo, H = p.alto, te = p.espiga, zl = p.fondo / 2 - p.vuelo - e / 2;
+    const xt = W / 2 - 15 - te / 2, xa = W / 2 - 15 - te - 35, pie = Math.min(p.pie, W / 2 - 20);
+    const arco = Math.max(0, Math.min(p.arco, H - e - p.faldon - 40)), m = (W / 2 - pie);
+    const pata = ptsPlano([[-W / 2, 0], [-m, 0], [-m * 0.55, arco * 0.82, false], [0, arco, false], [m * 0.55, arco * 0.82, false], [m, 0], [W / 2, 0], [W / 2, H - e],
+      [xt + te / 2, H - e], [xt + te / 2, H], [xt - te / 2, H], [xt - te / 2, H - e], [-xt + te / 2, H - e], [-xt + te / 2, H], [-xt - te / 2, H], [-xt - te / 2, H - e], [-W / 2, H - e]]);
+    const Z = zl + 35, yb = H - e - p.faldon, zi = Math.max(10, zl - e / 2 - 25);
+    const trav = ptsPlano([[-Z, yb], [-zi, yb], [0, yb + p.faldon * 0.4, false], [zi, yb], [Z, yb], [Z, H - e], [-Z, H - e]]);
+    return Object.assign({}, CLAVE_PLANO, { piezas: [
+      piezaPlana('Asiento', 'horizontal', H - e / 2, rectPlano(-p.ancho / 2, -p.fondo / 2, p.ancho / 2, p.fondo / 2, 22)),
+      piezaPlana('Pata delantera', 'frente', zl, pata), igualQue('Pata trasera', 'frente', -zl, 1),
+      piezaPlana('Travesaño izquierdo', 'lado', -xa, trav), igualQue('Travesaño derecho', 'lado', xa, 3),
+    ] });
+  },
+};
+PLANTILLAS.banco_lamas = {
+  nombre: 'Banco de lamas', grupo: 'plano',
+  desc: 'Dos laterales con el asiento curvo y lamas de canto encajadas a media madera; un travesaño pasante los une por debajo.',
+  params: [
+    { id: 'largo', nombre: 'Largo del banco', min: 400, max: 2400, paso: 10, valor: 1000 },
+    { id: 'fondo', nombre: 'Fondo', min: 220, max: 700, paso: 5, valor: 360 },
+    { id: 'alto', nombre: 'Altura del asiento', min: 250, max: 700, paso: 5, valor: 440 },
+    { id: 'hundido', nombre: 'Hundido del asiento', min: 0, max: 80, paso: 1, valor: 25 },
+    { id: 'lamas', nombre: 'Número de lamas', min: 3, max: 30, paso: 1, valor: 8 },
+    { id: 'altoLama', nombre: 'Alto de cada lama', min: 25, max: 150, paso: 1, valor: 55 },
+    { id: 'margen', nombre: 'Laterales desde el extremo', min: 20, max: 400, paso: 5, valor: 90 },
+    { id: 'arco', nombre: 'Altura del arco de los laterales', min: 0, max: 400, paso: 5, valor: 160 },
+    { id: 'pata', nombre: 'Ancho de cada pata', min: 30, max: 200, paso: 1, valor: 70 },
+  ],
+  generar(p, e) {
+    const D = p.fondo, hl = p.altoLama, xs = p.largo / 2 - p.margen, pata = Math.min(p.pata, D / 2 - 20);
+    const T = z => p.alto - hl * 0.25 - p.hundido * (1 - (2 * z / D) ** 2);   // canto de arriba de los laterales
+    const arco = Math.max(0, Math.min(p.arco, T(0) - hl - 120)), m = D / 2 - pata;
+    const lat = ptsPlano([[-D / 2, 0], [-m, 0], [-m * 0.5, arco * 0.8, false], [0, arco, false], [m * 0.5, arco * 0.8, false], [m, 0], [D / 2, 0], [D / 2, T(D / 2)],
+      [D / 4, T(D / 4), false], [0, T(0), false], [-D / 4, T(-D / 4), false], [-D / 2, T(-D / 2)]]);
+    const n = Math.max(2, Math.round(p.lamas)), z0 = -D / 2 + e / 2 + 6, z1 = D / 2 - e / 2 - 6, piezas = [
+      piezaPlana('Lateral izquierdo', 'lado', -xs, lat), igualQue('Lateral derecho', 'lado', xs, 0)];
+    for (let i = 0; i < n; i++) {
+      const z = z0 + (z1 - z0) * i / (n - 1), t = T(z);
+      piezas.push(piezaPlana('Lama ' + (i + 1), 'frente', z, rectPlano(-p.largo / 2, t - hl * 0.75, p.largo / 2, t + hl * 0.25, 6)));
+    }
+    const yt = arco + Math.max(30, (T(0) - hl - arco) * 0.35), ht = Math.min(80, Math.max(40, (T(0) - hl - arco) * 0.4)), xt = xs + e / 2 + 30;
+    piezas.push(piezaPlana('Travesaño', 'frente', 0, rectPlano(-xt, yt, xt, yt + ht, 8)));
+    return Object.assign({}, CLAVE_PLANO, { piezas });
+  },
+};
+PLANTILLAS.silla_plana = {
+  nombre: 'Silla de tableros', grupo: 'plano',
+  desc: 'Dos laterales con espigas que pasan por el asiento, respaldo y travesaño delantero a media madera y un travesaño trasero pasante.',
+  params: [
+    { id: 'ancho', nombre: 'Ancho', min: 300, max: 700, paso: 5, valor: 440 },
+    { id: 'fondo', nombre: 'Fondo', min: 300, max: 650, paso: 5, valor: 430 },
+    { id: 'asiento', nombre: 'Altura del asiento', min: 250, max: 600, paso: 5, valor: 450 },
+    { id: 'alto', nombre: 'Altura del respaldo', min: 500, max: 1200, paso: 5, valor: 820 },
+    { id: 'respaldo', nombre: 'Alto del respaldo', min: 80, max: 500, paso: 5, valor: 200 },
+    { id: 'pata', nombre: 'Ancho de las patas', min: 40, max: 120, paso: 1, valor: 56 },
+    { id: 'faldon', nombre: 'Alto del faldón bajo el asiento', min: 40, max: 200, paso: 1, valor: 70 },
+    { id: 'espiga', nombre: 'Ancho de las espigas', min: 20, max: 100, paso: 1, valor: 40 },
+  ],
+  generar(p, e) {
+    const hs = p.asiento, H = Math.max(p.alto, hs + p.respaldo + 40), pa = Math.max(p.pata, 2 * e + 20), te = p.espiga;
+    const zb = -p.fondo / 2 + pa / 2, zf = p.fondo / 2 - pa / 2, xs = p.ancho / 2 - 40, yr = hs - e - p.faldon;
+    const t2 = zf - pa / 2 - te / 2 - 20, t1 = zb + pa / 2 + te / 2 + 30, zm = (zb + zf) / 2;
+    const lat = ptsPlano([[zb - pa / 2, 0], [zb + pa / 2, 0], [zb + pa / 2, yr], [zm, yr + p.faldon * 0.35, false], [zf - pa / 2, yr], [zf - pa / 2, 0], [zf + pa / 2, 0], [zf + pa / 2, hs - e],
+      [t2 + te / 2, hs - e], [t2 + te / 2, hs], [t2 - te / 2, hs], [t2 - te / 2, hs - e], [t1 + te / 2, hs - e], [t1 + te / 2, hs], [t1 - te / 2, hs], [t1 - te / 2, hs - e],
+      [zb + pa / 2, hs - e], [zb + pa / 2, H], [zb - pa / 2, H]]);
+    const xT = xs + e / 2 + 20, yT = Math.min(160, yr * 0.35);
+    return Object.assign({}, CLAVE_PLANO, { piezas: [
+      piezaPlana('Lateral izquierdo', 'lado', -xs, lat), igualQue('Lateral derecho', 'lado', xs, 0),
+      piezaPlana('Asiento', 'horizontal', hs - e / 2, rectPlano(-p.ancho / 2, zb + pa / 2 + 1, p.ancho / 2, p.fondo / 2 + 15, 30, [0, 0, 1, 1])),
+      piezaPlana('Respaldo', 'frente', zb, rectPlano(-p.ancho / 2, H - p.respaldo, p.ancho / 2, H, 40, [0, 0, 1, 1])),
+      piezaPlana('Travesaño delantero', 'frente', zf, rectPlano(-xT, yr, xT, hs - e, 0)),
+      piezaPlana('Travesaño trasero', 'frente', zb, rectPlano(-(xs + e / 2 + 25), yT, xs + e / 2 + 25, yT + 60, 6)),
+    ] });
+  },
+};
+PLANTILLAS.plano_vacio = {
+  nombre: 'Vacío: piezas planas', grupo: 'plano',
+  desc: 'Un tablero de frente y otro de lado que se cruzan, para construir el mueble pieza a pieza o traer los contornos de un DXF o SVG.',
+  params: [
+    { id: 'ancho', nombre: 'Ancho del tablero de frente', min: 100, max: 2400, paso: 5, valor: 500 },
+    { id: 'alto', nombre: 'Alto', min: 100, max: 2400, paso: 5, valor: 400 },
+    { id: 'fondo', nombre: 'Fondo del tablero de lado', min: 100, max: 1200, paso: 5, valor: 300 },
+  ],
+  generar(p) {
+    return Object.assign({}, CLAVE_PLANO, { piezas: [
+      piezaPlana('Tablero de frente', 'frente', 0, rectPlano(-p.ancho / 2, 0, p.ancho / 2, p.alto)),
+      piezaPlana('Tablero de lado', 'lado', 0, rectPlano(-p.fondo / 2, 0, p.fondo / 2, p.alto * 0.8)),
+    ] });
+  },
+};
 const grupoDe = id => PLANTILLAS[id].grupo || 'lineal';
-const grupoTipo = t => t === 'radial' ? 'radial' : t === 'pared' ? 'pared' : 'lineal';
+const grupoTipo = t => t === 'radial' ? 'radial' : t === 'pared' ? 'pared' : t === 'plano' ? 'plano' : 'lineal';
 
 function paramsDefecto(id) { const o = {}; PLANTILLAS[id].params.forEach(q => o[q.id] = q.valor); return o; }
 // genera la forma desde la plantilla; si solo cambia el largo y hay retoques a mano, escala las claves
@@ -2795,8 +3066,9 @@ function aplicarPlantilla(soloLargo) {
     P.largo = P.params.largo;
     return;
   }
-  const g = pl.generar(P.params);
+  const g = pl.generar(P.params, grosor());
   P.largo = g.largo; P.esquinas = g.esquinas; P.claves = g.claves; P.editado = false;
+  if (g.piezas) { planoP().piezas = g.piezas; UI.costilla = Math.min(UI.costilla || 0, g.piezas.length - 1); }
   UI.clave = Math.min(UI.clave, P.claves.length - 1); UI.punto = -1;
 }
 
@@ -2894,12 +3166,22 @@ function flecha(ctx, x, y, dx, dy) {
 /* ---------- editor del perfil clave ---------- */
 let VP = null, VC = null;
 function claveActual() { return clavesOrdenadas()[UI.clave] || P.claves[0]; }
+// lo que se edita arriba: el perfil clave (con las esquinas del mueble) o, en las piezas planas, el contorno de la pieza seleccionada
+function ctrlEdit() {
+  if (esPlano()) {
+    const src = piezaFuente(UI.costilla); if (!src || !Array.isArray(src.pts)) return null;
+    if (!Array.isArray(src.esq) || src.esq.length !== src.pts.length) src.esq = src.pts.map(() => true);
+    return { pts: src.pts, esq: src.esq, pieza: src };
+  }
+  return { pts: claveActual().pts, esq: P.esquinas };
+}
 function colorCostilla(alfa) { return `rgba(168,116,63,${alfa})`; }
 
 function dibujarPerfil(ctx, V) {
   V.rejilla(ctx);
   if (!P || !R) return;
   if (relieveActivo()) { dibujarPerfilRelieve(ctx, V); return; }
+  if (esPlano()) { dibujarPerfilPlano(ctx, V); return; }
   const C = clavesOrdenadas(), k = claveActual(), acento = cssVar('--acento');
   // todas las costillas, muy suaves (la «envolvente»)
   ctx.lineWidth = 1; ctx.strokeStyle = colorCostilla(.16);
@@ -2995,7 +3277,7 @@ const ED = { arr: null };
 function snap(v) { const g = +$('#kRejilla').value; return g ? Math.round(v / g) * g : Math.round(v * 10) / 10; }
 function puntoCerca(mx, my) {
   if (formaCalculada()) return -1;
-  const k = claveActual(); let mejor = -1, md = 10;
+  const k = ctrlEdit(); if (!k) return -1; let mejor = -1, md = 10;
   k.pts.forEach((p, i) => { const [x, y] = VP.aPantalla(p[0], p[1]), d = Math.hypot(x - mx, y - my); if (d < md) { md = d; mejor = i; } });
   return mejor;
 }
@@ -3006,25 +3288,35 @@ function varillaCerca(mx, my) {
   return mejor;
 }
 function tramoCerca(mx, my) {
-  const k = claveActual(), m = curvaConTramos(k.pts, P.esquinas, 24);
+  const k = ctrlEdit(); if (!k) return null; const m = curvaConTramos(k.pts, k.esq, 24);
   let mejor = null, md = 9;
   m.forEach(o => { const [x, y] = VP.aPantalla(o.p[0], o.p[1]), d = Math.hypot(x - mx, y - my); if (d < md) { md = d; mejor = o; } });
   return mejor;
 }
 function insertarPunto(j, s) {
+  if (esPlano()) {
+    const k = ctrlEdit(); if (!k) return;
+    const q = puntoTramo(k.pts, k.esq, j, s); k.pts.splice(j + 1, 0, [Math.round(q[0] * 10) / 10, Math.round(q[1] * 10) / 10]); k.esq.splice(j + 1, 0, false);
+    UI.punto = j + 1; P.editado = true; return;
+  }
   const n = P.esquinas.length;
   P.claves.forEach(c => { const q = puntoTramo(c.pts, P.esquinas, j, s); c.pts.splice(j + 1, 0, [Math.round(q[0] * 10) / 10, Math.round(q[1] * 10) / 10]); });
   P.esquinas.splice(j + 1, 0, false);
   UI.punto = (j + 1) % (n + 1); P.editado = true;
 }
 function borrarPunto(i) {
+  if (esPlano()) {
+    const k = ctrlEdit(); if (!k) return;
+    if (k.pts.length <= 3) { aviso('Una pieza necesita al menos 3 puntos.'); return; }
+    k.pts.splice(i, 1); k.esq.splice(i, 1); UI.punto = -1; P.editado = true; cambio('Punto borrado'); return;
+  }
   if (P.esquinas.length <= 3) { aviso('Un perfil necesita al menos 3 puntos.'); return; }
   P.claves.forEach(c => c.pts.splice(i, 1)); P.esquinas.splice(i, 1);
   UI.punto = -1; P.editado = true; cambio('Punto borrado');
 }
 function alternarEsquina(i) {
   if (i < 0) { aviso('Selecciona antes un punto del perfil.'); return; }
-  P.esquinas[i] = !P.esquinas[i]; P.editado = true; cambio(P.esquinas[i] ? 'Punto en esquina' : 'Punto en curva');
+  const E = ctrlEdit().esq; E[i] = !E[i]; P.editado = true; cambio(E[i] ? 'Punto en esquina' : 'Punto en curva');
 }
 
 function iniciarEditor() {
@@ -3049,8 +3341,8 @@ function iniciarEditor() {
     const ip = puntoCerca(mx, my);
     if (ip >= 0) {
       UI.punto = ip; UI.varilla = -1;
-      const k = claveActual();
-      ED.arr = { tipo: 'punto', i: ip, x: mx, y: my, orig: P.claves.map(o => o.pts[ip].slice()), base: k.pts[ip].slice(), movido: false };
+      const k = ctrlEdit();
+      ED.arr = { tipo: 'punto', i: ip, x: mx, y: my, orig: esPlano() ? [] : P.claves.map(o => o.pts[ip].slice()), base: k.pts[ip].slice(), movido: false };
       VP.pintar(); return;
     }
     const iv = varillaCerca(mx, my);
@@ -3068,8 +3360,8 @@ function iniciarEditor() {
     if (!A.movido && Math.hypot(mx - A.x, my - A.y) < 3) return;
     A.movido = true;
     if (A.tipo === 'punto') {
-      const k = claveActual(), nu = ev.shiftKey ? A.base[0] + du : snap(A.base[0] + du), nv = ev.shiftKey ? A.base[1] + dv : snap(A.base[1] + dv);
-      if ($('#kTodas').checked) {
+      const k = ctrlEdit(), nu = ev.shiftKey ? A.base[0] + du : snap(A.base[0] + du), nv = ev.shiftKey ? A.base[1] + dv : snap(A.base[1] + dv);
+      if ($('#kTodas').checked && !esPlano()) {
         const ddu = nu - A.base[0], ddv = nv - A.base[1];
         P.claves.forEach((o, j) => { o.pts[A.i] = [Math.round((A.orig[j][0] + ddu) * 10) / 10, Math.round((A.orig[j][1] + ddv) * 10) / 10]; });
       } else k.pts[A.i] = [nu, nv];
@@ -3097,6 +3389,44 @@ function iniciarEditor() {
   $('#bCostSig').onclick = () => selCostilla(UI.costilla + 1);
   $('#piePerfil').innerHTML = ayudaPerfil();
 }
+// piezas planas: el contorno de la pieza seleccionada en su plano, con las piezas que la cruzan en gris
+function dibujarPerfilPlano(ctx, V) {
+  const c = piezaSel(), k = ctrlEdit(), acento = cssVar('--acento'), e = grosor();
+  if (!c || !k) return;
+  // dónde la cruzan las otras piezas (la franja del grosor de cada una, a lo largo del cruce)
+  (c.uniones || []).forEach(u => {
+    const otra = R.costillas[u.a === c.i ? u.b : u.a]; if (!otra) return;
+    const pa = PLANOS[c.plano], pb = PLANOS[otra.plano], eje = pa.a === pb.n ? 'v' : 'h';
+    const r = eje === 'v' ? [otra.x - e / 2, u.lo, otra.x + e / 2, u.hi] : [u.lo, otra.x - e / 2, u.hi, otra.x + e / 2];
+    const [x0, y0] = V.aPantalla(r[0], r[1]), [x1, y1] = V.aPantalla(r[2], r[3]);
+    ctx.fillStyle = 'rgba(95,107,120,.30)'; ctx.fillRect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0));
+    ctx.fillStyle = '#5f6b78'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText(otra.etq + (u.tipo === 'caja' ? (u.en === c.i ? ' (caja)' : ' (espiga)') : ''), (x0 + x1) / 2, Math.min(y0, y1) - 4);
+  });
+  ctx.textAlign = 'left';
+  // la pieza como se corta (con ranuras y cajas)
+  if (c.ok) {
+    ctx.fillStyle = conAlfa(acento, .12); ctx.beginPath();
+    [polyVista(c.poly), ...(c.int || []).map(polyVista)].forEach(pol => pol.forEach((p, i) => { const [x, y] = V.aPantalla(p[0], p[1]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }) || ctx.closePath());
+    ctx.fill('evenodd'); ctx.strokeStyle = colorCostilla(.8); ctx.lineWidth = 1.2; ctx.stroke();
+  }
+  // contorno de control (curva) y polígono de control
+  const curva = curvaCerrada(k.pts, k.esq);
+  ctx.strokeStyle = acento; ctx.lineWidth = 2.2; V.camino(ctx, curva); ctx.stroke();
+  ctx.strokeStyle = cssVar('--suave'); ctx.lineWidth = .8; ctx.setLineDash([2, 3]); V.camino(ctx, k.pts); ctx.stroke(); ctx.setLineDash([]);
+  k.pts.forEach((p, i) => {
+    const [x, y] = V.aPantalla(p[0], p[1]), sel = i === UI.punto;
+    ctx.fillStyle = sel ? acento : cssVar('--panel'); ctx.strokeStyle = acento; ctx.lineWidth = 1.8; ctx.beginPath();
+    if (k.esq[i]) ctx.rect(x - 4.5, y - 4.5, 9, 9); else ctx.arc(x, y, 5, 0, PI2);
+    ctx.fill(); ctx.stroke();
+  });
+  const b = cajaDe(curva);
+  V.cota(ctx, [b.x0, b.y0], [b.x1, b.y0], 22, fmt(b.w) + ' mm', false);
+  V.cota(ctx, [b.x1, b.y0], [b.x1, b.y1], 26, fmt(b.h) + ' mm', true);
+  const pl = PLANOS[c.plano];
+  ctx.fillStyle = cssVar('--suave'); ctx.font = '11.5px system-ui';
+  ctx.fillText(`${c.nombre} (${c.etq}) · ${pl.nombre.toLowerCase()}, en ${pl.normal} = ${fmt(c.x)} mm · horizontal: ${pl.ejes[0]} · vertical: ${pl.ejes[1]}` + (k.pieza && k.pieza !== planoP().piezas[UI.costilla] ? ` · igual que «${k.pieza.nombre}»` : ''), 8, 62);
+}
 // con relieve (texto o modelo) no hay perfiles clave: se ven las lamas y la seleccionada
 function dibujarPerfilRelieve(ctx, V) {
   ctx.fillStyle = 'rgba(150,156,164,.28)'; const [xp] = V.aPantalla(0, 0); ctx.fillRect(0, 0, xp, V.h);
@@ -3115,6 +3445,7 @@ function ayudaPerfil() {
 }
 function encuadrarPerfil() {
   if (!R) return;
+  if (esPlano()) { const k = ctrlEdit(), c = piezaSel(); if (!k) { VP.pintar(); return; } const b = cajaDe(curvaCerrada(k.pts, k.esq)); if (c && c.ok) { const d = c.caja; b.x0 = Math.min(b.x0, d.x0); b.y0 = Math.min(b.y0, d.y0); b.w = Math.max(b.x0 + b.w, d.x1) - b.x0; b.h = Math.max(b.y0 + b.h, d.y1) - b.y0; } VP.encuadrar(b, 50); return; }
   if (formaCalculada()) { const cs = R.costillas.filter(c => c.ok); if (cs.length) VP.encuadrar({ x0: 0, y0: 0, w: Math.max(...cs.map(c => c.caja.x1)), h: Math.max(...cs.map(c => c.caja.y1)) }, 50); return; }
   let x0 = Infinity, y0 = 0, x1 = -Infinity, y1 = -Infinity;
   P.claves.forEach(c => c.pts.forEach(p => { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }));
@@ -3155,7 +3486,8 @@ function selCostilla(i, encuadrar) {
   UI.costilla = clamp(i, 0, nPiezas() - 1);
   // si en esa costilla hay un perfil clave, se selecciona también (para editarlo arriba)
   const c = piezaSel();
-  if (c && UI.costilla < R.n && !formaCalculada() && P.tipo !== 'radial') {
+  if (esPlano()) { const cambia = UI.piezaVista !== UI.costilla; UI.piezaVista = UI.costilla; if (cambia) { UI.punto = -1; encuadrarPerfil(); } refrescarPiezaSel(); }
+  if (c && UI.costilla < R.n && !formaCalculada() && P.tipo !== 'radial' && !esPlano()) {
     const C = clavesOrdenadas(), tol = Math.max(grosor(), (R.sep || 0) / 2);
     let mej = -1, md = Infinity; C.forEach((k, j) => { const d = Math.abs(k.x - c.x); if (d < md) { md = d; mej = j; } });
     if (mej >= 0 && md <= tol && mej !== UI.clave) { UI.clave = mej; UI.punto = -1; refrescarClaves(); construirClaves3D(); }
@@ -3171,12 +3503,13 @@ const piezaSel = () => R ? (UI.costilla < R.n ? R.costillas[UI.costilla] : R.otr
 function encuadrarCostilla() { const c = piezaSel(); if (c && c.ok) VC.encuadrar(c.caja, 40); else VC.pintar(); }
 function refrescarCostilla() {
   const c = piezaSel(); if (!c) return;
-  $('#tipoPieza').textContent = c.disco ? 'Disco' : c.z ? 'Larguero' : P.tipo === 'pared' ? 'Lama' : 'Costilla';
+  $('#tipoPieza').textContent = esPlano() ? 'Pieza' : c.disco ? 'Disco' : c.z ? 'Larguero' : P.tipo === 'pared' ? 'Lama' : 'Costilla';
   $('#numCost').textContent = c.etq;
-  $('#infoCost').textContent = c.disco ? `a ${fmt(c.v)} mm de altura · Ø ${fmt(2 * c.rD)} mm · ${R.n} ranuras`
+  $('#infoCost').textContent = esPlano() ? `${c.nombre} · ${PLANOS[c.plano].nombre.toLowerCase()} en ${PLANOS[c.plano].normal} = ${fmt(c.x)} mm · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm · ${textoUnionesPieza(c)}` : c.disco ? `a ${fmt(c.v)} mm de altura · Ø ${fmt(2 * c.rD)} mm · ${R.n} ranuras`
     : c.z ? `z = ${fmt(c.u)} mm · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm · ${c.ranuras.length} ranuras`
     : `de ${R.n} · ${P.tipo === 'radial' ? 'ángulo' : 'x'} = ${textoPos(c.x)} · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm` + (c.ranuras.length ? ` · ${c.ranuras.length} ${P.tipo === 'reticula' ? 'ranuras' : 'muescas'}` : '');
   $$('#listaCost li').forEach((li, i) => li.classList.toggle('sel', i === UI.costilla));
+  if (esPlano()) refrescarPiezaSel();
 }
 
 /* ===================== HUECOS: VISTA PARA DIBUJARLOS Y PANEL =====================
@@ -3606,6 +3939,7 @@ function construir3D() {
   if (!G.scene || !R) return;
   limpiar(G.modelo); G.modelo.clear(); G.modelo.position.set(0, 0, 0);
   G.costillas = []; G.largueros = []; G.varillas = []; G.claves3d = [];
+  if (P.tipo === 'plano') { construir3DPlano(); return; }
   const e = grosor(), mats = materialesTablero(), rh = radioAgujero(), V = P.varillas;
   // medidas del mueble montado
   const bb = new T.Box3(), cs = R.costillas.filter(c => c.ok);
@@ -3693,6 +4027,35 @@ function construir3D() {
   G.suelo.scale.set(tam * 5, tam * 5, 1);
   G.tam = tam;
   luces3D();
+}
+// piezas planas: cada pieza en su plano, con las ranuras y las cajas (y el hueso de perro si está activo)
+function construir3DPlano() {
+  const e = grosor(), mats = materialesTablero(), bb = R.bbox || [[0, 1], [0, 1], [0, 1]];
+  R.costillas.forEach(c => {
+    if (!c.ok) { G.costillas.push(null); return; }
+    const m = new T.Mesh(extruir(polyVista(c.poly), [], e, (c.int || []).map(polyVista)), mats); m.castShadow = m.receiveShadow = true;
+    m.userData = { i: c.i, x: c.x, plano: c.plano };
+    G.modelo.add(m); G.costillas.push(m);
+  });
+  const sz = bb.map(r => r[1] - r[0]);
+  G.dims = [sz[0], sz[2], sz[1]]; G.alto = bb[1][1]; G.fondo = sz[2]; G.rmax = Math.max(sz[0], sz[2]) / 2;
+  G.centro = bb.map(r => (r[0] + r[1]) / 2);
+  const tam = Math.max(sz[0], sz[1], sz[2], 300); G.tam = tam;
+  colocarExplosion(); resaltar3D();
+  G.suelo.scale.set(tam * 5, tam * 5, 1); luces3D();
+}
+// coloca una pieza plana (con la explosión: cada pieza se aparta del centro siguiendo su normal; las horizontales, hacia arriba)
+function colocarPiezaPlana(m) {
+  const c = R && R.costillas[m.userData.i]; if (!c) return;
+  const b = basePieza(c), ex = P.vista.explosion || 0, pl = PLANOS[c.plano], ctr = G.centro || [0, 0, 0], tam = G.tam || 600;
+  const d = b.o.slice();
+  if (ex) {
+    d[pl.n] += (c.x - ctr[pl.n]) * ex * 1.3;   // se separan en proporción a su distancia al centro (mantienen el orden)
+    // las que se montan bajando (horizontales, o con ranuras desde abajo) suben
+    if (pl.n === 1 || (pl.b === 1 && c.ranuras.some(r => !r.alto && r.eje === 'v'))) d[1] += ex * tam * (pl.n === 1 ? 0.6 : 0.4);
+  }
+  const M4 = new T.Matrix4().makeBasis(V3(b.ex), V3(b.ey), V3(b.ez)).setPosition(d[0], d[1], d[2]);
+  m.matrixAutoUpdate = false; m.matrix.copy(M4); m.matrixWorldNeedsUpdate = true;
 }
 // luz normal (de arriba a un lado) o rasante: muy baja, casi paralela a la superficie, y se puede girar
 function luces3D() {
@@ -3783,7 +4146,7 @@ function construirVarillas3D() {
 function construirClaves3D() {
   (G.claves3d || []).forEach(l => { G.modelo.remove(l); l.geometry.dispose(); l.material.dispose(); });
   G.claves3d = [];
-  if (!P.vista.claves || formaCalculada()) return;
+  if (!P.vista.claves || formaCalculada() || P.tipo === 'plano') return;
   const C = clavesOrdenadas(), acento = cssVar('--acento') || '#1f6fd1';
   C.forEach((k, i) => {
     if (P.tipo === 'radial' && k.x >= 359.999 && C.length > 1) return;     // la de 360° es la misma que la de 0°
@@ -3800,6 +4163,7 @@ function construirClaves3D() {
 }
 function colocarExplosion() {
   const e = grosor(), ex = P.vista.explosion || 0;
+  if (P.tipo === 'plano') { G.costillas.forEach(m => { if (m) colocarPiezaPlana(m); }); pedirRender(); return; }
   G.costillas.forEach(m => { if (m) ponerEnMarco(m, marcoExpl(m.userData.x)); });
   G.largueros.forEach(m => {
     if (m.userData.modulo) return;
@@ -3813,6 +4177,7 @@ function colocarExplosion() {
   pedirRender();
 }
 function construirFantasma() {
+  if (P.tipo === 'plano') { if (G.fantasma) { G.modelo.remove(G.fantasma); G.fantasma.geometry.dispose(); G.fantasma = null; } return; }
   if (figuraActiva()) { if (G.fantasma) { G.modelo.remove(G.fantasma); G.fantasma.geometry.dispose(); G.fantasma = null; } return; }
   if (G.fantasma) { G.modelo.remove(G.fantasma); G.fantasma.geometry.dispose(); G.fantasma.material.dispose(); G.fantasma = null; }
   if (!P.vista.fantasma) return;
@@ -3934,9 +4299,9 @@ function iniciarPanel() {
   const enlazar = (sel, fn, ev = 'change') => $(sel).addEventListener(ev, fn);
   enlazar('#cGrosor', () => {
     const v = $('#cGrosor').value; $('#filaGrosorOtro').classList.toggle('oculto', v !== 'otro');
-    P.costillas.grosor = v === 'otro' ? +$('#cGrosorOtro').value : +v; cambio('Grosor ' + P.costillas.grosor + ' mm');
+    P.costillas.grosor = v === 'otro' ? +$('#cGrosorOtro').value : +v; if (esPlano() && !P.editado) aplicarPlantilla(); cambio('Grosor ' + P.costillas.grosor + ' mm');
   });
-  enlazar('#cGrosorOtro', () => { P.costillas.grosor = clamp(+$('#cGrosorOtro').value || 18, 3, 80); cambio('Grosor ' + P.costillas.grosor + ' mm'); });
+  enlazar('#cGrosorOtro', () => { P.costillas.grosor = clamp(+$('#cGrosorOtro').value || 18, 3, 80); if (esPlano() && !P.editado) aplicarPlantilla(); cambio('Grosor ' + P.costillas.grosor + ' mm'); });
   enlazar('#cModo', () => {
     P.costillas.modo = $('#cModo').value;
     // conserva el reparto actual al cambiar de modo
@@ -3969,6 +4334,9 @@ function iniciarPanel() {
   };
   $('#bVarMas').onclick = () => { UI.modo = UI.modo === 'varilla' ? 'normal' : 'varilla'; VP.pintar(); };
   $('#bVarQuitar').onclick = () => { if (!V().lista.length) return; V().lista = []; UI.varilla = -1; cambio('Varillas quitadas'); };
+  // piezas planas
+  enlazar('#plHolgura', () => { planoP().holgura = clamp(+$('#plHolgura').value || 0, 0, 3); cambio('Holgura de las uniones ' + fmt(planoP().holgura, 2) + ' mm'); });
+  iniciarPiezas();
   // tipo de mueble y retícula
   enlazar('#sTipo', () => {
     const nuevo = $('#sTipo').value, gN = grupoTipo(nuevo);
@@ -3991,7 +4359,8 @@ function iniciarPanel() {
     R = calcular();
     if (P.tipo === 'costillas' && !P.varillas.lista.length) autoVarillas(P.varillas.autoN);
     UI.costilla = 0; ponerControles();
-    cambio({ costillas: 'Costillas con varillas', reticula: 'Retícula entrelazada', radial: 'Rebanadas radiales', pared: 'Panel de pared' }[P.tipo]);
+    if (P.tipo === 'plano' && !planoP().piezas.length) aplicarPlantilla();
+    cambio({ costillas: 'Costillas con varillas', reticula: 'Retícula entrelazada', radial: 'Rebanadas radiales', pared: 'Panel de pared', plano: 'Piezas planas' }[P.tipo]);
     encuadrarSiHaceFalta(); camara('tres4');
   });
   // relieve: texto o modelo 3D
@@ -4195,22 +4564,29 @@ function mostrarSecciones(forzarFigura) {
   $('#secPlanta').classList.toggle('oculto', t !== 'costillas');
   $('#secRadial').classList.toggle('oculto', t !== 'radial');
   $('#secPared').classList.toggle('oculto', t !== 'pared');
+  const pl = t === 'plano';
+  $('#secPlano').classList.toggle('oculto', !pl); $('#secPiezas').classList.toggle('oculto', !pl);
+  ['#cVarillas3d', '#cClaves3d', '#cFantasma'].forEach(s => $(s).closest('label').classList.toggle('oculto', pl));
+  $('#titCostillas').textContent = pl ? 'Tablero' : t === 'pared' ? 'Lamas' : 'Costillas';
+  $('#titLista').textContent = pl ? 'Piezas' : t === 'pared' ? 'Lamas' : 'Costillas';
+  ['#cBase', '#cTope'].forEach(s => $(s).closest('label').classList.toggle('oculto', pl)); $('#resCost').classList.toggle('oculto', pl);
   $$('.filaArco').forEach(f => f.classList.toggle('oculto', P.planta.forma !== 'arco'));
   $$('.filaS').forEach(f => f.classList.toggle('oculto', P.planta.forma !== 's'));
   const rad = t === 'radial';
-  $('#cModo').closest('label').classList.toggle('oculto', rad);
-  $('#filaSep').classList.toggle('oculto', rad || P.costillas.modo !== 'separacion');
-  $('#filaNum').classList.toggle('oculto', rad || P.costillas.modo !== 'numero');
+  $('#cModo').closest('label').classList.toggle('oculto', rad || pl);
+  $('#filaSep').classList.toggle('oculto', rad || pl || P.costillas.modo !== 'separacion');
+  $('#filaNum').classList.toggle('oculto', rad || pl || P.costillas.modo !== 'numero');
+  if (pl) $('#filaTope').classList.add('oculto');
   $('#kPosTit').textContent = rad ? 'Posición (°)' : 'Posición (mm)';
   // relieve (paneles de pared)
   const rel = relieveActivo(), fig = figuraActiva() || (!!forzarFigura && t !== 'pared' && t !== 'radial'), calc = !!(rel || fig), Rl = P.relieve;
-  $('#filaOrigen').classList.toggle('oculto', t === 'radial');
+  $('#filaOrigen').classList.toggle('oculto', t === 'radial' || pl);
   [...$('#sOrigen').options].forEach(o => { o.hidden = t === 'pared' ? o.value === 'figura' : !['plantilla', 'figura'].includes(o.value); });
   $('#filaPlantilla').classList.toggle('oculto', calc); $('#bPlantillaFotos').classList.toggle('oculto', calc); $('#params').classList.toggle('oculto', calc); $('#descPlantilla').classList.toggle('oculto', calc);
   $('#secRelieve').classList.toggle('oculto', !rel); $('#secFigura').classList.toggle('oculto', !fig); $('#bConvertirPerfiles').classList.toggle('oculto', !(rel || figuraActiva()));
   $('#relTexto').classList.toggle('oculto', Rl.fuente !== 'texto'); $('#relModelo').classList.toggle('oculto', Rl.fuente !== 'modelo'); $('#relImagen').classList.toggle('oculto', Rl.fuente !== 'imagen');
-  $('#secClaves').classList.toggle('oculto', calc);
-  $('#sClave').classList.toggle('oculto', calc); $('#bEsquina').classList.toggle('oculto', calc); $('#infoClave').classList.toggle('oculto', calc);
+  $('#secClaves').classList.toggle('oculto', calc || pl);
+  $('#sClave').classList.toggle('oculto', calc || pl); $('#bEsquina').classList.toggle('oculto', calc); $('#infoClave').classList.toggle('oculto', calc || pl);
 }
 // campos de «Partir las lamas» (se enseñan los que hacen falta)
 function ponerPartir() {
@@ -4250,6 +4626,7 @@ function ponerControles() {
   const Pl = P.planta; $('#plForma').value = Pl.forma; $('#plRadio').value = Pl.radio; $('#plSentido').value = String(Pl.sentido === -1 ? -1 : 1); $('#plAmp').value = Pl.amplitud; $('#plOndas').value = Pl.ondas;
   const Ra = P.radial; $('#raNum').value = P.costillas.numero; $('#raTubo').value = Ra.tubo; $('#raHolTubo').value = Ra.holguraTubo; $('#raDiscos').value = Ra.discos; $('#raRDisco').value = Ra.rDisco; $('#raHolgura').value = Ra.holgura;
   ponerPartir();
+  $('#plHolgura').value = planoP().holgura; $('#pzRejilla').value = $('#kRejilla').value;
   const Pa = P.pared; $('#paNum').value = Pa.rastreles; $('#paAlto').value = Pa.alto; $('#paGrueso').value = Pa.grueso; $('#paMargen').value = Pa.margen; $('#paHolgura').value = Pa.holgura; $('#paVer').checked = Pa.verPared;
   $('#cClaves3d').checked = P.vista.claves !== false;
   const Fg = P.figura; $('#fgAlto').value = Fg.alto; $('#fgEje').value = Fg.eje; $('#fgGiro').value = String(Fg.giro || 0); $('#fgMin').value = Fg.minArea; $('#fgUnir').checked = Fg.unir !== false;
@@ -4297,19 +4674,22 @@ function refrescarClaves() {
 
 function refrescarListas() {
   // resumen del reparto
+  if (esPlano()) { const nM = R.uniones.filter(u => u.tipo === 'media').length, nC = R.uniones.filter(u => u.tipo === 'caja').length;
+    $('#plResumen').innerHTML = `<b>${R.n}</b> piezas · <b>${nM}</b> a media madera · <b>${nC}</b> en caja pasante · ranuras y cajas de <b>${fmt(grosor() + planoP().holgura, 2)}</b> mm`; }
   $('#resCost').innerHTML = P.tipo === 'radial' ? `<b>${R.n}</b> costillas cada <b>${fmt(R.sep, 1)}°</b> · junto al tubo quedan <b>${fmt(Math.max(0, R.hueco), 1)}</b> mm entre ellas`
     : `<b>${R.n}</b> ${P.tipo === 'pared' ? 'lamas' : 'costillas'} · separación <b>${fmt(R.sep, 1)}</b> mm · hueco <b>${fmt(Math.max(0, R.hueco), 1)}</b> mm`;
   // costillas y largueros
   const ret = P.tipo === 'reticula';
   $('#nCost').textContent = R.n + (R.otras.length ? ' + ' + R.otras.length : '');
   const malas = new Set(); R.avisos.forEach(a => { if (a.tipo === 'error') R.varillas.forEach(v => v.fallan.forEach(i => malas.add(i))); });
-  if (P.tipo === 'costillas') R.costillas.forEach(c => { if (!c.ok || (P.varillas.lista.length && c.nVar === 0)) malas.add(c.i); });
+  if (esPlano()) { R.costillas.forEach(c => { if (!c.ok || !c.uniones.length) malas.add(c.i); }); (R.ranurasMal || []).forEach(p => malas.add(p.i)); (R.pisan || []).forEach(q => malas.add(q[0])); }
+  else if (P.tipo === 'costillas') R.costillas.forEach(c => { if (!c.ok || (P.varillas.lista.length && c.nVar === 0)) malas.add(c.i); });
   else if (!ret) { R.costillas.forEach(c => { if (!c.ok) malas.add(c.i); }); (R.ranurasMal || []).forEach(p => malas.add(p.i)); (R.discosMal || []).forEach(d => malas.add(d.i)); (R.rastrelesMal || []).forEach(i => malas.add(i)); }
   else { R.costillas.forEach(c => { if (!c.ok || !c.ranuras.length) malas.add(c.i); }); (R.ranurasMal || []).forEach(p => malas.add(p.i)); }
   const ul = $('#listaCost'); ul.innerHTML = '';
   [...R.costillas, ...R.otras].forEach(c => {
     const li = document.createElement('li'); li.className = c.i === UI.costilla ? 'sel' : '';
-    li.innerHTML = `<span class="icono">${malas.has(c.i) ? '<span class="mal">!</span>' : c.disco ? '◎' : c.z ? '▬' : '▮'}</span><span class="nom">${c.nombre}</span><span class="med">${c.ok ? fmt(c.caja.w) + ' × ' + fmt(c.caja.h) : 'vacía'}</span>`;
+    li.innerHTML = `<span class="icono">${malas.has(c.i) ? '<span class="mal">!</span>' : c.plano ? { lado: '◧', frente: '▭', horizontal: '▱' }[c.plano] : c.disco ? '◎' : c.z ? '▬' : '▮'}</span><span class="nom">${c.nombre}</span><span class="med">${c.ok ? fmt(c.caja.w) + ' × ' + fmt(c.caja.h) : 'vacía'}</span>`;
     li.onclick = () => selCostilla(c.i);
     ul.appendChild(li);
   });
@@ -4325,10 +4705,11 @@ function refrescarListas() {
   const cm = calcularCompra(), largoV = cm.varillas.reduce((a, v) => a + v.largo, 0);
   $('#resumen').innerHTML = `<table>
     <tr><td>Medidas totales</td><td>${(G.dims || [0, 0, 0]).map(v => fmt(v)).join(' × ')} mm</td></tr>
-    <tr><td>${P.tipo === 'pared' ? 'Lamas' : 'Costillas'}</td><td>${R.n} de ${fmt(grosor(), 1)} mm</td></tr>
+    <tr><td>${esPlano() ? 'Piezas' : P.tipo === 'pared' ? 'Lamas' : 'Costillas'}</td><td>${R.n} de ${fmt(grosor(), 1)} mm</td></tr>
     <tr><td>Superficie de tablero</td><td>${fmt(cm.area / 1e6, 2)} m²</td></tr>
     <tr><td>Tableros ${fmt(cm.tablero[0])}×${fmt(cm.tablero[1])}</td><td>${cm.nTableros}</td></tr>
-    ${P.tipo === 'radial' ? `<tr><td>Tubo central</td><td>Ø ${fmt(P.radial.tubo)} mm</td></tr><tr><td>Discos de unión</td><td>${R.discos.length}</td></tr>`
+    ${esPlano() ? `<tr><td>Uniones a media madera</td><td>${R.uniones.filter(u => u.tipo === 'media').length}</td></tr><tr><td>Espigas en caja pasante</td><td>${R.uniones.filter(u => u.tipo === 'caja').length}</td></tr><tr><td>Ancho de ranuras y cajas</td><td>${fmt(grosor() + planoP().holgura, 2)} mm</td></tr>`
+    : P.tipo === 'radial' ? `<tr><td>Tubo central</td><td>Ø ${fmt(P.radial.tubo)} mm</td></tr><tr><td>Discos de unión</td><td>${R.discos.length}</td></tr>`
     : P.tipo === 'pared' ? `<tr><td>Rastreles ${fmt(P.pared.alto)} × ${fmt(P.pared.grueso)}</td><td>${R.rastreles.length} de ${fmt(P.largo)} mm</td></tr>`
     : ret ? `<tr><td>Largueros</td><td>${R.largueros.length} de ${fmt(grosor(), 1)} mm</td></tr>
     <tr><td>Cruces a media madera</td><td>${R.cruces.length}</td></tr>
@@ -4397,6 +4778,80 @@ function dialogoSimplificar() {
     }, true]]);
 }
 
+/* ---------- piezas planas: la pieza seleccionada ---------- */
+function refrescarPiezaSel() {
+  if (!esPlano()) return;
+  const ps = planoP().piezas, k = UI.costilla, p = ps[k]; if (!p) return;
+  $('#pzNombre').value = p.nombre || ''; $('#pzPlano').value = p.plano; $('#pzPos').value = p.c;
+  $('#pzPosTit').textContent = `Posición en ${PLANOS[p.plano].normal} (mm)`;
+  const par = p.igualA != null && ps[p.igualA] ? ps[p.igualA] : null, hijos = ps.filter(q => q.igualA === k);
+  const ig = $('#pzIgual'); ig.classList.toggle('oculto', !par && !hijos.length);
+  ig.textContent = par ? `Igual que «${par.nombre}»: al mover sus puntos cambian las dos.` : hijos.length ? `«${hijos.map(q => q.nombre).join('», «')}» ${hijos.length > 1 ? 'son iguales' : 'es igual'} que esta: al mover sus puntos cambian todas.` : '';
+  $('#pzSeparar').disabled = !par;
+}
+// pasa la pieza k a tener su propio contorno (deja de ser igual que otra)
+function separarPieza(k) {
+  const ps = planoP().piezas, p = ps[k]; if (!p || p.igualA == null) return;
+  const src = piezaFuente(k); p.pts = clonar(src.pts); p.esq = clonar(src.esq || src.pts.map(() => true)); delete p.igualA;
+}
+function iniciarPiezas() {
+  const pz = () => planoP().piezas[UI.costilla];
+  $('#pzNombre').onchange = () => { const p = pz(); if (!p) return; p.nombre = $('#pzNombre').value.trim() || p.nombre; cambio('Nombre: ' + p.nombre); };
+  $('#pzPlano').onchange = () => { const p = pz(); if (!p) return; p.plano = $('#pzPlano').value; P.editado = true; cambio('Dirección: ' + PLANOS[p.plano].nombre.toLowerCase()); };
+  $('#pzPos').onchange = () => { const p = pz(); if (!p) return; const v = +$('#pzPos').value; if (!isFinite(v)) return; p.c = Math.round(v * 10) / 10; P.editado = true; cambio('Posición de ' + p.nombre + ': ' + fmt(p.c) + ' mm'); };
+  $('#pzRejilla').onchange = () => { $('#kRejilla').value = $('#pzRejilla').value; };
+  $('#pzNueva').onclick = () => {
+    const ps = planoP().piezas, b = R && R.bbox ? R.bbox : [[-200, 200], [0, 400], [-150, 150]];
+    const w = Math.max(100, Math.round((b[0][1] - b[0][0]) * 0.6)), h = Math.max(60, Math.round((b[1][1] - b[1][0]) * 0.3)), yc = Math.round((b[1][0] + b[1][1]) / 2);
+    ps.push({ nombre: 'Pieza ' + (ps.length + 1), plano: 'frente', c: 0, pts: [[-w / 2, yc - h / 2], [w / 2, yc - h / 2], [w / 2, yc + h / 2], [-w / 2, yc + h / 2]], esq: [true, true, true, true] });
+    P.editado = true; cambio('Pieza nueva'); selCostilla(ps.length - 1);
+  };
+  $('#pzCopiar').onclick = () => {
+    const ps = planoP().piezas, p = pz(); if (!p) return;
+    const src = piezaFuente(UI.costilla), q = { nombre: p.nombre + ' (copia)', plano: p.plano, c: Math.round((p.c + Math.max(60, 3 * grosor())) * 10) / 10, pts: clonar(src.pts), esq: clonar(src.esq || src.pts.map(() => true)) };
+    ps.push(q); P.editado = true; cambio('Pieza copiada'); selCostilla(ps.length - 1);
+  };
+  $('#pzSimetrica').onclick = () => {
+    const ps = planoP().piezas, k = UI.costilla, p = pz(); if (!p) return;
+    const ctr = R && R.bbox ? (R.bbox[PLANOS[p.plano].n][0] + R.bbox[PLANOS[p.plano].n][1]) / 2 : 0, c2 = Math.round((2 * ctr - p.c) * 10) / 10;
+    if (Math.abs(c2 - p.c) < grosor()) { aviso('Esta pieza está en el centro: su simétrica caería en el mismo sitio. Muévela antes (Posición).', 5000); return; }
+    const base = p.igualA != null ? p.igualA : k;
+    ps.push({ nombre: p.nombre + ' (simétrica)', plano: p.plano, c: c2, igualA: base });
+    P.editado = true; cambio('Pieza simétrica'); selCostilla(ps.length - 1);
+  };
+  $('#pzSeparar').onclick = () => { const p = pz(); if (!p || p.igualA == null) return; separarPieza(UI.costilla); P.editado = true; cambio(p.nombre + ': contorno propio'); refrescarPiezaSel(); };
+  $('#pzQuitar').onclick = () => {
+    const ps = planoP().piezas, k = UI.costilla, p = pz(); if (!p) return;
+    if (ps.length <= 1) { aviso('Tiene que quedar al menos una pieza.'); return; }
+    if (!confirm(`¿Quitar «${p.nombre}»?`)) return;
+    ps.forEach((q, j) => { if (q.igualA === k) separarPieza(j); });
+    ps.splice(k, 1); ps.forEach(q => { if (q.igualA != null && q.igualA > k) q.igualA--; });
+    UI.costilla = Math.max(0, k - 1); UI.piezaVista = -1; P.editado = true; cambio('Pieza quitada'); selCostilla(UI.costilla);
+  };
+  $('#pzDXF').onclick = dialogoPiezaDXF;
+}
+function dialogoPiezaDXF() {
+  const k = UI.costilla, p = planoP().piezas[k]; if (!p) return;
+  pedirDXF((r, nombre) => {
+    const L0 = r.lazos[0], cb = cajaDe(L0), src = piezaFuente(k), act = cajaDe(curvaCerrada(src.pts, src.esq || src.pts.map(() => true)));
+    modal('📐 Contorno de la pieza desde un DXF o SVG', `
+      <p class="nota"><b>${esc(nombre)}</b>: contorno de ${fmt(cb.w, 1)} × ${fmt(cb.h, 1)} mm con ${L0.length.toLocaleString('es-ES')} puntos${r.lazos.length > 1 ? ` (hay ${r.lazos.length} contornos cerrados: se usa el mayor)` : ''}.${r.aviso ? `<br>⚠ ${esc(r.aviso)}` : ''}</p>
+      <p class="nota">Pasa a ser el contorno de <b>${esc(p.nombre)}</b>${p.igualA != null || planoP().piezas.some(q => q.igualA === k) ? ' (y de las piezas iguales a ella)' : ''}. En su plano, la horizontal es ${PLANOS[p.plano].ejes[0]} y la vertical ${PLANOS[p.plano].ejes[1]}.</p>
+      <label class="fila">Medidas <select id="dxEsc"><option value="real">Las del dibujo (mm reales)</option><option value="ancho">Ajustar al ancho de la pieza de ahora</option></select></label>
+      <label class="fila chk"><input type="checkbox" id="dxCentrar" checked> En el sitio de la pieza de ahora (mismo centro y misma base)</label>
+      <label class="fila" title="Si el contorno tiene muchos puntos, se quitan primero los que menos cambian la forma">Dejar como mucho (puntos) <input type="number" id="dxPts" value="${Math.min(150, L0.length)}" min="4" max="2000" step="10"></label>`,
+      [['✔ Traer el contorno', () => {
+        let L = simplificarLazo(L0, clamp(+$('#dxPts').value || 150, 4, 2000));
+        const kk = $('#dxEsc').value === 'ancho' && cb.w > 0.1 ? act.w / cb.w : 1;
+        L = L.map(q => [q[0] * kk, q[1] * kk]);
+        if ($('#dxCentrar').checked) { const c2 = cajaDe(L), dx = (act.x0 + act.w / 2) - (c2.x0 + c2.w / 2), dy = act.y0 - c2.y0; L = L.map(q => [q[0] + dx, q[1] + dy]); }
+        // los tramos curvos del dibujo ya vienen con muchos puntos: todos como esquina (tramos rectos), así no se deforma
+        src.pts = L.map(q => [Math.round(q[0] * 10) / 10, Math.round(q[1] * 10) / 10]); src.esq = L.map(() => true);
+        P.editado = true; cerrarModal(); cambio('Contorno desde ' + nombre); UI.piezaVista = -1; selCostilla(k);
+      }, true]]);
+  });
+}
+
 /* ===================== FABRICACIÓN: TABLEROS, DXF, SVG, DESPIECE ===================== */
 const TABLEROS = [
   { n: '2440 × 1220 (estándar)', a: 2440, h: 1220 },
@@ -4429,7 +4884,7 @@ const grosorDe = c => enMaqueta() ? grosorFab() : (c.grosorPieza || grosor());  
 const vetaOn = () => P.cnc.veta === 'si';
 function vetaDe(c) { const v = (P.cnc.vetaPiezas || {})[c.nombre]; return v === 'y' || v === 'libre' ? v : 'x'; }
 function ponVeta(c, v) { const m = P.cnc.vetaPiezas = P.cnc.vetaPiezas || {}; if (v === 'x') delete m[c.nombre]; else m[c.nombre] = v; }
-const holguraRanuraFab = () => enMaqueta() ? P.maqueta.holgura : P.tipo === 'radial' ? P.radial.holgura : P.reticula.holgura;
+const holguraRanuraFab = () => enMaqueta() ? P.maqueta.holgura : P.tipo === 'radial' ? P.radial.holgura : P.tipo === 'plano' ? planoP().holgura : P.reticula.holgura;
 function geoFab(c) {
   const k = escalaFab();
   // las ranuras se rehacen con el grosor de fabricación (el de la maqueta, si lo es)
@@ -4442,6 +4897,7 @@ function geoFab(c) {
   if (conHueso() && esq.length) { const h = huesoDePerro(base, esq, fresaFab() / 2 / k); base = h.poly; huesosMal = h.fallan; nHuesos = esq.length - h.fallan; }
   // huecos: la pieza puede ser solo un trozo de la lama o costilla, y tener agujeros por dentro
   let int = c.int || [];
+  if (c.generarInt) { int = c.generarInt(wF); if (conHueso()) int = int.map(h => huesoDePerro(h, h, fresaFab() / 2 / k).poly); }
   if (c.conHuecos && c.ranuras && c.ranuras.length && !c.modulo) { const q = parteFab(c, base); base = q.poly; int = q.int || []; }
   else if (c.conHuecos && !c.generar) base = c.poly;
   const poly = base.map(p => [p[0] * k, p[1] * k]), interiores = int.map(hh => hh.map(p => [p[0] * k, p[1] * k]));
@@ -4530,8 +4986,8 @@ function abrirFabricar() {
   if (!R) return;
   const f = fabActual(), lista = enMaqueta() ? TABLEROS_MAQ : TABLEROS;
   const ops = lista.map(t => `<option value="${t.a}x${t.h}" ${t.a === f.ancho && t.h === f.alto ? 'selected' : ''}>${t.n}</option>`).join('');
-  const maq = enMaqueta() ? `<div class="aviso-maq">Maqueta <b>1:${P.maqueta.escala}</b>: costillas a escala, tablero de ${fmt(P.maqueta.grosor, 1)} mm y agujeros de Ø ${fmt(P.maqueta.diam + P.maqueta.holgura, 2)} mm. Para el mueble real, quita «Fabricar como maqueta» en el panel izquierdo.</div>` : '';
-  modal('🪚 Fabricar: costillas en tableros' + (enMaqueta() ? ' · maqueta 1:' + P.maqueta.escala : ''), `${maq}
+  const maq = enMaqueta() ? `<div class="aviso-maq">Maqueta <b>1:${P.maqueta.escala}</b>: ${esPlano() ? 'piezas' : 'costillas'} a escala, tablero de ${fmt(P.maqueta.grosor, 1)} mm y ${P.tipo === 'costillas' ? `agujeros de Ø ${fmt(P.maqueta.diam + P.maqueta.holgura, 2)} mm` : `ranuras de ${fmt(P.maqueta.grosor + P.maqueta.holgura, 2)} mm`}. Para el mueble real, quita «Fabricar como maqueta» en el panel izquierdo.</div>` : '';
+  modal('🪚 Fabricar: ' + (esPlano() ? 'piezas' : P.tipo === 'pared' ? 'lamas' : 'costillas') + ' en tableros' + (enMaqueta() ? ' · maqueta 1:' + P.maqueta.escala : ''), `${maq}
     <div class="fab">
       <div class="opc">
         <label class="fila">Colocación <select id="fModo"><option value="tableros">En tableros</option><option value="fila">En fila (sin tablero)</option></select></label>
@@ -4653,10 +5109,10 @@ function previsualizarFab() {
   if (nE) {
     if (conHueso()) info.push(`Hueso de perro de Ø ${fmt(fr, 1)} mm en ${nH} esquinas` + (mH ? ` <span style="color:var(--peligro)">(${mH} no caben: ranura demasiado estrecha para la fresa)</span>` : '') + '.');
     else info.push(`<span style="color:#b26b00">${nE} esquinas interiores en ranuras y muescas sin hueso de perro: con fresa quedarán redondeadas y no encajarán del todo.</span>`);
-    if (fr && P.tipo === 'reticula' && fr > anchoR - 0.2) info.push(`<span style="color:var(--peligro)">La fresa de Ø ${fmt(fr, 1)} mm no cabe en las ranuras de ${fmt(anchoR, 2)} mm.</span>`);
+    if (fr && (P.tipo === 'reticula' || esPlano()) && fr > anchoR - 0.2) info.push(`<span style="color:var(--peligro)">La fresa de Ø ${fmt(fr, 1)} mm no cabe en las ranuras de ${fmt(anchoR, 2)} mm.</span>`);
   }
   if (P.cnc.arcos && ps.length) { const p0 = ps[0], cc = contornoCNC(p0.g.poly); info.push(`Contornos con arcos: la ${esc(p0.c.nombre.toLowerCase())} pasa de ${p0.g.poly.length} puntos a ${cc.pts.length} tramos (${cc.b.filter(v => v).length} arcos).`); }
-  info.push(P.tipo === 'reticula' ? `Ranuras de ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm · grosor del tablero ${fmt(grosorFab(), 1)} mm.` : `Agujeros: Ø ${fmt(2 * radioFab(), 2)} mm · grosor del tablero ${fmt(grosorFab(), 1)} mm.`);
+  info.push(P.tipo === 'reticula' || esPlano() ? `Ranuras${esPlano() ? ' y cajas' : ''} de ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm · grosor del tablero ${fmt(grosorFab(), 1)} mm.` : `Agujeros: Ø ${fmt(2 * radioFab(), 2)} mm · grosor del tablero ${fmt(grosorFab(), 1)} mm.`);
   $('#fInfo').innerHTML = info.join('<br>');
 }
 
@@ -4765,6 +5221,12 @@ function listaCompra() {
     });
     L.push(['Superficie de las piezas', `${fmt(cm.area / 1e6, 2)} m² en total`]);
   } else L.push([tablero, `${cm.nTableros} tablero${cm.nTableros === 1 ? '' : 's'} de ${fmt(cm.tablero[0])} × ${fmt(cm.tablero[1])} mm (${maq ? fmt(cm.area / 100, 0) + ' cm²' : fmt(cm.area / 1e6, 2) + ' m²'} de piezas)`]);
+  if (esPlano()) {
+    L.push(['Piezas', `${R.costillas.filter(c => c.ok).length}, con ${R.uniones.filter(u => u.tipo === 'media').length} uniones a media madera y ${R.uniones.filter(u => u.tipo === 'caja').length} espigas en caja pasante`]);
+    L.push(['Ranuras y cajas', `${fmt(grosorFab() + holguraRanuraFab(), 2)} mm de ancho`]);
+    L.push(['Herrajes', 'ninguno (cola en las uniones, si se quiere fijo)']);
+    return L;
+  }
   if (P.tipo === 'reticula') {
     L.push(['Piezas', `${R.costillas.filter(c => c.ok).length} costillas y ${R.largueros.filter(z => z.ok).length} largueros, con ${R.cruces.length} cruces`]);
     L.push(['Ranuras a media madera', `${fmt(grosorFab() + holguraRanuraFab(), 2)} mm de ancho`]);
@@ -4799,7 +5261,7 @@ function filasDespiece() {
   const mat = enMaqueta() ? `Maqueta ${fmt(P.maqueta.grosor, 1)} mm` : MATERIALES[P.costillas.material].nombre;
   return piezasFab().map(c => {
     const g = geoFab(c), rad = P.tipo === 'radial' && !c.disco;
-    return { n: c.etq, nombre: c.nombre, x: (c.disco ? c.v : c.z ? c.u : c.x) * (rad ? 1 : escalaFab()), eje: c.disco ? 'altura' : c.z ? 'z' : rad ? 'ángulo' : 'x',
+    return { n: c.etq, nombre: c.nombre, x: (c.disco ? c.v : c.z ? c.u : c.x) * (rad ? 1 : escalaFab()), eje: c.plano ? PLANOS[c.plano].normal : c.disco ? 'altura' : c.z ? 'z' : rad ? 'ángulo' : 'x',
       ranuras: c.ranuras.length + (c.disco ? R.n : 0), w: g.caja.w, h: g.caja.h, e: grosorDe(c), area: g.area, ag: g.agujeros.length, dA: g.agujeros.length ? fmt(2 * g.agujeros[0][2], 2) : '', mat };
   });
 }
@@ -4807,7 +5269,7 @@ function abrirDespiece() {
   if (!R) return;
   const F = filasDespiece(), L = listaCompra();
   modal('📋 Despiece y lista de compra' + (enMaqueta() ? ' · maqueta 1:' + P.maqueta.escala : ''), `
-    <h4>Costillas</h4>
+    <h4>${esPlano() ? 'Piezas' : P.tipo === 'pared' ? 'Lamas' : 'Costillas'}</h4>
     <div style="max-height:46vh;overflow:auto"><table class="tabla"><tr><th class="n">Pieza</th><th class="n">Posición</th><th class="n">Ancho</th><th class="n">Alto</th><th class="n">Grosor</th><th class="n">Superficie</th><th class="n">Agujeros / ranuras</th></tr>
     ${F.map(f => `<tr><td class="n">${esc(f.nombre)}</td><td class="n">${f.eje} = ${f.eje === 'ángulo' ? fmt(f.x, 1) + '°' : fmt(f.x) + ' mm'}</td><td class="n">${fmt(f.w, enMaqueta() ? 1 : 0)}</td><td class="n">${fmt(f.h, enMaqueta() ? 1 : 0)}</td><td class="n">${fmt(f.e, 1)}</td><td class="n">${fmt(f.area / 100)} cm²</td><td class="n">${f.ranuras ? f.ranuras + ' ranuras' : f.ag + ' × Ø' + f.dA}</td></tr>`).join('')}
     </table></div>
@@ -4933,10 +5395,10 @@ class PDFDoc {
 }
 
 // captura del 3D en JPEG (fondo blanco, sin resaltar, montado y en vista ¾)
-function captura3D() {
+function captura3D(expl) {
   const cam = G.cam.position.clone(), tgt = G.ctl.target.clone(), fondo = G.scene.background, ex = P.vista.explosion, res = P.vista.resalta, fan = P.vista.fantasma;
   const r = G.renderer, pr = r.getPixelRatio();
-  P.vista.explosion = 0; P.vista.resalta = false; P.vista.fantasma = false;
+  P.vista.explosion = expl || 0; P.vista.resalta = false; P.vista.fantasma = false;
   colocarExplosion(); resaltar3D(); construirFantasma();
   G.scene.background = new T.Color('#ffffff'); if (G.rejilla) G.rejilla.visible = false;
   r.setPixelRatio(2); ajustar3D(); camara('tres4'); r.render(G.scene, G.cam);
@@ -4979,7 +5441,15 @@ function planoPDF() {
   D.imagen(cap.bin, cap.w, cap.h, M, M + 18, iw, ih);
   D.trazo([210, 210, 210]).grosor(0.2).rect(M, M + 18, iw, ih).trazo();
   const fondo = (G.fondo || 0), alto = (G.alto || 0), x2 = M + iw + 8, a2 = W - M - x2;
-  let y = tabla(x2, M + 18, a2, [
+  let y = esPlano() ? tabla(x2, M + 18, a2, [
+    { titulo: 'Datos' },
+    ['Medidas (ancho × fondo × alto)', `${fmt((G.dims || [0])[0] * k)} × ${fmt(fondo * k)} × ${fmt(alto * k)} mm`],
+    ['Piezas', `${R.n} de ${fmt(e, 1)} mm`],
+    ['Material', maq ? `Maqueta de ${fmt(P.maqueta.grosor, 1)} mm` : MATERIALES[P.costillas.material].nombre],
+    ['Uniones a media madera', String(R.uniones.filter(u => u.tipo === 'media').length)],
+    ['Espigas en caja pasante', String(R.uniones.filter(u => u.tipo === 'caja').length)],
+    ['Ancho de ranuras y cajas', `${fmt(grosorFab() + holguraRanuraFab(), 2)} mm`],
+  ]) : tabla(x2, M + 18, a2, [
     { titulo: 'Datos' },
     ['Medidas (largo × fondo × alto)', `${fmt(P.largo * k)} × ${fmt(fondo * k)} × ${fmt(alto * k)} mm`],
     [P.tipo === 'pared' ? 'Lamas' : 'Costillas', `${R.n} de ${fmt(e, 1)} mm`],
@@ -4997,7 +5467,8 @@ function planoPDF() {
 
   const cs = R.costillas.filter(c => c.ok);
   const oH = { M, W, H, k, e, maq, gris, azul, madera, rojo, cm };
-  if (ret) hojaReticula(D, cabecera, tabla, oH);
+  if (esPlano()) hojaPlano(D, cabecera, tabla, oH);
+  else if (ret) hojaReticula(D, cabecera, tabla, oH);
   else if (P.tipo === 'radial') hojaRadial(D, cabecera, tabla, oH);
   else if (P.tipo === 'pared') hojaPared(D, cabecera, tabla, oH);
   else if (disposicion() === 'curva') hojaCurva(D, cabecera, tabla, oH);
@@ -5059,7 +5530,7 @@ function planoPDF() {
   const mw = Math.max(...csP.map(c => c.caja.w)), mh = Math.max(...csP.map(c => c.caja.h));
   const s3 = Math.min((cw - 10) / mw, (ch - 16) / mh);
   for (let h0 = 0; h0 < csP.length; h0 += porHoja) {
-    cabecera(`3. ${P.tipo === 'pared' ? 'Lamas' : 'Costillas'} ${csP[h0].etq} a ${csP[Math.min(csP.length, h0 + porHoja) - 1].etq} (todas a la misma escala, 1:${fmt(k / s3, 0)} aprox.)`);
+    cabecera(`3. ${esPlano() ? 'Piezas' : P.tipo === 'pared' ? 'Lamas' : 'Costillas'} ${csP[h0].etq} a ${csP[Math.min(csP.length, h0 + porHoja) - 1].etq} (todas a la misma escala, 1:${fmt(k / s3, 0)} aprox.)`);
     csP.slice(h0, h0 + porHoja).forEach((c, j) => {
       const g = geoFab(c), cx = M + (j % cols) * cw, cy = M + 18 + Math.floor(j / cols) * ch;
       D.trazo([225, 225, 225]).grosor(0.2).rect(cx + 1, cy + 1, cw - 2, ch - 2);
@@ -5074,7 +5545,8 @@ function planoPDF() {
       D.texto(PX(et[0]), PY(et[1]) + 2.2, c.etq, { pt: 14, b: true, al: 'c', col: azul });
       D.texto(cx + 3, cy + 6, c.nombre, { pt: 9, b: true });
       D.texto(cx + cw - 3, cy + 6, `${fmt(g.caja.w, maq ? 1 : 0)} × ${fmt(g.caja.h, maq ? 1 : 0)} mm`, { pt: 8.5, al: 'r', col: gris });
-      D.texto(cx + 3, cy + ch - 3.5, (P.tipo === 'radial' ? `a ${fmt(c.x, 1)}° · ` : `x = ${fmt(c.x * k)} mm · `) + (ret ? `${c.ranuras.length} ranuras` : P.tipo === 'radial' || P.tipo === 'pared' ? `${c.ranuras.length} muescas` : `${c.agujeros.length} agujeros`), { pt: 7.5, col: gris });
+      if (esPlano()) D.texto(cx + 3, cy + ch - 3.5, `${PLANOS[c.plano].normal} = ${fmt(c.x * k)} mm · ${textoUnionesPieza(c)}`, { pt: 6.5, col: gris });
+      else D.texto(cx + 3, cy + ch - 3.5, (P.tipo === 'radial' ? `a ${fmt(c.x, 1)}° · ` : `x = ${fmt(c.x * k)} mm · `) + (ret ? `${c.ranuras.length} ranuras` : P.tipo === 'radial' || P.tipo === 'pared' ? `${c.ranuras.length} muescas` : `${c.agujeros.length} agujeros`), { pt: 7.5, col: gris });
     });
   }
 
@@ -5140,7 +5612,7 @@ function planoPDF() {
   cabecera('5. Montaje paso a paso');
   const wR = fmt(grosorFab() + holguraRanuraFab(), 2), nZ = (R.largueros || []).length, ultZ = nZ ? R.largueros[nZ - 1].etq : '';
   const tabla2 = maq ? `tablero de ${fmt(P.maqueta.grosor, 1)} mm` : `${MATERIALES[P.costillas.material].nombre.toLowerCase()} de ${fmt(grosor(), 1)} mm`;
-  const pasos = P.tipo === 'radial' ? [
+  const pasos = esPlano() ? pasosPlano(k, maq) : P.tipo === 'radial' ? [
     `Corta las ${R.n} costillas y los ${R.discos.length} discos en ${tabla2}. Las muescas y ranuras son de ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm: prueba antes una en un retal.`,
     `Corta el tubo central de Ø ${fmt(P.radial.tubo * k, 1)} mm a ${fmt(cm.tubo)} mm.` + (maq ? '' : ' Si es una lámpara, pasa antes el cable por dentro.'),
     'Mete los discos en el tubo a su altura (hoja 2) y fíjalos con una gota de cola, con las ranuras de los dos discos alineadas.',
@@ -5195,7 +5667,7 @@ function planoPDF() {
     D.texto(M + 4, yp + 0.1, String(i + 1), { pt: 9, b: true, al: 'c', col: [255, 255, 255] });
     yp = D.parrafo(M + 11, yp, 170, t, { pt: 10 }) + 3;
   });
-  D.texto(M, H - M - 4, 'Herramientas: ' + (P.tipo === 'radial' ? (maq ? 'cortadora láser o cúter, cola.' : 'CNC o láser, sierra para el tubo, cola, lija.') : P.tipo === 'pared' ? 'CNC o sierra de calar, taladro, tacos y tornillos, nivel, taco separador.' : ret ? (maq ? 'cortadora láser o cúter, lija fina.' : 'CNC (fresa menor que la ranura), formón o lima, mazo de goma, lija.') : maq ? 'cortadora láser o cúter, cola blanca.' : `CNC o sierra de calar, broca de Ø ${fmt(2 * radioFab(), 1)}, lija, llaves para las tuercas M${V.diam}.`), { pt: 9, col: gris });
+  D.texto(M, H - M - 4, 'Herramientas: ' + (esPlano() ? (maq ? 'cortadora láser, lija fina; cola si se quiere fijo.' : 'CNC (o sierra de calar y escoplo), lija, maza de goma; cola si se quiere fijo.') : P.tipo === 'radial' ? (maq ? 'cortadora láser o cúter, cola.' : 'CNC o láser, sierra para el tubo, cola, lija.') : P.tipo === 'pared' ? 'CNC o sierra de calar, taladro, tacos y tornillos, nivel, taco separador.' : ret ? (maq ? 'cortadora láser o cúter, lija fina.' : 'CNC (fresa menor que la ranura), formón o lima, mazo de goma, lija.') : maq ? 'cortadora láser o cúter, cola blanca.' : `CNC o sierra de calar, broca de Ø ${fmt(2 * radioFab(), 1)}, lija, llaves para las tuercas M${V.diam}.`), { pt: 9, col: gris });
 
   // pies de página
   hojas.forEach((p, i) => { D.p = p; D.trazo([200, 200, 200]).grosor(0.2).linea(M, H - 8, W - M, H - 8); D.texto(M, H - 4.5, 'Made-rebanadas', { pt: 7.5, col: gris }); D.texto(W - M, H - 4.5, `Hoja ${i + 1} de ${hojas.length}`, { pt: 7.5, al: 'r', col: gris }); });
@@ -5358,6 +5830,53 @@ function hojaPared(D, cabecera, tabla, o) {
   if (relieveActivo()) filas.push(['Relieve', P.relieve.fuente === 'texto' ? `texto «${P.relieve.texto.replace(/\n/g, ' / ')}»` : `modelo ${P.relieve.modelo ? P.relieve.modelo.nombre : ''}`]);
   if (altaP) { const tx = zona.x + Math.min(zona.w, (X1 - X0 + 80) * s) + 14; tabla(tx, M + 24, W - M - tx, filas, { c1: 34 }); }
   else tabla(M, M + 134, W - 2 * M, filas, { c1: 70, alto: filas.length > 6 ? 4.3 : 5.2 });
+}
+
+// piezas planas: hoja 2 con el despiece explosionado, la lista de piezas y las uniones
+function hojaPlano(D, cabecera, tabla, o) {
+  const { M, W, H, k, gris, azul } = o;
+  cabecera('2. Piezas y uniones');
+  const cap = captura3D(0.6), iw = 130, ih = Math.min(150, iw * cap.h / cap.w);
+  D.imagen(cap.bin, cap.w, cap.h, M, M + 18, iw, ih);
+  D.trazo([210, 210, 210]).grosor(0.2).rect(M, M + 18, iw, ih).trazo();
+  D.texto(M, M + 22 + ih, 'Las piezas separadas (explosión) para ver cómo encajan.', { pt: 8, col: gris });
+  const x2 = M + iw + 8, a2 = W - M - x2;
+  const filas = [{ titulo: 'Piezas (posición: el centro del tablero; x desde el centro, y desde el suelo, z desde el centro)' }];
+  R.costillas.forEach(c => { if (!c.ok) return; const g = geoFab(c); filas.push([`${c.etq} · ${c.nombre}`, `${fmt(g.caja.w)} × ${fmt(g.caja.h)} mm · ${PLANOS[c.plano].nombre.toLowerCase()}, ${PLANOS[c.plano].normal} = ${fmt(c.x * k)}`]); });
+  let y = tabla(x2, M + 18, a2, filas, { c1: a2 * 0.45, alto: 4.6 });
+  const nom = i => R.costillas[i].etq + ' ' + R.costillas[i].nombre;
+  const fU = [{ titulo: 'Uniones' }];
+  R.uniones.forEach(u => {
+    if (u.tipo === 'caja') fU.push([`${nom(u.pasa)} en ${nom(u.en)}`, `espiga en caja de ${fmt((u.hi - u.lo + holguraRanuraFab()) * k, 1)} × ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm`]);
+    else { const arriba = u.aArriba ? u.a : u.b, abajo = u.aArriba ? u.b : u.a; fU.push([`${nom(arriba)} × ${nom(abajo)}`, `media madera de ${fmt((u.hi - u.lo) / 2 * k, 1)} mm (la ${R.costillas[arriba].etq} desde arriba)`]); }
+  });
+  let y2 = y + 6, x3 = x2, a3 = a2;
+  if (y2 + fU.length * 5.2 > H - M - 12) { cabecera('2b. Uniones'); y2 = M + 20; x3 = M; a3 = W - 2 * M; }
+  tabla(x3, y2, a3, fU, { c1: a3 * 0.45, alto: 4.6 });
+}
+// pasos de montaje de las piezas planas, por tipo de unión
+function pasosPlano(k, maq) {
+  const nom = i => `${R.costillas[i].nombre} (${R.costillas[i].etq})`, lista2 = a => a.length > 1 ? a.slice(0, -1).join(', ') + ' y ' + a[a.length - 1] : a[0] || '';
+  const w = fmt(grosorFab() + holguraRanuraFab(), 2), tabla2 = maq ? `tablero de ${fmt(P.maqueta.grosor, 1)} mm` : `${MATERIALES[P.costillas.material].nombre.toLowerCase()} de ${fmt(grosor(), 1)} mm`;
+  const pasos = [
+    `Corta las ${R.n} piezas en ${tabla2} (DXF o SVG en «Fabricar»; hojas 3 y 4). Las ranuras y las cajas son de ${w} mm: prueba antes una en un retal; tiene que entrar a mano, con un poco de roce.`,
+    'Lija los cantos (sin redondear los de las ranuras y las espigas) y marca cada pieza con su número en una cara que no se vea.',
+  ];
+  const horiz = i => R.costillas[i].plano === 'horizontal';
+  // 1) travesaños y espigas que pasan por cajas de piezas no horizontales
+  const pasan = {}; R.uniones.filter(u => u.tipo === 'caja' && !horiz(u.en)).forEach(u => { (pasan[u.pasa] = pasan[u.pasa] || []).push(u.en); });
+  Object.entries(pasan).forEach(([p, en]) => pasos.push(`Pasa ${nom(+p)} por ${en.length > 1 ? 'las cajas de' : 'la caja de'} ${lista2([...new Set(en)].map(nom))}.`));
+  // 2) medias maderas: la pieza con la ranura desde abajo baja sobre las que la tienen desde arriba
+  const baja = {}; R.uniones.filter(u => u.tipo === 'media').forEach(u => { const ar = u.aArriba ? u.a : u.b, ab = u.aArriba ? u.b : u.a; (baja[ab] = baja[ab] || []).push(ar); });
+  const ord = Object.keys(baja).map(Number).sort((a, b) => (R.costillas[a].caja.y0 || 0) - (R.costillas[b].caja.y0 || 0));
+  if (ord.length > 4) pasos.push(`Encaja a media madera, de abajo arriba: ${lista2(ord.map(i => `${nom(i)} sobre ${lista2([...new Set(baja[i])].map(j => R.costillas[j].etq))}`))}. Cada pieza baja con su ranura (la de abajo) sobre la ranura de arriba de la otra; si cuesta, da golpes suaves con una maza de goma y un taco.`);
+  else ord.forEach(i => pasos.push(`Baja ${nom(i)} sobre ${lista2([...new Set(baja[i])].map(nom))}: sus ranuras a media madera encajan una en la otra hasta quedar enrasadas.`));
+  // 3) tableros horizontales (asientos, tapas, baldas) sobre sus espigas
+  const tapas = {}; R.uniones.filter(u => u.tipo === 'caja' && horiz(u.en)).forEach(u => { (tapas[u.en] = tapas[u.en] || []).push(u.pasa); });
+  Object.entries(tapas).forEach(([t, de]) => pasos.push(`Pon ${nom(+t)} encima: las espigas de ${lista2([...new Set(de)].map(nom))} entran por sus cajas. Presiona por igual por todos los lados.`));
+  pasos.push('Comprueba que el mueble queda a escuadra y apoya bien. Si se quiere fijo, desmonta, pon cola en las uniones y vuelve a montar (o fija las espigas con una cuña).');
+  pasos.push(maq ? 'Mira la maqueta desde todos los lados antes de cortar el mueble real.' : 'Acabado: aceite, cera o barniz (mejor antes de montar, para llegar a todas las caras).');
+  return pasos;
 }
 
 /* ===================== ANIDADOR DE TABLEROS (assets/anidador) =====================
@@ -5949,6 +6468,7 @@ function proyectoDePlantilla(id, extra) {
   // paneles de pared: lamas finas y juntas (tablero de 12 mm cada 26 mm, hueco de 14 mm)
   if (grupoDe(id) === 'pared') { p.tipo = 'pared'; p.costillas.grosor = 12; p.costillas.separacion = 26; }
   // radiales: tablero fino, reparto por número y un tubo en el que quepan las costillas
+  if (grupoDe(id) === 'plano') { p.tipo = 'plano'; p.costillas.material = 'abedul'; }
   if (grupoDe(id) === 'radial') { p.tipo = 'radial'; p.costillas.grosor = 6; p.costillas.modo = 'numero'; p.costillas.numero = 12; p.radial.tubo = Math.max(p.radial.tubo, Math.ceil(p.costillas.numero * (p.costillas.grosor + 1) / Math.PI)); }
   if (extra) {
     if (extra.params) Object.assign(p.params, extra.params);
@@ -5956,6 +6476,7 @@ function proyectoDePlantilla(id, extra) {
     if (extra.varillas) Object.assign(p.varillas, extra.varillas);
     if (extra.reticula) Object.assign(p.reticula, extra.reticula);
     if (extra.tipo) p.tipo = extra.tipo;
+    if (extra.plano) Object.assign(p.plano, JSON.parse(JSON.stringify(extra.plano)));
     ['planta', 'radial', 'pared', 'relieve', 'figura'].forEach(k => { if (extra[k]) Object.assign(p[k], extra[k]); });
     if (Array.isArray(extra.huecos)) p.huecos = extra.huecos.map(h => {
       const b = huecoNuevo(h.forma || 'rect'), r = Object.assign(b, JSON.parse(JSON.stringify(h)), { mueble: Object.assign(b.mueble, h.mueble || {}) });
@@ -5997,7 +6518,10 @@ function validarProyecto(o) {
   p.pared.partir = Object.assign(proyectoBase().pared.partir, (o.pared || {}).partir || {});
   p.pared.modulos = Object.assign(proyectoBase().pared.modulos, (o.pared || {}).modulos || {});
   p.huecos = Array.isArray(o.huecos) ? o.huecos.map(h => { const b = huecoNuevo(h.forma || 'rect'); return Object.assign(b, h, { mueble: Object.assign(b.mueble, h.mueble || {}) }); }) : [];
-  if (!['reticula', 'radial', 'pared'].includes(p.tipo)) p.tipo = 'costillas';
+  if (!['reticula', 'radial', 'pared', 'plano'].includes(p.tipo)) p.tipo = 'costillas';
+  p.plano = Object.assign(proyectoBase().plano, o.plano || {});
+  p.plano.piezas = (Array.isArray(p.plano.piezas) ? p.plano.piezas : []).filter(z => z && (z.igualA != null || (Array.isArray(z.pts) && z.pts.length >= 3)))
+    .map(z => Object.assign({ nombre: 'Pieza', plano: 'frente', c: 0 }, z, { plano: PLANOS[z.plano] ? z.plano : 'frente', c: isFinite(+z.c) ? +z.c : 0 }));
   if (!PLANTILLAS[p.plantilla]) p.plantilla = 'libre';
   p.params = Object.assign(paramsDefecto(p.plantilla), o.params || {});
   const n = p.claves[0].pts.length;

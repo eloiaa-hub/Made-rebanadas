@@ -25,7 +25,8 @@ No hacen falta para usar el programa: solo para cambiarlo.
 | `02e_figura.js` | Figuras de pie: malla guardada en el proyecto (int16/uint32 en base64), cortes por planos, unión de trozos con puentes (rejilla) y conversión a perfiles clave |
 | `02d_relieve.js` | Relieve de pared: mapa de alturas desde un texto (canvas) o un modelo STL/OBJ/GLB/PLY (z-buffer; `leerMalla`, `leerGLTF`, `leerPLY`), perfil de cada lama, lamas horizontales |
 | `02c_disposicion.js` | Dónde va cada costilla (recta, curva, radial, pared), varillas curvas, tubo y discos, rastreles, comprobaciones de radial y pared |
-| `03_plantillas.js` | Plantillas paramétricas (banco, tumbona, pouf, mesa, estantería, libre) |
+| `02h_plano.js` | Piezas planas (flat-pack): cada pieza con su plano (`lado`, `frente`, `horizontal`), su posición y su contorno; busca los cruces y hace las uniones (media madera o caja pasante con `rectCaja`), comprobaciones, posición 3D (`basePieza`) |
+| `03_plantillas.js` | Plantillas paramétricas (banco, tumbona, pouf, mesa, estantería, libre…; las de piezas planas devuelven `piezas`) |
 | `04_editor2d.js` | Editor del perfil clave y vista de la costilla |
 | `05_tres.js` | Vista 3D (Three.js) |
 | `06_panel.js` | Paneles, recálculo y resumen |
@@ -56,7 +57,8 @@ No hacen falta para usar el programa: solo para cambiarlo.
 - `esquinas`: por punto, `true` = esquina, `false` = curva.
 - `costillas`: grosor, reparto (`separacion` o `numero`), recortes de base y techo, material.
 - `varillas`: tipo, diámetro, holgura, madera al borde, separadores y `lista` de posiciones `[u, v]`.
-- `tipo`: `costillas` (con varillas), `reticula`, `radial` o `pared`. En `radial`, la posición de los perfiles clave (`x`) es un ángulo de 0 a 360°.
+- `tipo`: `costillas` (con varillas), `reticula`, `radial`, `pared` o `plano`. En `radial`, la posición de los perfiles clave (`x`) es un ángulo de 0 a 360°. En `plano` los perfiles clave no se usan (queda uno de relleno).
+- `plano`: `holgura` de las uniones y `piezas` = `[{nombre, plano (lado, frente, horizontal), c (posición del centro del tablero en x, z o y), pts [[a, b]…], esq [bool…]} | {nombre, plano, c, igualA: índice}]` (las de `igualA` usan el contorno de otra pieza).
 - `planta`: forma (`recta`, `arco`, `s`), radio, sentido, amplitud y ondas.
 - `radial`: Ø del tubo, holgura, número y radio de los discos (0 = automático), holgura de las ranuras.
 - `pared`: número, alto, grueso, margen y holgura de los rastreles.

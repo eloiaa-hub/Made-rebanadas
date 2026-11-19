@@ -95,10 +95,10 @@ class PDFDoc {
 }
 
 // captura del 3D en JPEG (fondo blanco, sin resaltar, montado y en vista ¾)
-function captura3D() {
+function captura3D(expl) {
   const cam = G.cam.position.clone(), tgt = G.ctl.target.clone(), fondo = G.scene.background, ex = P.vista.explosion, res = P.vista.resalta, fan = P.vista.fantasma;
   const r = G.renderer, pr = r.getPixelRatio();
-  P.vista.explosion = 0; P.vista.resalta = false; P.vista.fantasma = false;
+  P.vista.explosion = expl || 0; P.vista.resalta = false; P.vista.fantasma = false;
   colocarExplosion(); resaltar3D(); construirFantasma();
   G.scene.background = new T.Color('#ffffff'); if (G.rejilla) G.rejilla.visible = false;
   r.setPixelRatio(2); ajustar3D(); camara('tres4'); r.render(G.scene, G.cam);
@@ -141,7 +141,15 @@ function planoPDF() {
   D.imagen(cap.bin, cap.w, cap.h, M, M + 18, iw, ih);
   D.trazo([210, 210, 210]).grosor(0.2).rect(M, M + 18, iw, ih).trazo();
   const fondo = (G.fondo || 0), alto = (G.alto || 0), x2 = M + iw + 8, a2 = W - M - x2;
-  let y = tabla(x2, M + 18, a2, [
+  let y = esPlano() ? tabla(x2, M + 18, a2, [
+    { titulo: 'Datos' },
+    ['Medidas (ancho × fondo × alto)', `${fmt((G.dims || [0])[0] * k)} × ${fmt(fondo * k)} × ${fmt(alto * k)} mm`],
+    ['Piezas', `${R.n} de ${fmt(e, 1)} mm`],
+    ['Material', maq ? `Maqueta de ${fmt(P.maqueta.grosor, 1)} mm` : MATERIALES[P.costillas.material].nombre],
+    ['Uniones a media madera', String(R.uniones.filter(u => u.tipo === 'media').length)],
+    ['Espigas en caja pasante', String(R.uniones.filter(u => u.tipo === 'caja').length)],
+    ['Ancho de ranuras y cajas', `${fmt(grosorFab() + holguraRanuraFab(), 2)} mm`],
+  ]) : tabla(x2, M + 18, a2, [
     { titulo: 'Datos' },
     ['Medidas (largo × fondo × alto)', `${fmt(P.largo * k)} × ${fmt(fondo * k)} × ${fmt(alto * k)} mm`],
     [P.tipo === 'pared' ? 'Lamas' : 'Costillas', `${R.n} de ${fmt(e, 1)} mm`],
@@ -159,7 +167,8 @@ function planoPDF() {
 
   const cs = R.costillas.filter(c => c.ok);
   const oH = { M, W, H, k, e, maq, gris, azul, madera, rojo, cm };
-  if (ret) hojaReticula(D, cabecera, tabla, oH);
+  if (esPlano()) hojaPlano(D, cabecera, tabla, oH);
+  else if (ret) hojaReticula(D, cabecera, tabla, oH);
   else if (P.tipo === 'radial') hojaRadial(D, cabecera, tabla, oH);
   else if (P.tipo === 'pared') hojaPared(D, cabecera, tabla, oH);
   else if (disposicion() === 'curva') hojaCurva(D, cabecera, tabla, oH);
@@ -221,7 +230,7 @@ function planoPDF() {
   const mw = Math.max(...csP.map(c => c.caja.w)), mh = Math.max(...csP.map(c => c.caja.h));
   const s3 = Math.min((cw - 10) / mw, (ch - 16) / mh);
   for (let h0 = 0; h0 < csP.length; h0 += porHoja) {
-    cabecera(`3. ${P.tipo === 'pared' ? 'Lamas' : 'Costillas'} ${csP[h0].etq} a ${csP[Math.min(csP.length, h0 + porHoja) - 1].etq} (todas a la misma escala, 1:${fmt(k / s3, 0)} aprox.)`);
+    cabecera(`3. ${esPlano() ? 'Piezas' : P.tipo === 'pared' ? 'Lamas' : 'Costillas'} ${csP[h0].etq} a ${csP[Math.min(csP.length, h0 + porHoja) - 1].etq} (todas a la misma escala, 1:${fmt(k / s3, 0)} aprox.)`);
     csP.slice(h0, h0 + porHoja).forEach((c, j) => {
       const g = geoFab(c), cx = M + (j % cols) * cw, cy = M + 18 + Math.floor(j / cols) * ch;
       D.trazo([225, 225, 225]).grosor(0.2).rect(cx + 1, cy + 1, cw - 2, ch - 2);
@@ -236,7 +245,8 @@ function planoPDF() {
       D.texto(PX(et[0]), PY(et[1]) + 2.2, c.etq, { pt: 14, b: true, al: 'c', col: azul });
       D.texto(cx + 3, cy + 6, c.nombre, { pt: 9, b: true });
       D.texto(cx + cw - 3, cy + 6, `${fmt(g.caja.w, maq ? 1 : 0)} × ${fmt(g.caja.h, maq ? 1 : 0)} mm`, { pt: 8.5, al: 'r', col: gris });
-      D.texto(cx + 3, cy + ch - 3.5, (P.tipo === 'radial' ? `a ${fmt(c.x, 1)}° · ` : `x = ${fmt(c.x * k)} mm · `) + (ret ? `${c.ranuras.length} ranuras` : P.tipo === 'radial' || P.tipo === 'pared' ? `${c.ranuras.length} muescas` : `${c.agujeros.length} agujeros`), { pt: 7.5, col: gris });
+      if (esPlano()) D.texto(cx + 3, cy + ch - 3.5, `${PLANOS[c.plano].normal} = ${fmt(c.x * k)} mm · ${textoUnionesPieza(c)}`, { pt: 6.5, col: gris });
+      else D.texto(cx + 3, cy + ch - 3.5, (P.tipo === 'radial' ? `a ${fmt(c.x, 1)}° · ` : `x = ${fmt(c.x * k)} mm · `) + (ret ? `${c.ranuras.length} ranuras` : P.tipo === 'radial' || P.tipo === 'pared' ? `${c.ranuras.length} muescas` : `${c.agujeros.length} agujeros`), { pt: 7.5, col: gris });
     });
   }
 
@@ -302,7 +312,7 @@ function planoPDF() {
   cabecera('5. Montaje paso a paso');
   const wR = fmt(grosorFab() + holguraRanuraFab(), 2), nZ = (R.largueros || []).length, ultZ = nZ ? R.largueros[nZ - 1].etq : '';
   const tabla2 = maq ? `tablero de ${fmt(P.maqueta.grosor, 1)} mm` : `${MATERIALES[P.costillas.material].nombre.toLowerCase()} de ${fmt(grosor(), 1)} mm`;
-  const pasos = P.tipo === 'radial' ? [
+  const pasos = esPlano() ? pasosPlano(k, maq) : P.tipo === 'radial' ? [
     `Corta las ${R.n} costillas y los ${R.discos.length} discos en ${tabla2}. Las muescas y ranuras son de ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm: prueba antes una en un retal.`,
     `Corta el tubo central de Ø ${fmt(P.radial.tubo * k, 1)} mm a ${fmt(cm.tubo)} mm.` + (maq ? '' : ' Si es una lámpara, pasa antes el cable por dentro.'),
     'Mete los discos en el tubo a su altura (hoja 2) y fíjalos con una gota de cola, con las ranuras de los dos discos alineadas.',
@@ -357,7 +367,7 @@ function planoPDF() {
     D.texto(M + 4, yp + 0.1, String(i + 1), { pt: 9, b: true, al: 'c', col: [255, 255, 255] });
     yp = D.parrafo(M + 11, yp, 170, t, { pt: 10 }) + 3;
   });
-  D.texto(M, H - M - 4, 'Herramientas: ' + (P.tipo === 'radial' ? (maq ? 'cortadora láser o cúter, cola.' : 'CNC o láser, sierra para el tubo, cola, lija.') : P.tipo === 'pared' ? 'CNC o sierra de calar, taladro, tacos y tornillos, nivel, taco separador.' : ret ? (maq ? 'cortadora láser o cúter, lija fina.' : 'CNC (fresa menor que la ranura), formón o lima, mazo de goma, lija.') : maq ? 'cortadora láser o cúter, cola blanca.' : `CNC o sierra de calar, broca de Ø ${fmt(2 * radioFab(), 1)}, lija, llaves para las tuercas M${V.diam}.`), { pt: 9, col: gris });
+  D.texto(M, H - M - 4, 'Herramientas: ' + (esPlano() ? (maq ? 'cortadora láser, lija fina; cola si se quiere fijo.' : 'CNC (o sierra de calar y escoplo), lija, maza de goma; cola si se quiere fijo.') : P.tipo === 'radial' ? (maq ? 'cortadora láser o cúter, cola.' : 'CNC o láser, sierra para el tubo, cola, lija.') : P.tipo === 'pared' ? 'CNC o sierra de calar, taladro, tacos y tornillos, nivel, taco separador.' : ret ? (maq ? 'cortadora láser o cúter, lija fina.' : 'CNC (fresa menor que la ranura), formón o lima, mazo de goma, lija.') : maq ? 'cortadora láser o cúter, cola blanca.' : `CNC o sierra de calar, broca de Ø ${fmt(2 * radioFab(), 1)}, lija, llaves para las tuercas M${V.diam}.`), { pt: 9, col: gris });
 
   // pies de página
   hojas.forEach((p, i) => { D.p = p; D.trazo([200, 200, 200]).grosor(0.2).linea(M, H - 8, W - M, H - 8); D.texto(M, H - 4.5, 'Made-rebanadas', { pt: 7.5, col: gris }); D.texto(W - M, H - 4.5, `Hoja ${i + 1} de ${hojas.length}`, { pt: 7.5, al: 'r', col: gris }); });
@@ -520,4 +530,51 @@ function hojaPared(D, cabecera, tabla, o) {
   if (relieveActivo()) filas.push(['Relieve', P.relieve.fuente === 'texto' ? `texto «${P.relieve.texto.replace(/\n/g, ' / ')}»` : `modelo ${P.relieve.modelo ? P.relieve.modelo.nombre : ''}`]);
   if (altaP) { const tx = zona.x + Math.min(zona.w, (X1 - X0 + 80) * s) + 14; tabla(tx, M + 24, W - M - tx, filas, { c1: 34 }); }
   else tabla(M, M + 134, W - 2 * M, filas, { c1: 70, alto: filas.length > 6 ? 4.3 : 5.2 });
+}
+
+// piezas planas: hoja 2 con el despiece explosionado, la lista de piezas y las uniones
+function hojaPlano(D, cabecera, tabla, o) {
+  const { M, W, H, k, gris, azul } = o;
+  cabecera('2. Piezas y uniones');
+  const cap = captura3D(0.6), iw = 130, ih = Math.min(150, iw * cap.h / cap.w);
+  D.imagen(cap.bin, cap.w, cap.h, M, M + 18, iw, ih);
+  D.trazo([210, 210, 210]).grosor(0.2).rect(M, M + 18, iw, ih).trazo();
+  D.texto(M, M + 22 + ih, 'Las piezas separadas (explosión) para ver cómo encajan.', { pt: 8, col: gris });
+  const x2 = M + iw + 8, a2 = W - M - x2;
+  const filas = [{ titulo: 'Piezas (posición: el centro del tablero; x desde el centro, y desde el suelo, z desde el centro)' }];
+  R.costillas.forEach(c => { if (!c.ok) return; const g = geoFab(c); filas.push([`${c.etq} · ${c.nombre}`, `${fmt(g.caja.w)} × ${fmt(g.caja.h)} mm · ${PLANOS[c.plano].nombre.toLowerCase()}, ${PLANOS[c.plano].normal} = ${fmt(c.x * k)}`]); });
+  let y = tabla(x2, M + 18, a2, filas, { c1: a2 * 0.45, alto: 4.6 });
+  const nom = i => R.costillas[i].etq + ' ' + R.costillas[i].nombre;
+  const fU = [{ titulo: 'Uniones' }];
+  R.uniones.forEach(u => {
+    if (u.tipo === 'caja') fU.push([`${nom(u.pasa)} en ${nom(u.en)}`, `espiga en caja de ${fmt((u.hi - u.lo + holguraRanuraFab()) * k, 1)} × ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm`]);
+    else { const arriba = u.aArriba ? u.a : u.b, abajo = u.aArriba ? u.b : u.a; fU.push([`${nom(arriba)} × ${nom(abajo)}`, `media madera de ${fmt((u.hi - u.lo) / 2 * k, 1)} mm (la ${R.costillas[arriba].etq} desde arriba)`]); }
+  });
+  let y2 = y + 6, x3 = x2, a3 = a2;
+  if (y2 + fU.length * 5.2 > H - M - 12) { cabecera('2b. Uniones'); y2 = M + 20; x3 = M; a3 = W - 2 * M; }
+  tabla(x3, y2, a3, fU, { c1: a3 * 0.45, alto: 4.6 });
+}
+// pasos de montaje de las piezas planas, por tipo de unión
+function pasosPlano(k, maq) {
+  const nom = i => `${R.costillas[i].nombre} (${R.costillas[i].etq})`, lista2 = a => a.length > 1 ? a.slice(0, -1).join(', ') + ' y ' + a[a.length - 1] : a[0] || '';
+  const w = fmt(grosorFab() + holguraRanuraFab(), 2), tabla2 = maq ? `tablero de ${fmt(P.maqueta.grosor, 1)} mm` : `${MATERIALES[P.costillas.material].nombre.toLowerCase()} de ${fmt(grosor(), 1)} mm`;
+  const pasos = [
+    `Corta las ${R.n} piezas en ${tabla2} (DXF o SVG en «Fabricar»; hojas 3 y 4). Las ranuras y las cajas son de ${w} mm: prueba antes una en un retal; tiene que entrar a mano, con un poco de roce.`,
+    'Lija los cantos (sin redondear los de las ranuras y las espigas) y marca cada pieza con su número en una cara que no se vea.',
+  ];
+  const horiz = i => R.costillas[i].plano === 'horizontal';
+  // 1) travesaños y espigas que pasan por cajas de piezas no horizontales
+  const pasan = {}; R.uniones.filter(u => u.tipo === 'caja' && !horiz(u.en)).forEach(u => { (pasan[u.pasa] = pasan[u.pasa] || []).push(u.en); });
+  Object.entries(pasan).forEach(([p, en]) => pasos.push(`Pasa ${nom(+p)} por ${en.length > 1 ? 'las cajas de' : 'la caja de'} ${lista2([...new Set(en)].map(nom))}.`));
+  // 2) medias maderas: la pieza con la ranura desde abajo baja sobre las que la tienen desde arriba
+  const baja = {}; R.uniones.filter(u => u.tipo === 'media').forEach(u => { const ar = u.aArriba ? u.a : u.b, ab = u.aArriba ? u.b : u.a; (baja[ab] = baja[ab] || []).push(ar); });
+  const ord = Object.keys(baja).map(Number).sort((a, b) => (R.costillas[a].caja.y0 || 0) - (R.costillas[b].caja.y0 || 0));
+  if (ord.length > 4) pasos.push(`Encaja a media madera, de abajo arriba: ${lista2(ord.map(i => `${nom(i)} sobre ${lista2([...new Set(baja[i])].map(j => R.costillas[j].etq))}`))}. Cada pieza baja con su ranura (la de abajo) sobre la ranura de arriba de la otra; si cuesta, da golpes suaves con una maza de goma y un taco.`);
+  else ord.forEach(i => pasos.push(`Baja ${nom(i)} sobre ${lista2([...new Set(baja[i])].map(nom))}: sus ranuras a media madera encajan una en la otra hasta quedar enrasadas.`));
+  // 3) tableros horizontales (asientos, tapas, baldas) sobre sus espigas
+  const tapas = {}; R.uniones.filter(u => u.tipo === 'caja' && horiz(u.en)).forEach(u => { (tapas[u.en] = tapas[u.en] || []).push(u.pasa); });
+  Object.entries(tapas).forEach(([t, de]) => pasos.push(`Pon ${nom(+t)} encima: las espigas de ${lista2([...new Set(de)].map(nom))} entran por sus cajas. Presiona por igual por todos los lados.`));
+  pasos.push('Comprueba que el mueble queda a escuadra y apoya bien. Si se quiere fijo, desmonta, pon cola en las uniones y vuelve a montar (o fija las espigas con una cuña).');
+  pasos.push(maq ? 'Mira la maqueta desde todos los lados antes de cortar el mueble real.' : 'Acabado: aceite, cera o barniz (mejor antes de montar, para llegar a todas las caras).');
+  return pasos;
 }

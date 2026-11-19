@@ -93,12 +93,22 @@ function flecha(ctx, x, y, dx, dy) {
 /* ---------- editor del perfil clave ---------- */
 let VP = null, VC = null;
 function claveActual() { return clavesOrdenadas()[UI.clave] || P.claves[0]; }
+// lo que se edita arriba: el perfil clave (con las esquinas del mueble) o, en las piezas planas, el contorno de la pieza seleccionada
+function ctrlEdit() {
+  if (esPlano()) {
+    const src = piezaFuente(UI.costilla); if (!src || !Array.isArray(src.pts)) return null;
+    if (!Array.isArray(src.esq) || src.esq.length !== src.pts.length) src.esq = src.pts.map(() => true);
+    return { pts: src.pts, esq: src.esq, pieza: src };
+  }
+  return { pts: claveActual().pts, esq: P.esquinas };
+}
 function colorCostilla(alfa) { return `rgba(168,116,63,${alfa})`; }
 
 function dibujarPerfil(ctx, V) {
   V.rejilla(ctx);
   if (!P || !R) return;
   if (relieveActivo()) { dibujarPerfilRelieve(ctx, V); return; }
+  if (esPlano()) { dibujarPerfilPlano(ctx, V); return; }
   const C = clavesOrdenadas(), k = claveActual(), acento = cssVar('--acento');
   // todas las costillas, muy suaves (la «envolvente»)
   ctx.lineWidth = 1; ctx.strokeStyle = colorCostilla(.16);
@@ -194,7 +204,7 @@ const ED = { arr: null };
 function snap(v) { const g = +$('#kRejilla').value; return g ? Math.round(v / g) * g : Math.round(v * 10) / 10; }
 function puntoCerca(mx, my) {
   if (formaCalculada()) return -1;
-  const k = claveActual(); let mejor = -1, md = 10;
+  const k = ctrlEdit(); if (!k) return -1; let mejor = -1, md = 10;
   k.pts.forEach((p, i) => { const [x, y] = VP.aPantalla(p[0], p[1]), d = Math.hypot(x - mx, y - my); if (d < md) { md = d; mejor = i; } });
   return mejor;
 }
@@ -205,25 +215,35 @@ function varillaCerca(mx, my) {
   return mejor;
 }
 function tramoCerca(mx, my) {
-  const k = claveActual(), m = curvaConTramos(k.pts, P.esquinas, 24);
+  const k = ctrlEdit(); if (!k) return null; const m = curvaConTramos(k.pts, k.esq, 24);
   let mejor = null, md = 9;
   m.forEach(o => { const [x, y] = VP.aPantalla(o.p[0], o.p[1]), d = Math.hypot(x - mx, y - my); if (d < md) { md = d; mejor = o; } });
   return mejor;
 }
 function insertarPunto(j, s) {
+  if (esPlano()) {
+    const k = ctrlEdit(); if (!k) return;
+    const q = puntoTramo(k.pts, k.esq, j, s); k.pts.splice(j + 1, 0, [Math.round(q[0] * 10) / 10, Math.round(q[1] * 10) / 10]); k.esq.splice(j + 1, 0, false);
+    UI.punto = j + 1; P.editado = true; return;
+  }
   const n = P.esquinas.length;
   P.claves.forEach(c => { const q = puntoTramo(c.pts, P.esquinas, j, s); c.pts.splice(j + 1, 0, [Math.round(q[0] * 10) / 10, Math.round(q[1] * 10) / 10]); });
   P.esquinas.splice(j + 1, 0, false);
   UI.punto = (j + 1) % (n + 1); P.editado = true;
 }
 function borrarPunto(i) {
+  if (esPlano()) {
+    const k = ctrlEdit(); if (!k) return;
+    if (k.pts.length <= 3) { aviso('Una pieza necesita al menos 3 puntos.'); return; }
+    k.pts.splice(i, 1); k.esq.splice(i, 1); UI.punto = -1; P.editado = true; cambio('Punto borrado'); return;
+  }
   if (P.esquinas.length <= 3) { aviso('Un perfil necesita al menos 3 puntos.'); return; }
   P.claves.forEach(c => c.pts.splice(i, 1)); P.esquinas.splice(i, 1);
   UI.punto = -1; P.editado = true; cambio('Punto borrado');
 }
 function alternarEsquina(i) {
   if (i < 0) { aviso('Selecciona antes un punto del perfil.'); return; }
-  P.esquinas[i] = !P.esquinas[i]; P.editado = true; cambio(P.esquinas[i] ? 'Punto en esquina' : 'Punto en curva');
+  const E = ctrlEdit().esq; E[i] = !E[i]; P.editado = true; cambio(E[i] ? 'Punto en esquina' : 'Punto en curva');
 }
 
 function iniciarEditor() {
@@ -248,8 +268,8 @@ function iniciarEditor() {
     const ip = puntoCerca(mx, my);
     if (ip >= 0) {
       UI.punto = ip; UI.varilla = -1;
-      const k = claveActual();
-      ED.arr = { tipo: 'punto', i: ip, x: mx, y: my, orig: P.claves.map(o => o.pts[ip].slice()), base: k.pts[ip].slice(), movido: false };
+      const k = ctrlEdit();
+      ED.arr = { tipo: 'punto', i: ip, x: mx, y: my, orig: esPlano() ? [] : P.claves.map(o => o.pts[ip].slice()), base: k.pts[ip].slice(), movido: false };
       VP.pintar(); return;
     }
     const iv = varillaCerca(mx, my);
@@ -267,8 +287,8 @@ function iniciarEditor() {
     if (!A.movido && Math.hypot(mx - A.x, my - A.y) < 3) return;
     A.movido = true;
     if (A.tipo === 'punto') {
-      const k = claveActual(), nu = ev.shiftKey ? A.base[0] + du : snap(A.base[0] + du), nv = ev.shiftKey ? A.base[1] + dv : snap(A.base[1] + dv);
-      if ($('#kTodas').checked) {
+      const k = ctrlEdit(), nu = ev.shiftKey ? A.base[0] + du : snap(A.base[0] + du), nv = ev.shiftKey ? A.base[1] + dv : snap(A.base[1] + dv);
+      if ($('#kTodas').checked && !esPlano()) {
         const ddu = nu - A.base[0], ddv = nv - A.base[1];
         P.claves.forEach((o, j) => { o.pts[A.i] = [Math.round((A.orig[j][0] + ddu) * 10) / 10, Math.round((A.orig[j][1] + ddv) * 10) / 10]; });
       } else k.pts[A.i] = [nu, nv];
@@ -296,6 +316,44 @@ function iniciarEditor() {
   $('#bCostSig').onclick = () => selCostilla(UI.costilla + 1);
   $('#piePerfil').innerHTML = ayudaPerfil();
 }
+// piezas planas: el contorno de la pieza seleccionada en su plano, con las piezas que la cruzan en gris
+function dibujarPerfilPlano(ctx, V) {
+  const c = piezaSel(), k = ctrlEdit(), acento = cssVar('--acento'), e = grosor();
+  if (!c || !k) return;
+  // dónde la cruzan las otras piezas (la franja del grosor de cada una, a lo largo del cruce)
+  (c.uniones || []).forEach(u => {
+    const otra = R.costillas[u.a === c.i ? u.b : u.a]; if (!otra) return;
+    const pa = PLANOS[c.plano], pb = PLANOS[otra.plano], eje = pa.a === pb.n ? 'v' : 'h';
+    const r = eje === 'v' ? [otra.x - e / 2, u.lo, otra.x + e / 2, u.hi] : [u.lo, otra.x - e / 2, u.hi, otra.x + e / 2];
+    const [x0, y0] = V.aPantalla(r[0], r[1]), [x1, y1] = V.aPantalla(r[2], r[3]);
+    ctx.fillStyle = 'rgba(95,107,120,.30)'; ctx.fillRect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0));
+    ctx.fillStyle = '#5f6b78'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText(otra.etq + (u.tipo === 'caja' ? (u.en === c.i ? ' (caja)' : ' (espiga)') : ''), (x0 + x1) / 2, Math.min(y0, y1) - 4);
+  });
+  ctx.textAlign = 'left';
+  // la pieza como se corta (con ranuras y cajas)
+  if (c.ok) {
+    ctx.fillStyle = conAlfa(acento, .12); ctx.beginPath();
+    [polyVista(c.poly), ...(c.int || []).map(polyVista)].forEach(pol => pol.forEach((p, i) => { const [x, y] = V.aPantalla(p[0], p[1]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }) || ctx.closePath());
+    ctx.fill('evenodd'); ctx.strokeStyle = colorCostilla(.8); ctx.lineWidth = 1.2; ctx.stroke();
+  }
+  // contorno de control (curva) y polígono de control
+  const curva = curvaCerrada(k.pts, k.esq);
+  ctx.strokeStyle = acento; ctx.lineWidth = 2.2; V.camino(ctx, curva); ctx.stroke();
+  ctx.strokeStyle = cssVar('--suave'); ctx.lineWidth = .8; ctx.setLineDash([2, 3]); V.camino(ctx, k.pts); ctx.stroke(); ctx.setLineDash([]);
+  k.pts.forEach((p, i) => {
+    const [x, y] = V.aPantalla(p[0], p[1]), sel = i === UI.punto;
+    ctx.fillStyle = sel ? acento : cssVar('--panel'); ctx.strokeStyle = acento; ctx.lineWidth = 1.8; ctx.beginPath();
+    if (k.esq[i]) ctx.rect(x - 4.5, y - 4.5, 9, 9); else ctx.arc(x, y, 5, 0, PI2);
+    ctx.fill(); ctx.stroke();
+  });
+  const b = cajaDe(curva);
+  V.cota(ctx, [b.x0, b.y0], [b.x1, b.y0], 22, fmt(b.w) + ' mm', false);
+  V.cota(ctx, [b.x1, b.y0], [b.x1, b.y1], 26, fmt(b.h) + ' mm', true);
+  const pl = PLANOS[c.plano];
+  ctx.fillStyle = cssVar('--suave'); ctx.font = '11.5px system-ui';
+  ctx.fillText(`${c.nombre} (${c.etq}) · ${pl.nombre.toLowerCase()}, en ${pl.normal} = ${fmt(c.x)} mm · horizontal: ${pl.ejes[0]} · vertical: ${pl.ejes[1]}` + (k.pieza && k.pieza !== planoP().piezas[UI.costilla] ? ` · igual que «${k.pieza.nombre}»` : ''), 8, 62);
+}
 // con relieve (texto o modelo) no hay perfiles clave: se ven las lamas y la seleccionada
 function dibujarPerfilRelieve(ctx, V) {
   ctx.fillStyle = 'rgba(150,156,164,.28)'; const [xp] = V.aPantalla(0, 0); ctx.fillRect(0, 0, xp, V.h);
@@ -314,6 +372,7 @@ function ayudaPerfil() {
 }
 function encuadrarPerfil() {
   if (!R) return;
+  if (esPlano()) { const k = ctrlEdit(), c = piezaSel(); if (!k) { VP.pintar(); return; } const b = cajaDe(curvaCerrada(k.pts, k.esq)); if (c && c.ok) { const d = c.caja; b.x0 = Math.min(b.x0, d.x0); b.y0 = Math.min(b.y0, d.y0); b.w = Math.max(b.x0 + b.w, d.x1) - b.x0; b.h = Math.max(b.y0 + b.h, d.y1) - b.y0; } VP.encuadrar(b, 50); return; }
   if (formaCalculada()) { const cs = R.costillas.filter(c => c.ok); if (cs.length) VP.encuadrar({ x0: 0, y0: 0, w: Math.max(...cs.map(c => c.caja.x1)), h: Math.max(...cs.map(c => c.caja.y1)) }, 50); return; }
   let x0 = Infinity, y0 = 0, x1 = -Infinity, y1 = -Infinity;
   P.claves.forEach(c => c.pts.forEach(p => { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }));
@@ -354,7 +413,8 @@ function selCostilla(i, encuadrar) {
   UI.costilla = clamp(i, 0, nPiezas() - 1);
   // si en esa costilla hay un perfil clave, se selecciona también (para editarlo arriba)
   const c = piezaSel();
-  if (c && UI.costilla < R.n && !formaCalculada() && P.tipo !== 'radial') {
+  if (esPlano()) { const cambia = UI.piezaVista !== UI.costilla; UI.piezaVista = UI.costilla; if (cambia) { UI.punto = -1; encuadrarPerfil(); } refrescarPiezaSel(); }
+  if (c && UI.costilla < R.n && !formaCalculada() && P.tipo !== 'radial' && !esPlano()) {
     const C = clavesOrdenadas(), tol = Math.max(grosor(), (R.sep || 0) / 2);
     let mej = -1, md = Infinity; C.forEach((k, j) => { const d = Math.abs(k.x - c.x); if (d < md) { md = d; mej = j; } });
     if (mej >= 0 && md <= tol && mej !== UI.clave) { UI.clave = mej; UI.punto = -1; refrescarClaves(); construirClaves3D(); }
@@ -370,10 +430,11 @@ const piezaSel = () => R ? (UI.costilla < R.n ? R.costillas[UI.costilla] : R.otr
 function encuadrarCostilla() { const c = piezaSel(); if (c && c.ok) VC.encuadrar(c.caja, 40); else VC.pintar(); }
 function refrescarCostilla() {
   const c = piezaSel(); if (!c) return;
-  $('#tipoPieza').textContent = c.disco ? 'Disco' : c.z ? 'Larguero' : P.tipo === 'pared' ? 'Lama' : 'Costilla';
+  $('#tipoPieza').textContent = esPlano() ? 'Pieza' : c.disco ? 'Disco' : c.z ? 'Larguero' : P.tipo === 'pared' ? 'Lama' : 'Costilla';
   $('#numCost').textContent = c.etq;
-  $('#infoCost').textContent = c.disco ? `a ${fmt(c.v)} mm de altura · Ø ${fmt(2 * c.rD)} mm · ${R.n} ranuras`
+  $('#infoCost').textContent = esPlano() ? `${c.nombre} · ${PLANOS[c.plano].nombre.toLowerCase()} en ${PLANOS[c.plano].normal} = ${fmt(c.x)} mm · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm · ${textoUnionesPieza(c)}` : c.disco ? `a ${fmt(c.v)} mm de altura · Ø ${fmt(2 * c.rD)} mm · ${R.n} ranuras`
     : c.z ? `z = ${fmt(c.u)} mm · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm · ${c.ranuras.length} ranuras`
     : `de ${R.n} · ${P.tipo === 'radial' ? 'ángulo' : 'x'} = ${textoPos(c.x)} · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm` + (c.ranuras.length ? ` · ${c.ranuras.length} ${P.tipo === 'reticula' ? 'ranuras' : 'muescas'}` : '');
   $$('#listaCost li').forEach((li, i) => li.classList.toggle('sel', i === UI.costilla));
+  if (esPlano()) refrescarPiezaSel();
 }
