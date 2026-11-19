@@ -526,6 +526,7 @@ function ranurar(base, ranuras, w) {
     const ww = r.ancho != null ? r.ancho : w, nuevo = r.lat ? hacerRanuraLat(poly, r, ww) : hacerRanura(poly, r, ww);
     if (nuevo) { poly = nuevo; if (nuevo.esq) esq.push(...nuevo.esq); } else fallan.push(r);
   }
+  if (poly !== base) poly.esq = esq;     // todas las esquinas, para dibujar el hueso de perro en las vistas
   return { poly, fallan, esq };
 }
 
@@ -3127,7 +3128,7 @@ function dibujarCostilla(ctx, V) {
   const c = piezaSel(); if (!c || !c.ok) return;
   ctx.fillStyle = colorCostilla(.28); ctx.strokeStyle = colorCostilla(1); ctx.lineWidth = 2;
   // la pieza con sus huecos de dentro (si los tiene)
-  ctx.beginPath(); [c.poly, ...(c.int || [])].forEach(pol => pol.forEach((p, i) => { const [x, y] = V.aPantalla(p[0], p[1]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }) || ctx.closePath());
+  ctx.beginPath(); [polyVista(c.poly), ...(c.int || [])].forEach(pol => pol.forEach((p, i) => { const [x, y] = V.aPantalla(p[0], p[1]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }) || ctx.closePath());
   ctx.fill('evenodd'); ctx.stroke();
   // los otros trozos de la misma lama o costilla, en claro
   const pad = c.padre || c; (pad.partes || []).forEach(q => { if (q === c || !q.ok) return; ctx.save(); ctx.globalAlpha = .35; ctx.setLineDash([4, 3]); V.camino(ctx, q.poly); ctx.stroke(); ctx.restore(); });
@@ -3617,14 +3618,14 @@ function construir3D() {
   R.costillas.forEach(c => {
     if (!c.ok) { G.costillas.push(null); return; }
     const hs = c.agujeros.map(k => ({ x: V.lista[k][0], y: V.lista[k][1], r: rh }));
-    const m = new T.Mesh(extruir(c.poly, hs, e, c.int), mats); m.castShadow = m.receiveShadow = true;
+    const m = new T.Mesh(extruir(polyVista(c.poly), hs, e, c.int), mats); m.castShadow = m.receiveShadow = true;
     m.userData = { i: c.i, x: c.x };
     G.modelo.add(m); G.costillas.push(m);
   });
   // retícula: largueros en el plano (x, v)
   R.largueros.forEach(z => {
     if (!z.ok) return;
-    const m = new T.Mesh(extruir(z.poly, [], e), mats); m.castShadow = m.receiveShadow = true;
+    const m = new T.Mesh(extruir(polyVista(z.poly), [], e), mats); m.castShadow = m.receiveShadow = true;
     m.userData = { i: z.i, u: z.u, z: true };
     G.modelo.add(m); G.largueros.push(m);
   });
@@ -3632,7 +3633,7 @@ function construir3D() {
   (R.trozos || []).forEach(t => {
     if (!t.ok) return;
     const hs = t.agujeros.map(k => ({ x: V.lista[k][0], y: V.lista[k][1], r: rh }));
-    const m = new T.Mesh(extruir(t.poly, hs, e, t.int), mats); m.castShadow = m.receiveShadow = true;
+    const m = new T.Mesh(extruir(polyVista(t.poly), hs, e, t.int), mats); m.castShadow = m.receiveShadow = true;
     m.userData = t.z ? { i: t.i, u: t.u, z: true } : { i: t.i, trozoX: t.x };
     G.modelo.add(m); G.largueros.push(m);
   });
@@ -3652,7 +3653,7 @@ function construir3D() {
   });
   // radial: discos (horizontales) y tubo central
   R.discos.forEach(d => {
-    const g = extruir(d.poly, d.huecos, e); g.rotateX(-Math.PI / 2);
+    const g = extruir(polyVista(d.poly), d.huecos, e); g.rotateX(-Math.PI / 2);
     const m = new T.Mesh(g, mats); m.castShadow = m.receiveShadow = true; m.userData = { i: d.i, disco: true, v: d.v };
     G.modelo.add(m); G.largueros.push(m);
   });
@@ -5418,33 +5419,63 @@ window.addEventListener('message', e => {
 const fresaFab = () => enMaqueta() ? (+P.maqueta.fresa || 0) : (+P.cnc.fresa || 0);
 const conHueso = () => P.cnc.hueso && fresaFab() > 0;
 
-// Sustituye cada esquina interior marcada por un arco de radio r que pasa por ella (centro dentro del hueco)
+// el contorno de una pieza para las vistas (3D y pieza): con el hueso de perro si está activo
+function polyVista(poly) {
+  if (!poly || !poly.esq || !poly.esq.length || !conHueso()) return poly;
+  if (poly._hueso && poly._hueso.r === fresaFab() / 2 / escalaFab()) return poly._hueso.poly;
+  const r = fresaFab() / 2 / escalaFab(), h = huesoDePerro(poly, poly.esq, r).poly;
+  Object.defineProperty(poly, '_hueso', { value: { r, poly: h }, configurable: true, writable: true });
+  return h;
+}
+// Sustituye cada esquina interior marcada por un arco de radio r que pasa por ella (centro dentro del hueco).
+// Si dos esquinas seguidas están tan cerca que sus círculos se pisan (ranura estrecha para la fresa),
+// los dos arcos se unen en el punto donde se cortan: es lo que de verdad corta la fresa.
 function huesoDePerro(poly, esq, r) {
   if (!esq || !esq.length || !(r > 0)) return { poly, fallan: 0 };
   const n = poly.length, cerca = (a, b) => Math.abs(a[0] - b[0]) < 1e-6 && Math.abs(a[1] - b[1]) < 1e-6;
   const marcas = new Set(); poly.forEach((p, i) => { if (esq.some(e => e && cerca(e, p))) marcas.add(i); });
-  const out = []; let fallan = 0;
-  for (let i = 0; i < n; i++) {
-    const C = poly[i];
-    if (!marcas.has(i)) { out.push(C); continue; }
-    const A0 = poly[(i - 1 + n) % n], B0 = poly[(i + 1) % n];
+  const H = new Array(n).fill(null); let fallan = 0;
+  marcas.forEach(i => {
+    const C = poly[i], A0 = poly[(i - 1 + n) % n], B0 = poly[(i + 1) % n];
     let da = [C[0] - A0[0], C[1] - A0[1]], db = [B0[0] - C[0], B0[1] - C[1]];
     const la = Math.hypot(...da), lb = Math.hypot(...db);
+    if (!(la > 1e-9 && lb > 1e-9)) { fallan++; return; }
     da = [da[0] / la, da[1] / la]; db = [db[0] / lb, db[1] / lb];
-    if (da[0] * db[1] - da[1] * db[0] >= 0) { out.push(C); continue; }  // no es una esquina hacia dentro
+    if (da[0] * db[1] - da[1] * db[0] >= 0) return;  // no es una esquina hacia dentro
     let w = [da[0] - db[0], da[1] - db[1]]; const lw = Math.hypot(...w); w = [w[0] / lw, w[1] / lw];
     const Q = [C[0] - r * w[0], C[1] - r * w[1]];
     const tA = 2 * r * (w[0] * da[0] + w[1] * da[1]), tB = -2 * r * (w[0] * db[0] + w[1] * db[1]);
-    if (!(tA > 0 && tB > 0) || tA > la - 0.01 || tB > lb - 0.01) { out.push(C); fallan++; continue; }
-    const A = [C[0] - tA * da[0], C[1] - tA * da[1]], B = [C[0] + tB * db[0], C[1] + tB * db[1]];
-    // arco de A a B alrededor de Q pasando por C
-    const ang = p => Math.atan2(p[1] - Q[1], p[0] - Q[0]), aA = ang(A), aB = ang(B), aC = ang(C);
-    const norm = x => ((x % PI2) + PI2) % PI2;
-    let barrido = norm(aB - aA); if (norm(aC - aA) > barrido) barrido -= PI2;   // el sentido que pasa por C
-    out.push(A);
-    const k = Math.max(6, Math.ceil(Math.abs(barrido) / (Math.PI / 16)));
-    for (let m = 1; m < k; m++) { const a = aA + barrido * m / k; out.push([Q[0] + r * Math.cos(a), Q[1] + r * Math.sin(a)]); }
-    out.push(B);
+    if (!(tA > 0 && tB > 0) || tA > la - 0.01 || tB > lb - 0.01) { fallan++; return; }
+    H[i] = { C, Q, A: [C[0] - tA * da[0], C[1] - tA * da[1]], B: [C[0] + tB * db[0], C[1] + tB * db[1]], tA, tB, lb };
+  });
+  // esquinas seguidas cuyos círculos se pisan: el punto donde se cortan, del lado de la madera
+  const union = new Array(n).fill(null);
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n, h = H[i], g = H[j];
+    if (!h || !g || h.tB + g.tA < h.lb - 1e-6) continue;
+    const dx = g.Q[0] - h.Q[0], dy = g.Q[1] - h.Q[1], d = Math.hypot(dx, dy);
+    if (!(d > 1e-9) || d >= 2 * r) continue;
+    const m = [h.Q[0] + dx / 2, h.Q[1] + dy / 2], hh = Math.sqrt(r * r - d * d / 4), nx = -dy / d, ny = dx / d;
+    const X1 = [m[0] + nx * hh, m[1] + ny * hh], X2 = [m[0] - nx * hh, m[1] - ny * hh];
+    const lado = p => dx * (p[1] - h.Q[1]) - dy * (p[0] - h.Q[0]);
+    union[i] = Math.sign(lado(X1)) === Math.sign(lado(h.C)) ? X1 : X2;
+  }
+  const norm = x => ((x % PI2) + PI2) % PI2;
+  const arco = (Q, S, E, C, out) => {   // de S a E alrededor de Q, por el lado que pasa por C (sin S, con E)
+    const ang = p => Math.atan2(p[1] - Q[1], p[0] - Q[0]), aS = ang(S);
+    let barrido = norm(ang(E) - aS); if (norm(ang(C) - aS) > barrido) barrido -= PI2;
+    const k = Math.max(3, Math.ceil(Math.abs(barrido) / (Math.PI / 16)));
+    for (let m = 1; m < k; m++) { const a = aS + barrido * m / k; out.push([Q[0] + r * Math.cos(a), Q[1] + r * Math.sin(a)]); }
+    out.push(E);
+  };
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const h = H[i];
+    if (!h) { out.push(poly[i]); continue; }
+    const prev = union[(i - 1 + n) % n], sig = union[i];
+    const S = prev || h.A;
+    if (!prev) out.push(h.A);
+    arco(h.Q, S, sig || h.B, h.C, out);
   }
   return { poly: out, fallan };
 }
@@ -6131,7 +6162,7 @@ function iniciar() {
   requestAnimationFrame(() => { ajustar3D(); VP.ajustar(); VC.ajustar(); cargarProyecto(P, true); });
 }
 // para las pruebas automáticas
-window.MadeRebanadas = { get P() { return P; }, get R() { return R; }, calcular: () => { const t = performance.now(); R = calcular(); return performance.now() - t; }, autoVar: () => autoVarillas(P.varillas.autoN), construir3D: () => { const t = performance.now(); construir3D(); return performance.now() - t; }, cargar: o => cargarProyecto(validarProyecto(o)), dxf: () => dxf(), svg: () => svg(), plano: () => planoPDF(), malla3D: o => piezasMalla3D(o || {}), pieza: i => piezaCalcador([...R.costillas, ...R.otras][i]), geo: i => geoFab([...R.costillas, ...R.otras][i]), camara: t => camara(t), selCostilla: i => selCostilla(i), slugEjemplo: n => slugEjemplo(n), formasTexto: h => formasTexto(h), leerSVG: t => leerSVG(t), leerMalla: (b, n) => leerMalla(b, n), cerradas: o => piezasCerradas(o || { zArriba: true, escala: 1, herrajes: true }),
+window.MadeRebanadas = { get P() { return P; }, get R() { return R; }, calcular: () => { const t = performance.now(); R = calcular(); return performance.now() - t; }, autoVar: () => autoVarillas(P.varillas.autoN), construir3D: () => { const t = performance.now(); construir3D(); return performance.now() - t; }, cargar: o => cargarProyecto(validarProyecto(o)), dxf: () => dxf(), svg: () => svg(), plano: () => planoPDF(), malla3D: o => piezasMalla3D(o || {}), pieza: i => piezaCalcador([...R.costillas, ...R.otras][i]), geo: i => geoFab([...R.costillas, ...R.otras][i]), camara: t => camara(t), selCostilla: i => selCostilla(i), slugEjemplo: n => slugEjemplo(n), formasTexto: h => formasTexto(h), leerSVG: t => leerSVG(t), leerMalla: (b, n) => leerMalla(b, n), polyVista: i => { const c = [...R.costillas, ...R.otras][i]; return { poly: c.poly, vista: polyVista(c.poly), esq: c.poly.esq || [] }; }, cerradas: o => piezasCerradas(o || { zArriba: true, escala: 1, herrajes: true }),
   leerDXF: t => leerDXF(t), colocar: () => colocarEnTableros(fabActual()), compra: () => listaCompra(), despiece: () => filasDespiece(), csvCortes: () => { let out; const d0 = descargar; descargar = (n, c) => { out = c; }; try { exportarCSVCortes(); } finally { descargar = d0; } return out; }, vetaDe: c => vetaDe(c), ponVeta: (c, v) => ponVeta(c, v),
   pantallaPunto: i => { const k = claveActual().pts[i], r = $('#cPerfil').getBoundingClientRect(), q = VP.aPantalla(k[0], k[1]); return [r.left + q[0], r.top + q[1]]; },
   pantallaVarilla: i => { const k = P.varillas.lista[i], r = $('#cPerfil').getBoundingClientRect(), q = VP.aPantalla(k[0], k[1]); return [r.left + q[0], r.top + q[1]]; } };

@@ -7,33 +7,63 @@
 const fresaFab = () => enMaqueta() ? (+P.maqueta.fresa || 0) : (+P.cnc.fresa || 0);
 const conHueso = () => P.cnc.hueso && fresaFab() > 0;
 
-// Sustituye cada esquina interior marcada por un arco de radio r que pasa por ella (centro dentro del hueco)
+// el contorno de una pieza para las vistas (3D y pieza): con el hueso de perro si está activo
+function polyVista(poly) {
+  if (!poly || !poly.esq || !poly.esq.length || !conHueso()) return poly;
+  if (poly._hueso && poly._hueso.r === fresaFab() / 2 / escalaFab()) return poly._hueso.poly;
+  const r = fresaFab() / 2 / escalaFab(), h = huesoDePerro(poly, poly.esq, r).poly;
+  Object.defineProperty(poly, '_hueso', { value: { r, poly: h }, configurable: true, writable: true });
+  return h;
+}
+// Sustituye cada esquina interior marcada por un arco de radio r que pasa por ella (centro dentro del hueco).
+// Si dos esquinas seguidas están tan cerca que sus círculos se pisan (ranura estrecha para la fresa),
+// los dos arcos se unen en el punto donde se cortan: es lo que de verdad corta la fresa.
 function huesoDePerro(poly, esq, r) {
   if (!esq || !esq.length || !(r > 0)) return { poly, fallan: 0 };
   const n = poly.length, cerca = (a, b) => Math.abs(a[0] - b[0]) < 1e-6 && Math.abs(a[1] - b[1]) < 1e-6;
   const marcas = new Set(); poly.forEach((p, i) => { if (esq.some(e => e && cerca(e, p))) marcas.add(i); });
-  const out = []; let fallan = 0;
-  for (let i = 0; i < n; i++) {
-    const C = poly[i];
-    if (!marcas.has(i)) { out.push(C); continue; }
-    const A0 = poly[(i - 1 + n) % n], B0 = poly[(i + 1) % n];
+  const H = new Array(n).fill(null); let fallan = 0;
+  marcas.forEach(i => {
+    const C = poly[i], A0 = poly[(i - 1 + n) % n], B0 = poly[(i + 1) % n];
     let da = [C[0] - A0[0], C[1] - A0[1]], db = [B0[0] - C[0], B0[1] - C[1]];
     const la = Math.hypot(...da), lb = Math.hypot(...db);
+    if (!(la > 1e-9 && lb > 1e-9)) { fallan++; return; }
     da = [da[0] / la, da[1] / la]; db = [db[0] / lb, db[1] / lb];
-    if (da[0] * db[1] - da[1] * db[0] >= 0) { out.push(C); continue; }  // no es una esquina hacia dentro
+    if (da[0] * db[1] - da[1] * db[0] >= 0) return;  // no es una esquina hacia dentro
     let w = [da[0] - db[0], da[1] - db[1]]; const lw = Math.hypot(...w); w = [w[0] / lw, w[1] / lw];
     const Q = [C[0] - r * w[0], C[1] - r * w[1]];
     const tA = 2 * r * (w[0] * da[0] + w[1] * da[1]), tB = -2 * r * (w[0] * db[0] + w[1] * db[1]);
-    if (!(tA > 0 && tB > 0) || tA > la - 0.01 || tB > lb - 0.01) { out.push(C); fallan++; continue; }
-    const A = [C[0] - tA * da[0], C[1] - tA * da[1]], B = [C[0] + tB * db[0], C[1] + tB * db[1]];
-    // arco de A a B alrededor de Q pasando por C
-    const ang = p => Math.atan2(p[1] - Q[1], p[0] - Q[0]), aA = ang(A), aB = ang(B), aC = ang(C);
-    const norm = x => ((x % PI2) + PI2) % PI2;
-    let barrido = norm(aB - aA); if (norm(aC - aA) > barrido) barrido -= PI2;   // el sentido que pasa por C
-    out.push(A);
-    const k = Math.max(6, Math.ceil(Math.abs(barrido) / (Math.PI / 16)));
-    for (let m = 1; m < k; m++) { const a = aA + barrido * m / k; out.push([Q[0] + r * Math.cos(a), Q[1] + r * Math.sin(a)]); }
-    out.push(B);
+    if (!(tA > 0 && tB > 0) || tA > la - 0.01 || tB > lb - 0.01) { fallan++; return; }
+    H[i] = { C, Q, A: [C[0] - tA * da[0], C[1] - tA * da[1]], B: [C[0] + tB * db[0], C[1] + tB * db[1]], tA, tB, lb };
+  });
+  // esquinas seguidas cuyos círculos se pisan: el punto donde se cortan, del lado de la madera
+  const union = new Array(n).fill(null);
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n, h = H[i], g = H[j];
+    if (!h || !g || h.tB + g.tA < h.lb - 1e-6) continue;
+    const dx = g.Q[0] - h.Q[0], dy = g.Q[1] - h.Q[1], d = Math.hypot(dx, dy);
+    if (!(d > 1e-9) || d >= 2 * r) continue;
+    const m = [h.Q[0] + dx / 2, h.Q[1] + dy / 2], hh = Math.sqrt(r * r - d * d / 4), nx = -dy / d, ny = dx / d;
+    const X1 = [m[0] + nx * hh, m[1] + ny * hh], X2 = [m[0] - nx * hh, m[1] - ny * hh];
+    const lado = p => dx * (p[1] - h.Q[1]) - dy * (p[0] - h.Q[0]);
+    union[i] = Math.sign(lado(X1)) === Math.sign(lado(h.C)) ? X1 : X2;
+  }
+  const norm = x => ((x % PI2) + PI2) % PI2;
+  const arco = (Q, S, E, C, out) => {   // de S a E alrededor de Q, por el lado que pasa por C (sin S, con E)
+    const ang = p => Math.atan2(p[1] - Q[1], p[0] - Q[0]), aS = ang(S);
+    let barrido = norm(ang(E) - aS); if (norm(ang(C) - aS) > barrido) barrido -= PI2;
+    const k = Math.max(3, Math.ceil(Math.abs(barrido) / (Math.PI / 16)));
+    for (let m = 1; m < k; m++) { const a = aS + barrido * m / k; out.push([Q[0] + r * Math.cos(a), Q[1] + r * Math.sin(a)]); }
+    out.push(E);
+  };
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const h = H[i];
+    if (!h) { out.push(poly[i]); continue; }
+    const prev = union[(i - 1 + n) % n], sig = union[i];
+    const S = prev || h.A;
+    if (!prev) out.push(h.A);
+    arco(h.Q, S, sig || h.B, h.C, out);
   }
   return { poly: out, fallan };
 }

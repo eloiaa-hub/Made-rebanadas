@@ -2,6 +2,8 @@
 
 ## v1.5
 
+- El **hueso de perro** de las ranuras (retícula, discos de los radiales, muescas de los rastreles) se ve ahora también en la **vista 3D** y en la **vista de la pieza**, no solo en Fabricar, el DXF y el plano.
+- Arreglado: en las ranuras estrechas para la fresa (tablero fino, como en el «Busto en retícula»), los dos huesos de perro del fondo se pisaban y el contorno se cruzaba consigo mismo en el DXF. Ahora se unen en un solo fondo redondeado.
 - **Guardar en GLB para Blender** (🧊 3D → *GLB (Blender, con texturas)*): cada pieza con su nombre, agrupadas en Tablero / Rastreles / Herrajes, con los materiales de la vista 3D y, si quieres, las **texturas de madera dentro** (color, relieve y rugosidad). En metros; Blender lo coloca solo con Z arriba. Pasa el validador oficial de glTF.
 - **Importar SVG** para los huecos y los perfiles clave (📐 DXF / SVG…, 📐 Perfil desde un DXF o SVG…): trayectos con curvas y arcos, rectángulos redondeados, círculos, elipses y polígonos, con sus transformaciones, en mm según el tamaño del documento.
 - **Importar GLB / glTF y PLY** en el relieve de pared y en las figuras de pie, además de STL y OBJ: modelos de Sketchfab, de Blender, de apps de escaneo con el móvil o de MeshLab.

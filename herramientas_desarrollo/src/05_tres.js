@@ -167,14 +167,14 @@ function construir3D() {
   R.costillas.forEach(c => {
     if (!c.ok) { G.costillas.push(null); return; }
     const hs = c.agujeros.map(k => ({ x: V.lista[k][0], y: V.lista[k][1], r: rh }));
-    const m = new T.Mesh(extruir(c.poly, hs, e, c.int), mats); m.castShadow = m.receiveShadow = true;
+    const m = new T.Mesh(extruir(polyVista(c.poly), hs, e, c.int), mats); m.castShadow = m.receiveShadow = true;
     m.userData = { i: c.i, x: c.x };
     G.modelo.add(m); G.costillas.push(m);
   });
   // retícula: largueros en el plano (x, v)
   R.largueros.forEach(z => {
     if (!z.ok) return;
-    const m = new T.Mesh(extruir(z.poly, [], e), mats); m.castShadow = m.receiveShadow = true;
+    const m = new T.Mesh(extruir(polyVista(z.poly), [], e), mats); m.castShadow = m.receiveShadow = true;
     m.userData = { i: z.i, u: z.u, z: true };
     G.modelo.add(m); G.largueros.push(m);
   });
@@ -182,7 +182,7 @@ function construir3D() {
   (R.trozos || []).forEach(t => {
     if (!t.ok) return;
     const hs = t.agujeros.map(k => ({ x: V.lista[k][0], y: V.lista[k][1], r: rh }));
-    const m = new T.Mesh(extruir(t.poly, hs, e, t.int), mats); m.castShadow = m.receiveShadow = true;
+    const m = new T.Mesh(extruir(polyVista(t.poly), hs, e, t.int), mats); m.castShadow = m.receiveShadow = true;
     m.userData = t.z ? { i: t.i, u: t.u, z: true } : { i: t.i, trozoX: t.x };
     G.modelo.add(m); G.largueros.push(m);
   });
@@ -202,7 +202,7 @@ function construir3D() {
   });
   // radial: discos (horizontales) y tubo central
   R.discos.forEach(d => {
-    const g = extruir(d.poly, d.huecos, e); g.rotateX(-Math.PI / 2);
+    const g = extruir(polyVista(d.poly), d.huecos, e); g.rotateX(-Math.PI / 2);
     const m = new T.Mesh(g, mats); m.castShadow = m.receiveShadow = true; m.userData = { i: d.i, disco: true, v: d.v };
     G.modelo.add(m); G.largueros.push(m);
   });

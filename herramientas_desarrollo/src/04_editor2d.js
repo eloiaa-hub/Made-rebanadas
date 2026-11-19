@@ -327,7 +327,7 @@ function dibujarCostilla(ctx, V) {
   const c = piezaSel(); if (!c || !c.ok) return;
   ctx.fillStyle = colorCostilla(.28); ctx.strokeStyle = colorCostilla(1); ctx.lineWidth = 2;
   // la pieza con sus huecos de dentro (si los tiene)
-  ctx.beginPath(); [c.poly, ...(c.int || [])].forEach(pol => pol.forEach((p, i) => { const [x, y] = V.aPantalla(p[0], p[1]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }) || ctx.closePath());
+  ctx.beginPath(); [polyVista(c.poly), ...(c.int || [])].forEach(pol => pol.forEach((p, i) => { const [x, y] = V.aPantalla(p[0], p[1]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }) || ctx.closePath());
   ctx.fill('evenodd'); ctx.stroke();
   // los otros trozos de la misma lama o costilla, en claro
   const pad = c.padre || c; (pad.partes || []).forEach(q => { if (q === c || !q.ok) return; ctx.save(); ctx.globalAlpha = .35; ctx.setLineDash([4, 3]); V.camino(ctx, q.poly); ctx.stroke(); ctx.restore(); });

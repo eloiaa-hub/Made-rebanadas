@@ -52,6 +52,7 @@ function ranurar(base, ranuras, w) {
     const ww = r.ancho != null ? r.ancho : w, nuevo = r.lat ? hacerRanuraLat(poly, r, ww) : hacerRanura(poly, r, ww);
     if (nuevo) { poly = nuevo; if (nuevo.esq) esq.push(...nuevo.esq); } else fallan.push(r);
   }
+  if (poly !== base) poly.esq = esq;     // todas las esquinas, para dibujar el hueso de perro en las vistas
   return { poly, fallan, esq };
 }
 
