@@ -74,9 +74,11 @@ window.MADE_EJEMPLOS = [
   { nombre: 'Taburete de patas cruzadas', plantilla: 'taburete_plano', desc: 'Piezas planas: dos patas con arco y dos travesaños a media madera; las espigas de las patas asoman por el asiento.',
     params: {}, costillas: { grosor: 18, material: 'abedul' } },
   { nombre: 'Banco de lamas de pino', plantilla: 'banco_lamas', desc: 'Piezas planas: 1,2 m, nueve lamas de canto encajadas en los laterales y un travesaño pasante.',
-    params: { largo: 1200, lamas: 9, margen: 110 }, costillas: { grosor: 18, material: 'pino_ply' } },
+    params: { largo: 1200, lamas: 9, margen: 110 }, costillas: { grosor: 18, material: 'pino_ply' }, plano: { cunas: true } },
   { nombre: 'Silla de piezas solapadas', plantilla: 'silla_solapada', desc: 'Piezas planas: laterales de dos capas (pata trasera y lateral del asiento) unidos con tacos, travesaños a media madera y pasantes.',
     params: {}, costillas: { grosor: 18, material: 'abedul' } },
+  { nombre: 'Mesilla de uniones dentadas', plantilla: 'mesilla_dentada', desc: 'Piezas planas: tapa y laterales con esquinas dentadas, balda con espigas en T y travesaño trasero.',
+    params: {}, costillas: { grosor: 15, material: 'chopo' } },
   { nombre: 'Silla de tableros de roble', plantilla: 'silla_plana', desc: 'Piezas planas: laterales con espigas por el asiento, respaldo y travesaños a media madera y pasantes.',
     params: {}, costillas: { grosor: 18, material: 'roble' } },
 ];

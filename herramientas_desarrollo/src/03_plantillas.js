@@ -348,7 +348,7 @@ function rectPlano(x0, y0, x1, y1, r = 0, cuales = [1, 1, 1, 1]) {
 // puntos con su marca de esquina: [[x, y, esquina?]…]
 const ptsPlano = L => ({ pts: redondeaPts(L.map(q => [q[0], q[1]])), esq: L.map(q => q[2] !== false) });
 const piezaPlana = (nombre, plano, c, forma, extra) => Object.assign({ nombre, plano, c: Math.round(c * 10) / 10, pts: forma.pts, esq: forma.esq }, extra || {});
-const igualQue = (nombre, plano, c, k) => ({ nombre, plano, c: Math.round(c * 10) / 10, igualA: k });
+const igualQue = (nombre, plano, c, k, extra) => Object.assign({ nombre, plano, c: Math.round(c * 10) / 10, igualA: k }, extra || {});
 const CLAVE_PLANO = { largo: 100, esquinas: [true, true, true], claves: [{ x: 0, pts: [[0, 0], [100, 0], [100, 100]] }] };
 PLANTILLAS.taburete_plano = {
   nombre: 'Taburete de patas cruzadas', grupo: 'plano',
@@ -362,8 +362,10 @@ PLANTILLAS.taburete_plano = {
     { id: 'pie', nombre: 'Ancho de cada pie', min: 30, max: 200, paso: 1, valor: 60 },
     { id: 'faldon', nombre: 'Alto de los travesaños', min: 40, max: 200, paso: 1, valor: 80 },
     { id: 'espiga', nombre: 'Ancho de las espigas', min: 20, max: 120, paso: 1, valor: 40 },
+    { id: 'abre', nombre: 'Patas abiertas (°)', min: 0, max: 15, paso: 0.5, valor: 4 },
   ],
   generar(p, e) {
+    const ab = p.abre ? { eje: 'arriba' } : {};
     const W = p.ancho - 2 * p.vuelo, H = p.alto, te = p.espiga, zl = p.fondo / 2 - p.vuelo - e / 2;
     const xt = W / 2 - 15 - te / 2, xa = W / 2 - 15 - te - 35, pie = Math.min(p.pie, W / 2 - 20);
     const arco = Math.max(0, Math.min(p.arco, H - e - p.faldon - 40)), m = (W / 2 - pie);
@@ -373,7 +375,7 @@ PLANTILLAS.taburete_plano = {
     const trav = ptsPlano([[-Z, yb], [-zi, yb], [0, yb + p.faldon * 0.4, false], [zi, yb], [Z, yb], [Z, H - e], [-Z, H - e]]);
     return Object.assign({}, CLAVE_PLANO, { piezas: [
       piezaPlana('Asiento', 'horizontal', H - e / 2, rectPlano(-p.ancho / 2, -p.fondo / 2, p.ancho / 2, p.fondo / 2, 22)),
-      piezaPlana('Pata delantera', 'frente', zl, pata), igualQue('Pata trasera', 'frente', -zl, 1),
+      piezaPlana('Pata delantera', 'frente', zl, pata, p.abre ? Object.assign({ giro: -p.abre }, ab) : {}), igualQue('Pata trasera', 'frente', -zl, 1, p.abre ? Object.assign({ giro: p.abre }, ab) : {}),
       piezaPlana('Travesaño izquierdo', 'lado', -xa, trav), igualQue('Travesaño derecho', 'lado', xa, 3),
     ] });
   },
@@ -421,19 +423,21 @@ PLANTILLAS.silla_plana = {
     { id: 'pata', nombre: 'Ancho de las patas', min: 40, max: 120, paso: 1, valor: 56 },
     { id: 'faldon', nombre: 'Alto del faldón bajo el asiento', min: 40, max: 200, paso: 1, valor: 70 },
     { id: 'espiga', nombre: 'Ancho de las espigas', min: 20, max: 100, paso: 1, valor: 40 },
+    { id: 'inclina', nombre: 'Inclinación del respaldo (°)', min: 0, max: 20, paso: 0.5, valor: 8 },
   ],
   generar(p, e) {
     const hs = p.asiento, H = Math.max(p.alto, hs + p.respaldo + 40), pa = Math.max(p.pata, 2 * e + 20), te = p.espiga;
+    const al = (p.inclina || 0) * Math.PI / 180, y0 = hs, dz = y => (y - y0) * Math.tan(al);   // por encima del asiento, el poste se va hacia atrás
     const zb = -p.fondo / 2 + pa / 2, zf = p.fondo / 2 - pa / 2, xs = p.ancho / 2 - 40, yr = hs - e - p.faldon;
     const t2 = zf - pa / 2 - te / 2 - 20, t1 = zb + pa / 2 + te / 2 + 30, zm = (zb + zf) / 2;
     const lat = ptsPlano([[zb - pa / 2, 0], [zb + pa / 2, 0], [zb + pa / 2, yr], [zm, yr + p.faldon * 0.35, false], [zf - pa / 2, yr], [zf - pa / 2, 0], [zf + pa / 2, 0], [zf + pa / 2, hs - e],
       [t2 + te / 2, hs - e], [t2 + te / 2, hs], [t2 - te / 2, hs], [t2 - te / 2, hs - e], [t1 + te / 2, hs - e], [t1 + te / 2, hs], [t1 - te / 2, hs], [t1 - te / 2, hs - e],
-      [zb + pa / 2, hs - e], [zb + pa / 2, H], [zb - pa / 2, H]]);
-    const xT = xs + e / 2 + 20, yT = Math.min(160, yr * 0.35);
+      [zb + pa / 2, hs - e], [zb + pa / 2, y0], [zb + pa / 2 - dz(H), H], [zb - pa / 2 - dz(H), H], [zb - pa / 2, y0]]);
+    const xT = xs + e / 2 + 20, yT = Math.min(160, yr * 0.35), bL = y => y0 + (y - y0) / Math.cos(al);   // alto medido a lo largo del respaldo inclinado
     return Object.assign({}, CLAVE_PLANO, { piezas: [
       piezaPlana('Lateral izquierdo', 'lado', -xs, lat), igualQue('Lateral derecho', 'lado', xs, 0),
       piezaPlana('Asiento', 'horizontal', hs - e / 2, rectPlano(-p.ancho / 2, zb + pa / 2 + 1, p.ancho / 2, p.fondo / 2 + 15, 30, [0, 0, 1, 1])),
-      piezaPlana('Respaldo', 'frente', zb, rectPlano(-p.ancho / 2, H - p.respaldo, p.ancho / 2, H, 40, [0, 0, 1, 1])),
+      piezaPlana('Respaldo', 'frente', zb, rectPlano(-p.ancho / 2, bL(H - p.respaldo), p.ancho / 2, bL(H), 40, [0, 0, 1, 1]), al ? { giro: -(p.inclina), pivote: y0 } : {}),
       piezaPlana('Travesaño delantero', 'frente', zf, rectPlano(-xT, yr, xT, hs - e, 0)),
       piezaPlana('Travesaño trasero', 'frente', zb, rectPlano(-(xs + e / 2 + 25), yT, xs + e / 2 + 25, yT + 60, 6)),
     ] });
@@ -476,6 +480,30 @@ PLANTILLAS.silla_solapada = {
     ] });
   },
 };
+PLANTILLAS.mesilla_dentada = {
+  nombre: 'Mesilla de uniones dentadas', grupo: 'plano',
+  desc: 'Tapa y laterales con esquinas dentadas; la balda entra en los laterales con espigas en T y un travesaño trasero pasante los ata.',
+  params: [
+    { id: 'ancho', nombre: 'Ancho', min: 250, max: 900, paso: 5, valor: 420 },
+    { id: 'fondo', nombre: 'Fondo', min: 200, max: 600, paso: 5, valor: 340 },
+    { id: 'alto', nombre: 'Altura', min: 250, max: 900, paso: 5, valor: 520 },
+    { id: 'balda', nombre: 'Altura de la balda', min: 80, max: 700, paso: 5, valor: 190 },
+    { id: 'arco', nombre: 'Altura del arco de los laterales', min: 0, max: 300, paso: 5, valor: 110 },
+    { id: 'pie', nombre: 'Ancho de cada pie', min: 30, max: 150, paso: 1, valor: 50 },
+    { id: 'trasero', nombre: 'Alto del travesaño trasero', min: 40, max: 150, paso: 1, valor: 70 },
+  ],
+  generar(p, e) {
+    const W = p.ancho, D = p.fondo, H = p.alto, pie = Math.min(p.pie, D / 2 - 20), m = D / 2 - pie;
+    const arco = Math.max(0, Math.min(p.arco, p.balda - e / 2 - 40)), hB = clamp(p.balda, arco + e / 2 + 30, H - p.trasero - 2 * e - 40);
+    const lat = ptsPlano([[-D / 2, 0], [-m, 0], [-m * 0.55, arco * 0.82, false], [0, arco, false], [m * 0.55, arco * 0.82, false], [m, 0], [D / 2, 0], [D / 2, H], [-D / 2, H]]);
+    return Object.assign({}, CLAVE_PLANO, { piezas: [
+      piezaPlana('Lateral izquierdo', 'lado', -(W / 2 - e / 2), lat), igualQue('Lateral derecho', 'lado', W / 2 - e / 2, 0),
+      piezaPlana('Tapa', 'horizontal', H - e / 2, rectPlano(-W / 2, -D / 2, W / 2, D / 2, 0)),
+      piezaPlana('Balda', 'horizontal', hB, rectPlano(-W / 2, -D / 2 + e + 4, W / 2, D / 2 - 15, 0)),
+      piezaPlana('Travesaño trasero', 'frente', -D / 2 + e / 2, rectPlano(-W / 2, H - e - p.trasero, W / 2, H - e, 0)),
+    ], asiento: false });
+  },
+};
 PLANTILLAS.plano_vacio = {
   nombre: 'Vacío: piezas planas', grupo: 'plano',
   desc: 'Un tablero de frente y otro de lado que se cruzan, para construir el mueble pieza a pieza o traer los contornos de un DXF o SVG.',
@@ -488,7 +516,7 @@ PLANTILLAS.plano_vacio = {
     return Object.assign({}, CLAVE_PLANO, { piezas: [
       piezaPlana('Tablero de frente', 'frente', 0, rectPlano(-p.ancho / 2, 0, p.ancho / 2, p.alto)),
       piezaPlana('Tablero de lado', 'lado', 0, rectPlano(-p.fondo / 2, 0, p.fondo / 2, p.alto * 0.8)),
-    ] });
+    ], asiento: false });
   },
 };
 const grupoDe = id => PLANTILLAS[id].grupo || 'lineal';
@@ -506,6 +534,6 @@ function aplicarPlantilla(soloLargo) {
   }
   const g = pl.generar(P.params, grosor());
   P.largo = g.largo; P.esquinas = g.esquinas; P.claves = g.claves; P.editado = false;
-  if (g.piezas) { planoP().piezas = g.piezas; UI.costilla = Math.min(UI.costilla || 0, g.piezas.length - 1); }
+  if (g.piezas) { planoP().asiento = g.asiento !== false; planoP().piezas = g.piezas; UI.costilla = Math.min(UI.costilla || 0, g.piezas.length - 1); }
   UI.clave = Math.min(UI.clave, P.claves.length - 1); UI.punto = -1;
 }

@@ -74,6 +74,7 @@ function iniciar3D() {
     if (hit) selCostilla(hit.object.userData.i);
   });
   $$('[data-cam]').forEach(b => b.onclick = () => camara(b.dataset.cam));
+  $('#bMontaje').onclick = () => montajeAnimado();
   colores3D();
 }
 function colores3D() {
@@ -155,6 +156,7 @@ function construir3D() {
   if (!G.scene || !R) return;
   limpiar(G.modelo); G.modelo.clear(); G.modelo.position.set(0, 0, 0);
   G.costillas = []; G.largueros = []; G.varillas = []; G.claves3d = [];
+  if (G.montaje) pararMontaje();
   if (P.tipo === 'plano') { construir3DPlano(); return; }
   const e = grosor(), mats = materialesTablero(), rh = radioAgujero(), V = P.varillas;
   // medidas del mueble montado
@@ -262,17 +264,58 @@ function construir3DPlano() {
   G.suelo.scale.set(tam * 5, tam * 5, 1); luces3D();
 }
 // coloca una pieza plana (con la explosión: cada pieza se aparta del centro siguiendo su normal; las horizontales, hacia arriba)
-function colocarPiezaPlana(m) {
+function colocarPiezaPlana(m, exF) {
   const c = R && R.costillas[m.userData.i]; if (!c) return;
-  const b = basePieza(c), ex = P.vista.explosion || 0, pl = PLANOS[c.plano], ctr = G.centro || [0, 0, 0], tam = G.tam || 600;
+  const b = basePieza(c), ex = exF != null ? exF : (P.vista.explosion || 0), pl = PLANOS[c.plano], ctr = G.centro || [0, 0, 0], tam = G.tam || 600;
   const d = b.o.slice();
   if (ex) {
     d[pl.n] += (c.x - ctr[pl.n]) * ex * 1.3;   // se separan en proporción a su distancia al centro (mantienen el orden)
     // las que se montan bajando (horizontales, o con ranuras desde abajo) suben
     if (pl.n === 1 || (pl.b === 1 && c.ranuras.some(r => !r.alto && r.eje === 'v'))) d[1] += ex * tam * (pl.n === 1 ? 0.6 : 0.4);
+    else if (exF != null && Math.abs(c.x - ctr[pl.n]) < tam * 0.05) d[1] += ex * tam * 0.4;   // en el montaje, las del centro bajan desde arriba
   }
   const M4 = new T.Matrix4().makeBasis(V3(b.ex), V3(b.ey), V3(b.ez)).setPosition(d[0], d[1], d[2]);
   m.matrixAutoUpdate = false; m.matrix.copy(M4); m.matrixWorldNeedsUpdate = true;
+}
+/* ---------- montaje animado (piezas planas): las piezas entran una a una, en el orden del plano ---------- */
+function ordenMontaje() {
+  const ps = R.costillas.filter(c => c.ok), hecho = new Set(), orden = [], pon = c => { if (c && !hecho.has(c.i)) { hecho.add(c.i); orden.push(c.i); } };
+  const horiz = c => c.plano === 'horizontal', baja = c => c.ranuras.some(r => !r.alto && r.eje === 'v' && PLANOS[c.plano].b === 1);
+  const pasan = new Set(R.uniones.filter(u => u.tipo === 'caja' && !horiz(R.costillas[u.en])).map(u => u.pasa));
+  // 1) las que se apoyan en el suelo (y sus piezas solapadas), de un lado al otro
+  ps.filter(c => !horiz(c) && !c.cuna && !baja(c) && !pasan.has(c.i)).sort((a, b) => a.caja.y0 - b.caja.y0 || a.x - b.x).forEach(c => {
+    pon(c); R.uniones.filter(u => u.tipo === 'solape' && (u.a === c.i || u.b === c.i)).forEach(u => pon(R.costillas[u.a === c.i ? u.b : u.a]));
+  });
+  ps.filter(c => pasan.has(c.i)).forEach(pon);          // 2) travesaños pasantes
+  ps.filter(c => c.cuna).forEach(pon);                   // 3) sus cuñas
+  ps.filter(c => baja(c) && !horiz(c)).sort((a, b) => a.caja.y0 - b.caja.y0).forEach(pon);   // 4) las que bajan a media madera
+  ps.filter(horiz).sort((a, b) => a.x - b.x).forEach(pon);   // 5) asientos y tapas
+  ps.forEach(pon);
+  return orden;
+}
+function montajeAnimado() {
+  if (G.montaje) { pararMontaje(); return; }
+  if (!esPlano() || !R) return;
+  const orden = ordenMontaje(), dur = 900, pausa = 250, t0 = performance.now();
+  G.montaje = { orden, t0 };
+  $('#bMontaje').textContent = '■ Parar';
+  const porI = new Map(G.costillas.filter(Boolean).map(m => [m.userData.i, m]));
+  const paso = () => {
+    if (!G.montaje) return;
+    const t = performance.now() - t0, k = Math.floor(t / (dur + pausa)), f = clamp((t - k * (dur + pausa)) / dur, 0, 1), suave = 1 - Math.pow(1 - f, 3);
+    orden.forEach((i, j) => { const m = porI.get(i); if (!m) return; m.visible = j <= k; if (j < k) colocarPiezaPlana(m, 0); else if (j === k) colocarPiezaPlana(m, 1.1 * (1 - suave)); });
+    const c = R.costillas[orden[Math.min(k, orden.length - 1)]];
+    if (c) $('#estado').textContent = `Montaje ${Math.min(k + 1, orden.length)}/${orden.length}: ${c.etq} · ${c.nombre}`;
+    pedirRender();
+    if (k >= orden.length) { pararMontaje(); $('#estado').textContent = 'Montaje terminado'; return; }
+    requestAnimationFrame(paso);
+  };
+  requestAnimationFrame(paso);
+}
+function pararMontaje() {
+  if (!G.montaje) return;
+  G.montaje = null; $('#bMontaje').textContent = '▶ Montaje';
+  G.costillas.forEach(m => { if (m) m.visible = true; }); colocarExplosion();
 }
 // luz normal (de arriba a un lado) o rasante: muy baja, casi paralela a la superficie, y se puede girar
 function luces3D() {

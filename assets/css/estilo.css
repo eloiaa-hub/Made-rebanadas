@@ -275,3 +275,6 @@ input:disabled,select:disabled{opacity:.55}
 .anidBarra button{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.25);color:var(--barraTxt);font-weight:600}
 .anidMarco .calcCaja{flex:1;min-height:0;height:auto}
 .aviso-maq{background:color-mix(in srgb,#e0a020 16%,transparent);border:1px solid #e0a020;border-radius:6px;padding:6px 10px;margin-bottom:10px;font-size:12.5px}
+
+.vtit .ptCoord{pointer-events:auto;display:inline-flex;gap:3px;align-items:center;font-weight:400;font-size:11px;background:var(--panel);border:1px solid var(--borde);border-radius:5px;padding:1px 5px}
+.vtit .ptCoord input{width:62px;font-size:11px;padding:1px 3px}

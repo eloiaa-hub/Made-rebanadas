@@ -110,6 +110,8 @@ function iniciarPanel() {
   $('#bVarQuitar').onclick = () => { if (!V().lista.length) return; V().lista = []; UI.varilla = -1; cambio('Varillas quitadas'); };
   // piezas planas
   enlazar('#plHolgura', () => { planoP().holgura = clamp(+$('#plHolgura').value || 0, 0, 3); cambio('Holgura de las uniones ' + fmt(planoP().holgura, 2) + ' mm'); });
+  enlazar('#plAsiento', () => { planoP().asiento = $('#plAsiento').checked; cambio(planoP().asiento ? 'Comprobaciones de asiento' : 'Sin comprobaciones de asiento'); });
+  enlazar('#plCunas', () => { planoP().cunas = $('#plCunas').checked; cambio(planoP().cunas ? 'Espigas pasantes con cuña' : 'Espigas sin cuña'); });
   enlazar('#plSolTipo', () => { solapeP().tipo = $('#plSolTipo').value; if (solapeP().tipo === 'tornillos' && solapeP().diam > 6) { solapeP().diam = 4; $('#plSolDiam').value = 4; } else if (solapeP().tipo === 'tacos' && solapeP().diam < 6) { solapeP().diam = 8; $('#plSolDiam').value = 8; } cambio('Solapes con ' + solapeP().tipo); });
   enlazar('#plSolDiam', () => { solapeP().diam = clamp(+$('#plSolDiam').value || 8, 2, 30); cambio('Ø ' + fmt(solapeP().diam, 1) + ' mm'); });
   enlazar('#plSolN', () => { solapeP().n = clamp(Math.round(+$('#plSolN').value || 0), 0, 20); cambio(solapeP().n ? solapeP().n + ' fijaciones por solape' : 'Fijaciones automáticas'); });
@@ -343,6 +345,7 @@ function mostrarSecciones(forzarFigura) {
   $('#secPared').classList.toggle('oculto', t !== 'pared');
   const pl = t === 'plano';
   $('#secPlano').classList.toggle('oculto', !pl); $('#secPiezas').classList.toggle('oculto', !pl);
+  $('#bMontaje').classList.toggle('oculto', !pl);
   ['#cVarillas3d', '#cClaves3d', '#cFantasma'].forEach(s => $(s).closest('label').classList.toggle('oculto', pl));
   $('#titCostillas').textContent = pl ? 'Tablero' : t === 'pared' ? 'Lamas' : 'Costillas';
   $('#titLista').textContent = pl ? 'Piezas' : t === 'pared' ? 'Lamas' : 'Costillas';
@@ -403,7 +406,7 @@ function ponerControles() {
   const Pl = P.planta; $('#plForma').value = Pl.forma; $('#plRadio').value = Pl.radio; $('#plSentido').value = String(Pl.sentido === -1 ? -1 : 1); $('#plAmp').value = Pl.amplitud; $('#plOndas').value = Pl.ondas;
   const Ra = P.radial; $('#raNum').value = P.costillas.numero; $('#raTubo').value = Ra.tubo; $('#raHolTubo').value = Ra.holguraTubo; $('#raDiscos').value = Ra.discos; $('#raRDisco').value = Ra.rDisco; $('#raHolgura').value = Ra.holgura;
   ponerPartir();
-  $('#plHolgura').value = planoP().holgura; $('#plSolTipo').value = solapeP().tipo; $('#plSolDiam').value = solapeP().diam; $('#plSolN').value = solapeP().n; $('#pzRejilla').value = $('#kRejilla').value;
+  $('#plHolgura').value = planoP().holgura; $('#plCunas').checked = !!planoP().cunas; $('#plAsiento').checked = planoP().asiento !== false; $('#plSolTipo').value = solapeP().tipo; $('#plSolDiam').value = solapeP().diam; $('#plSolN').value = solapeP().n; $('#pzRejilla').value = $('#kRejilla').value;
   const Pa = P.pared; $('#paNum').value = Pa.rastreles; $('#paAlto').value = Pa.alto; $('#paGrueso').value = Pa.grueso; $('#paMargen').value = Pa.margen; $('#paHolgura').value = Pa.holgura; $('#paVer').checked = Pa.verPared;
   $('#cClaves3d').checked = P.vista.claves !== false;
   const Fg = P.figura; $('#fgAlto').value = Fg.alto; $('#fgEje').value = Fg.eje; $('#fgGiro').value = String(Fg.giro || 0); $('#fgMin').value = Fg.minArea; $('#fgUnir').checked = Fg.unir !== false;
@@ -452,8 +455,8 @@ function refrescarClaves() {
 function refrescarListas() {
   // resumen del reparto
   if (esPlano()) { const nM = R.uniones.filter(u => u.tipo === 'media').length, nC = R.uniones.filter(u => u.tipo === 'caja').length;
-    const nS = R.uniones.filter(u => u.tipo === 'solape').length, nF = R.uniones.reduce((s, u) => s + (u.puntos || []).length, 0);
-    $('#plResumen').innerHTML = `<b>${R.n}</b> piezas · <b>${nM}</b> a media madera · <b>${nC}</b> en caja pasante` + (nS ? ` · <b>${nS}</b> solapes con <b>${nF}</b> ${solapeP().tipo}` : '') + ` · ranuras y cajas de <b>${fmt(grosor() + planoP().holgura, 2)}</b> mm`; }
+    const nD = R.uniones.filter(u => u.tipo === 'dentada').length, nS = R.uniones.filter(u => u.tipo === 'solape').length, nF = R.uniones.reduce((s, u) => s + (u.puntos || []).length, 0);
+    $('#plResumen').innerHTML = `<b>${R.n}</b> piezas · <b>${nM}</b> a media madera · <b>${nC}</b> en caja pasante` + (nD ? ` · <b>${nD}</b> dentadas` : '') + (nS ? ` · <b>${nS}</b> solapes con <b>${nF}</b> ${solapeP().tipo}` : '') + ` · ranuras y cajas de <b>${fmt(grosor() + planoP().holgura, 2)}</b> mm`; }
   $('#resCost').innerHTML = P.tipo === 'radial' ? `<b>${R.n}</b> costillas cada <b>${fmt(R.sep, 1)}°</b> · junto al tubo quedan <b>${fmt(Math.max(0, R.hueco), 1)}</b> mm entre ellas`
     : `<b>${R.n}</b> ${P.tipo === 'pared' ? 'lamas' : 'costillas'} · separación <b>${fmt(R.sep, 1)}</b> mm · hueco <b>${fmt(Math.max(0, R.hueco), 1)}</b> mm`;
   // costillas y largueros
@@ -561,7 +564,8 @@ function refrescarPiezaSel() {
   if (!esPlano()) return;
   const ps = planoP().piezas, k = UI.costilla, p = ps[k]; if (!p) return;
   $('#pzNombre').value = p.nombre || ''; $('#pzPlano').value = p.plano; $('#pzPos').value = p.c;
-  $('#pzPosTit').textContent = `Posición en ${PLANOS[p.plano].normal} (mm)`;
+  $('#pzPosTit').textContent = `Posición en ${PLANOS[p.plano].normal} (mm)`; $('#pzGiro').value = +p.giro || 0; $('#pzEje').value = p.eje || 'abajo';
+  $('#pzGiroTit').textContent = 'Inclinación (°; + ' + { frente: 'arriba hacia delante', lado: 'arriba hacia x−', horizontal: 'baja por delante' }[p.plano] + ')';
   const par = p.igualA != null && ps[p.igualA] ? ps[p.igualA] : null, hijos = ps.filter(q => q.igualA === k);
   const ig = $('#pzIgual'); ig.classList.toggle('oculto', !par && !hijos.length);
   ig.textContent = par ? `Igual que «${par.nombre}»: al mover sus puntos cambian las dos.` : hijos.length ? `«${hijos.map(q => q.nombre).join('», «')}» ${hijos.length > 1 ? 'son iguales' : 'es igual'} que esta: al mover sus puntos cambian todas.` : '';
@@ -577,6 +581,8 @@ function iniciarPiezas() {
   $('#pzNombre').onchange = () => { const p = pz(); if (!p) return; p.nombre = $('#pzNombre').value.trim() || p.nombre; cambio('Nombre: ' + p.nombre); };
   $('#pzPlano').onchange = () => { const p = pz(); if (!p) return; p.plano = $('#pzPlano').value; P.editado = true; cambio('Dirección: ' + PLANOS[p.plano].nombre.toLowerCase()); };
   $('#pzPos').onchange = () => { const p = pz(); if (!p) return; const v = +$('#pzPos').value; if (!isFinite(v)) return; p.c = Math.round(v * 10) / 10; P.editado = true; cambio('Posición de ' + p.nombre + ': ' + fmt(p.c) + ' mm'); };
+  $('#pzGiro').onchange = () => { const p = pz(); if (!p) return; const v = clamp(+$('#pzGiro').value || 0, -60, 60); if (v) p.giro = Math.round(v * 10) / 10; else delete p.giro; P.editado = true; cambio(p.nombre + ': inclinación ' + fmt(v, 1) + '°'); };
+  $('#pzEje').onchange = () => { const p = pz(); if (!p) return; p.eje = $('#pzEje').value; delete p.pivote; P.editado = true; cambio(p.nombre + ': gira por ' + $('#pzEje').selectedOptions[0].textContent.toLowerCase()); };
   $('#pzRejilla').onchange = () => { $('#kRejilla').value = $('#pzRejilla').value; };
   $('#pzNueva').onclick = () => {
     const ps = planoP().piezas, b = R && R.bbox ? R.bbox : [[-200, 200], [0, 400], [-150, 150]];
@@ -586,7 +592,7 @@ function iniciarPiezas() {
   };
   $('#pzCopiar').onclick = () => {
     const ps = planoP().piezas, p = pz(); if (!p) return;
-    const src = piezaFuente(UI.costilla), q = { nombre: p.nombre + ' (copia)', plano: p.plano, c: Math.round((p.c + Math.max(60, 3 * grosor())) * 10) / 10, pts: clonar(src.pts), esq: clonar(src.esq || src.pts.map(() => true)) };
+    const src = piezaFuente(UI.costilla), q = { nombre: p.nombre + ' (copia)', plano: p.plano, giro: p.giro || 0, c: Math.round((p.c + Math.max(60, 3 * grosor())) * 10) / 10, pts: clonar(src.pts), esq: clonar(src.esq || src.pts.map(() => true)) };
     ps.push(q); P.editado = true; cambio('Pieza copiada'); selCostilla(ps.length - 1);
   };
   $('#pzSimetrica').onclick = () => {
@@ -594,7 +600,7 @@ function iniciarPiezas() {
     const ctr = R && R.bbox ? (R.bbox[PLANOS[p.plano].n][0] + R.bbox[PLANOS[p.plano].n][1]) / 2 : 0, c2 = Math.round((2 * ctr - p.c) * 10) / 10;
     if (Math.abs(c2 - p.c) < grosor()) { aviso('Esta pieza está en el centro: su simétrica caería en el mismo sitio. Muévela antes (Posición).', 5000); return; }
     const base = p.igualA != null ? p.igualA : k;
-    ps.push({ nombre: p.nombre + ' (simétrica)', plano: p.plano, c: c2, igualA: base });
+    ps.push(Object.assign({ nombre: p.nombre + ' (simétrica)', plano: p.plano, c: c2, igualA: base }, p.giro ? { giro: -p.giro, eje: p.eje, pivote: p.pivote } : {}));
     P.editado = true; cambio('Pieza simétrica'); selCostilla(ps.length - 1);
   };
   $('#pzSeparar').onclick = () => { const p = pz(); if (!p || p.igualA == null) return; separarPieza(UI.costilla); P.editado = true; cambio(p.nombre + ': contorno propio'); refrescarPiezaSel(); };

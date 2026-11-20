@@ -100,7 +100,7 @@ function ctrlEdit() {
     if (!Array.isArray(src.esq) || src.esq.length !== src.pts.length) src.esq = src.pts.map(() => true);
     return { pts: src.pts, esq: src.esq, pieza: src };
   }
-  return { pts: claveActual().pts, esq: P.esquinas };
+  const k = P && P.claves && P.claves.length ? claveActual() : null; return k ? { pts: k.pts, esq: P.esquinas } : null;
 }
 function colorCostilla(alfa) { return `rgba(168,116,63,${alfa})`; }
 
@@ -247,7 +247,7 @@ function alternarEsquina(i) {
 }
 
 function iniciarEditor() {
-  VP = new Vista2D($('#cPerfil'), dibujarPerfil);
+  VP = new Vista2D($('#cPerfil'), (ctx, V) => { dibujarPerfil(ctx, V); refrescarPuntoCoord(); });
   VC = new Vista2D($('#cCost'), dibujarCostilla);
   const c = $('#cPerfil');
   c.addEventListener('contextmenu', ev => ev.preventDefault());
@@ -310,6 +310,15 @@ function iniciarEditor() {
     const t = tramoCerca(mx, my); if (t) { insertarPunto(t.j, t.s); cambio('Punto añadido'); }
   });
   $('#bEsquina').onclick = () => alternarEsquina(UI.punto);
+  const ponCoord = () => {
+    const k = ctrlEdit(); if (!k || UI.punto < 0 || !k.pts[UI.punto]) return;
+    const nu = +$('#ptU').value, nv = +$('#ptV').value; if (!isFinite(nu) || !isFinite(nv)) return;
+    const q = k.pts[UI.punto], du = nu - q[0], dv = nv - q[1]; if (!du && !dv) return;
+    if ($('#kTodas').checked && !esPlano()) P.claves.forEach(o => { const p = o.pts[UI.punto]; o.pts[UI.punto] = [Math.round((p[0] + du) * 10) / 10, Math.round((p[1] + dv) * 10) / 10]; });
+    else k.pts[UI.punto] = [Math.round(nu * 10) / 10, Math.round(nv * 10) / 10];
+    P.editado = true; cambio('Punto en ' + fmt(nu, 1) + ', ' + fmt(nv, 1));
+  };
+  $('#ptU').onchange = ponCoord; $('#ptV').onchange = ponCoord;
   $('#bEncuadrarPerfil').onclick = () => encuadrarPerfil();
   $('#sClave').onchange = () => { UI.clave = +$('#sClave').value; UI.punto = -1; refrescarClaves(); VP.pintar(); costillaDeClave(); };
   $('#bCostAnt').onclick = () => selCostilla(UI.costilla - 1);
@@ -322,13 +331,13 @@ function dibujarPerfilPlano(ctx, V) {
   if (!c || !k) return;
   // dónde la cruzan las otras piezas (la franja del grosor de cada una, a lo largo del cruce)
   (c.uniones || []).forEach(u => {
-    const otra = R.costillas[u.a === c.i ? u.b : u.a]; if (!otra) return;
-    const pa = PLANOS[c.plano], pb = PLANOS[otra.plano], eje = pa.a === pb.n ? 'v' : 'h';
-    const r = eje === 'v' ? [otra.x - e / 2, u.lo, otra.x + e / 2, u.hi] : [u.lo, otra.x - e / 2, u.hi, otra.x + e / 2];
-    const [x0, y0] = V.aPantalla(r[0], r[1]), [x1, y1] = V.aPantalla(r[2], r[3]);
-    ctx.fillStyle = 'rgba(95,107,120,.30)'; ctx.fillRect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0));
+    const otra = R.costillas[u.a === c.i ? u.b : u.a], g = u.geo && u.geo[c.i]; if (!otra || !g) return;
+    const [cs, sn] = g.rot, w = e * (g.wf || 1);
+    const r = [[g.c - w / 2, g.lo], [g.c + w / 2, g.lo], [g.c + w / 2, g.hi], [g.c - w / 2, g.hi]].map(q => desgirarP(q, cs, sn));
+    ctx.fillStyle = 'rgba(95,107,120,.30)'; V.camino(ctx, r); ctx.fill();
+    const top = r.reduce((m, q) => q[1] > m[1] ? q : m, r[0]), [tx, ty] = V.aPantalla(top[0], top[1]);
     ctx.fillStyle = '#5f6b78'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center';
-    ctx.fillText(otra.etq + (u.tipo === 'caja' ? (u.en === c.i ? ' (caja)' : ' (espiga)') : ''), (x0 + x1) / 2, Math.min(y0, y1) - 4);
+    ctx.fillText(otra.etq + (u.tipo === 'caja' ? (u.en === c.i ? ' (caja)' : ' (espiga)') : u.tipo === 'dentada' ? ' (dientes)' : ''), tx, ty - 4);
   });
   ctx.textAlign = 'left';
   // piezas paralelas pegadas cara con cara: la zona común y los tacos o tornillos
@@ -362,7 +371,17 @@ function dibujarPerfilPlano(ctx, V) {
   V.cota(ctx, [b.x1, b.y0], [b.x1, b.y1], 26, fmt(b.h) + ' mm', true);
   const pl = PLANOS[c.plano];
   ctx.fillStyle = cssVar('--suave'); ctx.font = '11.5px system-ui';
-  ctx.fillText(`${c.nombre} (${c.etq}) · ${pl.nombre.toLowerCase()}, en ${pl.normal} = ${fmt(c.x)} mm · horizontal: ${pl.ejes[0]} · vertical: ${pl.ejes[1]}` + (k.pieza && k.pieza !== planoP().piezas[UI.costilla] ? ` · igual que «${k.pieza.nombre}»` : ''), 8, 72);
+  ctx.fillText(`${c.nombre} (${c.etq}) · ${pl.nombre.toLowerCase()}, en ${pl.normal} = ${fmt(c.x)} mm${c.giro ? `, inclinada ${fmt(c.giro, 1)}°` : ''} · horizontal: ${pl.ejes[0]} · vertical: ${pl.ejes[1]}` + (k.pieza && k.pieza !== planoP().piezas[UI.costilla] ? ` · igual que «${k.pieza.nombre}»` : ''), 8, 72);
+}
+// casillas con la posición del punto seleccionado (se pueden escribir)
+function refrescarPuntoCoord() {
+  const caja = $('#ptCoord'); if (!caja) return;
+  const k = P && R && !formaCalculada() && !UI.vistaHuecos ? ctrlEdit() : null, p = k && UI.punto >= 0 ? k.pts[UI.punto] : null;
+  caja.classList.toggle('oculto', !p); if (!p) return;
+  const ej = esPlano() && piezaSel() ? PLANOS[piezaSel().plano].ejes.map(t => t.replace(/.*\((\w)\)/, '$1')) : ['u', 'v'];
+  $('#ptLu').textContent = ej[0]; $('#ptLv').textContent = ej[1];
+  if (document.activeElement !== $('#ptU')) $('#ptU').value = p[0];
+  if (document.activeElement !== $('#ptV')) $('#ptV').value = p[1];
 }
 // con relieve (texto o modelo) no hay perfiles clave: se ven las lamas y la seleccionada
 function dibujarPerfilRelieve(ctx, V) {

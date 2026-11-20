@@ -148,6 +148,7 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   <tr><th>Qué quieres hacer</th><th>Cómo</th></tr>
   <tr><td>Elegir el perfil clave</td><td><b>Pinchando su línea en la vista 3D</b> (los perfiles clave se dibujan en azul y el que se edita, en naranja), el desplegable del título del editor, la lista <b>Perfiles clave</b> del panel derecho, o <kbd>RePág</kbd> / <kbd>AvPág</kbd>.</td></tr>
   <tr><td>Mover un punto</td><td>Arrástralo. Se ajusta a la <b>rejilla al mover</b> (5 mm por defecto); con <kbd>Mayús</kbd> se mueve libre.</td></tr>
+  <tr><td>Poner un punto a cota exacta</td><td>Haz clic en el punto: arriba, junto al título del editor, salen sus dos coordenadas. Escribe la medida y pulsa Intro (con «moverlo en todas las claves», se mueve lo mismo en todas). En las piezas planas, las casillas llevan el nombre de sus ejes (z / y, x / y o x / z).</td></tr>
   <tr><td>Mover el punto en todos los perfiles</td><td>Marca <b>Al mover un punto, moverlo en todas las claves</b>: el punto se desplaza lo mismo en todos los perfiles y la forma conserva sus ondas.</td></tr>
   <tr><td>Añadir un punto</td><td><b>Doble clic sobre la línea</b> del perfil. Se añade en todos los perfiles clave, en el mismo sitio de la curva.</td></tr>
   <tr><td>Esquina o curva</td><td><b>Doble clic sobre el punto</b>, tecla <kbd>E</kbd> o botón <b>◇ Esquina</b>.</td></tr>
@@ -491,17 +492,21 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 <ul>
   <li><b>Media madera</b>: si dos piezas se cruzan, cada una lleva una ranura del grosor del tablero (más la holgura) hasta la mitad del cruce. La que termina arriba en el cruce lleva la ranura desde arriba y la otra desde abajo: así se monta bajando una sobre otra (las lamas del banco sobre los laterales, el respaldo sobre los laterales de la silla).</li>
   <li><b>Espiga en caja pasante</b>: si una pieza queda <b>entera dentro de la otra</b> a lo largo del cruce, la otra lleva un agujero rectangular (la caja) por el que pasa. Así salen las <b>espigas</b> de las patas que asoman por el asiento y los <b>travesaños pasantes</b> que atraviesan los laterales y sobresalen un poco.</li>
+  <li><b>Esquina dentada</b> (<i>finger joint</i>): si las dos piezas <b>terminan una en la otra</b> (como la tapa y el lateral de una caja, enrasadas por fuera), el canto de cada una se reparte en dientes alternos, de unos dos grosores de ancho: los de una entran en los huecos de la otra.</li>
+  <li><b>Espigas en T</b>: si una pieza termina con un <b>canto largo</b> (100 mm o más) contra la cara de otra que sigue (una balda contra un lateral), su canto se convierte en espigas y la otra lleva sus cajas. Los cantos cortos (las espigas que dibujas tú, de 40 mm) siguen siendo una espiga en una caja.</li>
   <li><b>Solape con tacos o tornillos</b>: dos piezas <b>paralelas pegadas cara con cara</b> (a un grosor de tablero una de otra, como las dos capas de un lateral) que se pisan en su plano se unen por la zona común. El programa reparte en ella los <b>tacos</b> (taladros ciegos en las dos piezas, que salen en la capa de taladros del DXF) o los <b>tornillos</b> (agujero pasante en la pieza de fuera y agujero guía en la de dentro), lejos del borde y lo más separados posible. Se elige en «Piezas planas: uniones»: tacos o tornillos, su Ø y cuántos por solape (0 = según su tamaño, al menos 2). Así se hacen los laterales de dos capas, en los que una pieza larga (la pata trasera que sube al respaldo) y otra (el lateral del asiento con la pata delantera) se cruzan sin tener que cortar el tablero en forma de L.</li>
   <li>Las ranuras y las cajas llevan el <b>hueso de perro</b> de Fabricar, como las demás.</li>
-  <li>La <b>holgura de las uniones</b> (apartado «Piezas planas: uniones», a la izquierda) es lo que las ranuras y las cajas son más anchas que el tablero: 0,3 mm entra a mano con algo de roce. Prueba antes una unión en un retal.</li>
+  <li><b>Espigas pasantes con cuña</b> (casilla en «Piezas planas: uniones»): los travesaños y espigas que atraviesan un lateral o una pata asoman lo justo para un agujero con su <b>cuña</b>, que sale del mismo tablero y aparece en la lista de piezas (C1, C2…). El agujero empieza 1,5 mm dentro de la cara, así la cuña tira de la espiga y aprieta la unión: el mueble queda firme sin cola y se puede desmontar. No se ponen en asientos ni en tapas.</li>
+  <li>La <b>holgura de las uniones</b> (apartado «Piezas planas: uniones», a la izquierda) es lo que las ranuras y las cajas son más anchas que el tablero: 0,3 mm entra a mano con algo de roce. Mejor que adivinarla, córtate la <b>🧪 pieza de prueba</b> de Fabricar (apartado 19). Prueba antes una unión en un retal.</li>
 </ul>
 <div class="caja">Para que salga una espiga, dibuja la pieza con una <b>lengüeta</b> que llegue hasta la otra cara del tablero que atraviesa (o que la pase un poco). Para una media madera, basta con que las dos piezas se crucen. Si dos piezas solo se tocan (un faldón que apoya debajo del asiento), no hay unión: el programa lo da por bueno, pero esa pieza tiene que estar sujeta por otro sitio.</div>
 <h3>Plantillas</h3>
 <table class="tabla">
-  <tr><td>Taburete de patas cruzadas</td><td>Dos patas de frente con un arco y dos travesaños de lado, cruzados a media madera. Las espigas de las patas pasan por el asiento. Se cambian el ancho, el fondo, la altura, el vuelo del asiento, el arco, los pies, el alto de los travesaños y el ancho de las espigas.</td></tr>
+  <tr><td>Taburete de patas cruzadas</td><td>Dos patas de frente con un arco y dos travesaños de lado, cruzados a media madera. Las espigas de las patas pasan por el asiento. Se cambian el ancho, el fondo, la altura, el vuelo del asiento, el arco, los pies, el alto de los travesaños, el ancho de las espigas y cuánto se <b>abren las patas</b> (inclinadas, 4° por defecto).</td></tr>
   <tr><td>Banco de lamas</td><td>Dos laterales con el asiento curvo y lamas de canto encajadas a media madera en ellos; un travesaño pasante los une por debajo. Se cambian el largo, el fondo, la altura, el hundido del asiento, el número y el alto de las lamas, el arco y las patas.</td></tr>
-  <tr><td>Silla de tableros</td><td>Dos laterales con espigas que pasan por el asiento; el respaldo y el travesaño delantero, a media madera; el travesaño trasero, pasante.</td></tr>
+  <tr><td>Silla de tableros</td><td>Dos laterales con espigas que pasan por el asiento; el respaldo y el travesaño delantero, a media madera; el travesaño trasero, pasante. El respaldo y la parte de arriba de los laterales se <b>inclinan</b> hacia atrás (8° por defecto).</td></tr>
   <tr><td>Silla de piezas solapadas</td><td>Cada lateral es de dos capas: la pata trasera, que sube hasta el respaldo, y el lateral del asiento con la pata delantera, solapadas y unidas con tacos. Dos travesaños forman el respaldo (el de arriba a media madera y el otro pasante), el delantero va a media madera y el asiento se estrecha por detrás entre las patas y lleva las espigas de los laterales.</td></tr>
+  <tr><td>Mesilla de uniones dentadas</td><td>La tapa y los laterales con esquinas dentadas, la balda con espigas en T que atraviesan los laterales y un travesaño trasero. No es un asiento: no lleva las comprobaciones de silla.</td></tr>
   <tr><td>Vacío: piezas planas</td><td>Un tablero de frente y otro de lado que se cruzan, para empezar de cero.</td></tr>
 </table>
 <p>Las espigas de las plantillas quedan <b>enrasadas</b> con el tablero que atraviesan: si cambias el grosor del tablero, la plantilla se vuelve a generar (mientras no hayas retocado las piezas a mano).</p>
@@ -517,10 +522,28 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
       <li><b>🗑 Quitar</b> y <b>📐 Contorno desde un DXF o SVG…</b>: el contorno de la pieza dibujado en otro programa, con sus medidas o ajustado al ancho de la pieza de ahora.</li>
     </ul></li>
 </ul>
+<figure><img src="img/dentadas.png" alt="Uniones dentadas"><figcaption>La «Mesilla de uniones dentadas»: el lateral con los dientes de la esquina arriba y las cajas de la balda; la tapa con sus dientes y la balda con sus espigas.</figcaption></figure>
+<h3>Piezas inclinadas</h3>
+<div class="dos">
+  <img src="img/inclinada.png" alt="Silla con el respaldo inclinado" class="estrecha">
+  <div>
+    <p>Una pieza puede <b>girar</b> alrededor de su eje horizontal: <b>Inclinación (°)</b> en «Pieza seleccionada». Así se hace un respaldo inclinado, un asiento que baja por detrás o unas patas abiertas. La casilla dice hacia dónde va el giro positivo en cada dirección (de frente: + arriba hacia delante; de lado: + arriba hacia x−; horizontal: + baja por delante).</p>
+    <ul>
+      <li><b>Gira alrededor de</b>: su borde de abajo (o de atrás, en las horizontales), el de arriba (para <b>abrir patas</b>: el pie se va hacia fuera y el asiento no se mueve) o su centro.</li>
+      <li>Las uniones se recalculan: la ranura o la caja sale <b>inclinada</b> en la pieza recta, del ancho que hace falta para el tablero que la cruza en ángulo.</li>
+      <li>Si una pieza inclinada tocaba el suelo, su pie se alarga hasta el suelo.</li>
+      <li>⇋ Simétrica pone a la pareja la inclinación contraria (las patas de delante y de atrás se abren las dos hacia fuera).</li>
+    </ul>
+    <div class="caja">El corte es siempre recto (a 90°): en un cruce inclinado, el canto de la ranura no sigue el ángulo y queda una pequeña holgura en cuña, que tapa la cola. Con más de 15° conviene repasar a mano. Las esquinas dentadas, los solapes y las cuñas solo se calculan entre piezas rectas.</div>
+  </div>
+</div>
+<h3>Montaje animado</h3>
+<p>Con <b>▶ Montaje</b> (bajo la vista 3D) las piezas entran <b>una a una</b>, en el orden del plano de montaje: primero las que apoyan en el suelo y sus piezas solapadas, luego los travesaños pasantes y sus cuñas, después las que bajan a media madera y al final los asientos y las tapas. Arriba se lee qué pieza entra. ■ Parar lo deja todo en su sitio.</p>
 <figure><img src="img/piezas_planas_expl.png" alt="Taburete con explosión" style="max-width:420px"><figcaption>Con la <b>explosión</b>, cada pieza se aparta siguiendo su dirección y las que se montan bajando suben: se ve cómo encajan.</figcaption></figure>
 <h3>Comprobaciones, fabricación y plano</h3>
 <ul>
   <li>El programa avisa si una pieza <b>no se cruza con ninguna</b> (quedaría suelta), si dos piezas paralelas <b>se pisan</b>, si una ranura no se puede hacer, si una media madera o una espiga es <b>demasiado corta</b>, si una caja queda <b>muy cerca del borde</b> o si un solape es tan estrecho que no caben los tacos (o solo cabe uno y la unión podría girar).</li>
+  <li><b>Si es para sentarse</b> (casilla «Es para sentarse», marcada en sillas, taburetes y bancos): da las medidas del asiento y avisa si se salen de las habituales para un adulto (altura de 420 a 470 mm, fondo de 380 a 460, ancho de al menos 400, respaldo que suba 250 a 300 mm). Y hace tres <b>pruebas de vuelco</b> orientativas (no son un ensayo normalizado), con el peso del propio mueble: hacia atrás, con 600 N sentado y 80 N empujando el respaldo arriba; hacia delante, sentado en el borde de delante; y de costado, sentado en un extremo. Si vuelca, es un error; si aguanta con poco margen (menos de ×1,5), un aviso.</li>
   <li>Fabricar, el DXF, el SVG, el Anidador (también con láser), la maqueta, el despiece, la lista de compra y la exportación 3D (STL, OBJ, GLB, SolidCraft) funcionan igual que con los otros tipos.</li>
   <li>El <b>plano de montaje</b> trae una hoja con las piezas separadas, la lista de piezas con su posición y todas las uniones, y los pasos de montaje en orden: primero se unen las piezas solapadas (con la profundidad de los taladros y el largo de los tacos), luego los travesaños pasantes, luego las medias maderas de abajo arriba y al final los tableros horizontales sobre sus espigas.</li>
 </ul>
@@ -674,6 +697,14 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   </div>
 </div>
 <figure><img src="img/hueso.png" alt="Hueso de perro en las ranuras" style="max-width:560px"><figcaption>Fondo de las ranuras de un larguero, con el hueso de perro en cada esquina.</figcaption></figure>
+<h3>Pieza de prueba de holgura</h3>
+<div class="dos">
+  <img src="img/prueba_holgura.png" alt="Pieza de prueba de holgura">
+  <div>
+    <p><b>🧪 Pieza de prueba</b> (en Fabricar) prepara un retal con <b>ranuras</b> desde el borde y <b>cajas</b> de varios anchos, con la medida grabada debajo de cada una. Se escribe el <b>grosor real</b> del tablero (mídelo con el calibre: casi nunca es el nominal; un contrachapado «de 18» puede medir 17,6), las holguras a probar y la fresa, y se guarda en DXF o SVG.</p>
+    <p>Córtalo con la misma máquina y la misma fresa que el mueble y prueba un trozo del mismo tablero en cada ranura y cada caja. La buena es la que entra a mano con un poco de roce: esa diferencia con el grosor es la holgura que hay que poner en el mueble (en la retícula, los radiales, los rastreles o las piezas planas).</p>
+  </div>
+</div>
 <p><b>⬇ CSV de cortes</b> guarda una línea por costilla (nombre, largo y ancho de su rectángulo, cantidad y veta) con el mismo formato de despiece que lee el <b>Anidador</b> y que abre cualquier hoja de cálculo. <b>🧩 Anidador</b> abre el Anidador con las costillas por su forma real (sección 23).</p>
 <div class="caja taller">Taladra y vacía <b>los agujeros antes que el contorno</b>: si cortas primero la pieza, se puede mover al hacer los agujeros. Deja puentes (pestañas) si la pieza es pequeña.</div>
 
