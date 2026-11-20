@@ -36,6 +36,9 @@ function calcularPresupuesto() {
   if (esPlano()) {
     const nF = R.uniones.reduce((s, u) => s + (u.puntos || []).length, 0);
     if (nF) filas.push([solapeP().tipo === 'tornillos' ? 'Tornillos' : 'Tacos de madera', nF, solapeP().tipo === 'tornillos' ? B.tornillo : B.taco]);
+    const nh = herrajesTotales();
+    if (nh.barril) filas.push(['Pernos con tuerca de barril', nh.barril, B.barril]);
+    if (nh.excentrica) filas.push(['Excéntricas con perno', nh.excentrica, B.excentrica]);
   }
   if (!maq && B.cola) filas.push(['Cola, lija y varios', 1, B.cola]);
   const m2 = cm.area / 1e6 * 2 * 1.1;   // las dos caras y un poco de canto
@@ -81,14 +84,14 @@ function dialogoPresupuesto() {
         ${P.tipo === 'costillas' ? n('psVar', 'Varilla o tubo (€/m)', B.varilla, 0.5) + n('psSep', 'Separador (€/m)', B.separador, 0.5) + n('psTue', 'Tuerca y arandela (cada)', B.tuerca, 0.05) : ''}
         ${P.tipo === 'radial' ? n('psVar', 'Tubo central (€/m)', B.varilla, 0.5) : ''}
         ${P.tipo === 'pared' ? n('psRas', 'Rastrel (€/m)', B.rastrel, 0.5) : ''}
-        ${esPlano() ? n('psTac', 'Taco de madera (cada)', B.taco, 0.01) + n('psTor', 'Tornillo (cada)', B.tornillo, 0.01) : ''}
+        ${esPlano() ? n('psTac', 'Taco de madera (cada)', B.taco, 0.01) + n('psTor', 'Tornillo (cada)', B.tornillo, 0.01) + n('psBar', 'Perno y tuerca de barril (juego)', B.barril, 0.05) + n('psExc', 'Excéntrica con perno (juego)', B.excentrica, 0.05) : ''}
         ${n('psCola', 'Cola, lija y varios (total)', B.cola, 1)}
         ${n('psAcab', 'Acabado (€/m²)', B.acabado, 1, 'Aceite, barniz o laca, por m² de superficie')}
         ${n('psMarg', 'Margen (%)', B.margen, 5)}
       </div>
       <div><div id="psRes" style="font-size:13px"></div></div>
     </div>`, [['Precios por defecto', () => { P.presupuesto = proyectoBase().presupuesto; guardado(); dialogoPresupuesto(); }], ['⬇ CSV', () => exportarCSVPresupuesto()]], true);
-  const mapa = { psAv: 'avance', psPas: 'pasada', psBaj: 'bajada', psEnt: 'entrada', psTab: 'minTablero', psExtra: 'extra', psHora: 'hora', psVar: 'varilla', psSep: 'separador', psTue: 'tuerca', psRas: 'rastrel', psTac: 'taco', psTor: 'tornillo', psCola: 'cola', psAcab: 'acabado', psMarg: 'margen' };
+  const mapa = { psAv: 'avance', psPas: 'pasada', psBaj: 'bajada', psEnt: 'entrada', psTab: 'minTablero', psExtra: 'extra', psHora: 'hora', psVar: 'varilla', psSep: 'separador', psTue: 'tuerca', psRas: 'rastrel', psTac: 'taco', psTor: 'tornillo', psBar: 'barril', psExc: 'excentrica', psCola: 'cola', psAcab: 'acabado', psMarg: 'margen' };
   const pintar = () => {
     const r = calcularPresupuesto(), filas = filasPresupuesto(r);
     $('#psRes').innerHTML = '<table class="tabla">' + filas.map(f => f.titulo ? `<tr><th colspan="2">${esc(f.titulo)}</th></tr>` : `<tr><td>${esc(f[0])}</td><td style="text-align:right"><b>${esc(f[1])}</b></td></tr>`).join('') + '</table>'

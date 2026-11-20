@@ -82,6 +82,7 @@ function validarProyecto(o) {
   p.vista = Object.assign(proyectoBase().vista, o.vista || {});
   p.maqueta = Object.assign(proyectoBase().maqueta, o.maqueta || {});
   p.cnc = Object.assign(proyectoBase().cnc, o.cnc || {});
+  p.ficha = Object.assign(proyectoBase().ficha, o.ficha || {});
   p.presupuesto = Object.assign(proyectoBase().presupuesto, o.presupuesto || {});
   p.reticula = Object.assign(proyectoBase().reticula, o.reticula || {});
   ['planta', 'radial', 'pared', 'relieve', 'figura'].forEach(k => p[k] = Object.assign(proyectoBase()[k], o[k] || {}));

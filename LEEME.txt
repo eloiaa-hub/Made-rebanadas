@@ -9,6 +9,7 @@ Modelo 3D (botón 🧊 3D): STL, OBJ + MTL, GLB (Blender) o SolidCraft (.sc o JS
 Importa: DXF y SVG (huecos y perfiles); STL, OBJ, GLB y PLY (relieves y figuras)
 Tipos de mueble: costillas con varillas, retícula, radial, panel de pared y piezas planas (sillas, taburetes…)
 Plano de montaje en PDF con vistas acotadas; tiempo de mecanizado y presupuesto (botón 🛠 Fabricar)
+Ficha de práctica para alumnos con rúbrica (botón 🎓 Ficha); muebles de kit con herrajes; flexión de baldas
 
 Copia siempre la carpeta completa:
   assets/js        programa (app.js) y Three.js empaquetado sin módulos

@@ -111,6 +111,10 @@ function iniciarPanel() {
   // piezas planas
   enlazar('#plHolgura', () => { planoP().holgura = clamp(+$('#plHolgura').value || 0, 0, 3); cambio('Holgura de las uniones ' + fmt(planoP().holgura, 2) + ' mm'); });
   enlazar('#plAsiento', () => { planoP().asiento = $('#plAsiento').checked; cambio(planoP().asiento ? 'Comprobaciones de asiento' : 'Sin comprobaciones de asiento'); });
+  enlazar('#plHerraje', () => { planoP().herraje = $('#plHerraje').value; cambio($('#plHerraje').value === 'no' ? 'Cantos con uniones dentadas' : 'Cantos a tope con ' + NOMBRE_HERRAJE[$('#plHerraje').value]); });
+  enlazar('#plFlexion', () => { planoP().flexion = $('#plFlexion').checked; cambio(planoP().flexion ? 'Comprobación de flexión' : 'Sin comprobación de flexión'); });
+  enlazar('#plPersona', () => { planoP().persona = clamp(+$('#plPersona').value || 100, 20, 200); cambio('Persona de ' + fmt(planoP().persona) + ' kg'); });
+  enlazar('#plCarga', () => { planoP().cargaBalda = clamp(+$('#plCarga').value || 0, 0, 500); cambio('Carga de las baldas ' + fmt(planoP().cargaBalda) + ' kg/m²'); });
   enlazar('#plCunas', () => { planoP().cunas = $('#plCunas').checked; cambio(planoP().cunas ? 'Espigas pasantes con cuña' : 'Espigas sin cuña'); });
   enlazar('#plSolTipo', () => { solapeP().tipo = $('#plSolTipo').value; if (solapeP().tipo === 'tornillos' && solapeP().diam > 6) { solapeP().diam = 4; $('#plSolDiam').value = 4; } else if (solapeP().tipo === 'tacos' && solapeP().diam < 6) { solapeP().diam = 8; $('#plSolDiam').value = 8; } cambio('Solapes con ' + solapeP().tipo); });
   enlazar('#plSolDiam', () => { solapeP().diam = clamp(+$('#plSolDiam').value || 8, 2, 30); cambio('Ø ' + fmt(solapeP().diam, 1) + ' mm'); });
@@ -406,7 +410,7 @@ function ponerControles() {
   const Pl = P.planta; $('#plForma').value = Pl.forma; $('#plRadio').value = Pl.radio; $('#plSentido').value = String(Pl.sentido === -1 ? -1 : 1); $('#plAmp').value = Pl.amplitud; $('#plOndas').value = Pl.ondas;
   const Ra = P.radial; $('#raNum').value = P.costillas.numero; $('#raTubo').value = Ra.tubo; $('#raHolTubo').value = Ra.holguraTubo; $('#raDiscos').value = Ra.discos; $('#raRDisco').value = Ra.rDisco; $('#raHolgura').value = Ra.holgura;
   ponerPartir();
-  $('#plHolgura').value = planoP().holgura; $('#plCunas').checked = !!planoP().cunas; $('#plAsiento').checked = planoP().asiento !== false; $('#plSolTipo').value = solapeP().tipo; $('#plSolDiam').value = solapeP().diam; $('#plSolN').value = solapeP().n; $('#pzRejilla').value = $('#kRejilla').value;
+  $('#plHolgura').value = planoP().holgura; $('#plCunas').checked = !!planoP().cunas; $('#plAsiento').checked = planoP().asiento !== false; $('#plFlexion').checked = planoP().flexion !== false; $('#plHerraje').value = planoP().herraje || 'no'; $('#plPersona').value = planoP().persona; $('#plCarga').value = planoP().cargaBalda; $('#plSolTipo').value = solapeP().tipo; $('#plSolDiam').value = solapeP().diam; $('#plSolN').value = solapeP().n; $('#pzRejilla').value = $('#kRejilla').value;
   const Pa = P.pared; $('#paNum').value = Pa.rastreles; $('#paAlto').value = Pa.alto; $('#paGrueso').value = Pa.grueso; $('#paMargen').value = Pa.margen; $('#paHolgura').value = Pa.holgura; $('#paVer').checked = Pa.verPared;
   $('#cClaves3d').checked = P.vista.claves !== false;
   const Fg = P.figura; $('#fgAlto').value = Fg.alto; $('#fgEje').value = Fg.eje; $('#fgGiro').value = String(Fg.giro || 0); $('#fgMin').value = Fg.minArea; $('#fgUnir').checked = Fg.unir !== false;

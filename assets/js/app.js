@@ -95,8 +95,9 @@ function proyectoBase() {
     vista: { explosion: 0, fantasma: false, varillas: true, resalta: true, claves: true, rasante: false, rasAng: 30 },
     maqueta: { activa: false, escala: 5, grosor: 3, diam: 3, holgura: 0.2, fresa: 0 },
     cnc: { fresa: 6, hueso: true, arcos: true, tolArco: 0.05, veta: 'no' },
+    ficha: { titulo: '', modulo: '', duracion: '', objetivos: '', tareas: '', entrega: '', criterios: '', corte: true },
     presupuesto: { avance: 3000, pasada: 6, bajada: 600, entrada: 3, minTablero: 5, extra: 15, hora: 30, precios: {}, precioMaqueta: 4,
-      varilla: 3, separador: 4, tuerca: 0.3, rastrel: 2.5, taco: 0.05, tornillo: 0.08, cola: 10, acabado: 8, margen: 0 },
+      varilla: 3, separador: 4, tuerca: 0.3, rastrel: 2.5, taco: 0.05, tornillo: 0.08, barril: 0.45, excentrica: 0.35, cola: 10, acabado: 8, margen: 0 },
     reticula: { num: 4, margen: 40, holgura: 0.3, xArriba: true, vuelo: 25 },
     planta: { forma: 'recta', radio: 2500, sentido: 1, amplitud: 150, ondas: 1 },
     radial: { tubo: 20, holguraTubo: 0.5, discos: 2, rDisco: 0, holgura: 0.3 },
@@ -110,7 +111,7 @@ function proyectoBase() {
       capa: { activa: false, texto: 'Hola', letra: 'Arial Black', negrita: true, tamLetra: 160, relieve: 30, x: 50, y: 15, modo: 'sale' } },
     huecos: [],
     figura: { activa: false, malla: null, alto: 800, eje: 'x', giro: 0, minArea: 2, unir: true },
-    plano: { holgura: 0.3, piezas: [], solape: { tipo: 'tacos', diam: 8, n: 0 }, cunas: false },
+    plano: { holgura: 0.3, piezas: [], solape: { tipo: 'tacos', diam: 8, n: 0 }, cunas: false, flexion: true, persona: 100, cargaBalda: 150 },
   };
 }
 
@@ -2470,7 +2471,7 @@ const PLANOS = {
   horizontal: { n: 1, a: 0, b: 2, nombre: 'Horizontal', ejes: ['ancho (x)', 'fondo (z)'], normal: 'y' },
 };
 const esPlano = () => P && P.tipo === 'plano';
-const planoP = () => P.plano || (P.plano = { holgura: 0.3, piezas: [], solape: { tipo: 'tacos', diam: 8, n: 0 }, cunas: false });
+const planoP = () => { const p = P.plano || (P.plano = { holgura: 0.3, piezas: [], solape: { tipo: 'tacos', diam: 8, n: 0 }, cunas: false }); if (p.persona == null) p.persona = 100; if (p.cargaBalda == null) p.cargaBalda = 150; return p; };
 const solapeP = () => { const Pp = planoP(); return Pp.solape || (Pp.solape = { tipo: 'tacos', diam: 8, n: 0 }); };
 // la pieza de la que se toma el contorno (las simétricas usan el de su pareja)
 function piezaFuente(k) {
@@ -2537,6 +2538,16 @@ function calcularPlano() {
       const u = { a: i, b: j, lo, hi, geo: { [i]: geoRecta(ejeA, B.x, lo, hi), [j]: geoRecta(ejeB, A.x, lo, hi) } };
       // ¿termina alguna de las dos dentro del grosor de la otra? (esquina o canto contra una cara)
       const fA = window.ClipperLib ? finCanto(A.base, ejeA, B.x, lo, hi, e) : 0, fB = window.ClipperLib ? finCanto(B.base, ejeB, A.x, lo, hi, e) : 0;
+      const Hm = planoP().herraje || 'no';
+      if (Hm !== 'no' && (fA || fB)) {   // unión a tope con herraje desmontable (perno y tuerca de barril, o excéntrica)
+        let tA = fA && !fB;
+        if (fA && fB) tA = A.plano === 'horizontal' ? true : B.plano === 'horizontal' ? false : A.plano === 'frente' ? true : B.plano === 'frente' ? false : true;
+        const [Pt, Pc, ej, ejC, sT] = tA ? [A, B, ejeA, ejeB, fA] : [B, A, ejeB, ejeA, fB];
+        u.tipo = 'herraje'; u.en = Pc.i; u.pasa = Pt.i; u.herraje = Hm;
+        Pt.dientes.push({ eje: ej, c: Pc.x, s: sT, t: [lo, hi], quita: 0, tope: true });
+        ponerHerraje(u, Pt, Pc, ej, ejC, sT, e);
+        res.uniones.push(u); A.uniones.push(u); B.uniones.push(u); return;
+      }
       if ((fA && fB) || ((fA || fB) && hi - lo >= 100)) {
         const n = Math.max(3, Math.round((hi - lo) / Math.max(2 * e, 30)) | 1), t = Array.from({ length: n + 1 }, (_, k) => lo + (hi - lo) * k / n);
         u.tipo = 'dentada'; u.dientes = n;
@@ -2621,7 +2632,7 @@ function calcularPlano() {
     const rT = dT / 2;
     u.puntos.forEach(q => {
       if (So.tipo === 'tornillos') { ps[fuera].taladros.push([q[0], q[1], rT, 'pasante']); ps[fuera === i ? j : i].taladros.push([q[0], q[1], Math.max(1, rT * 0.6), 'guia']); }
-      else { A.taladros.push([q[0], q[1], rT, 'ciego']); B.taladros.push([q[0], q[1], rT, 'ciego']); }
+      else { const pr = largoTaco(e).prof; A.taladros.push([q[0], q[1], rT, 'ciego', pr]); B.taladros.push([q[0], q[1], rT, 'ciego', pr]); }
     });
     res.uniones.push(u); A.uniones.push(u); B.uniones.push(u);
   });
@@ -2648,11 +2659,39 @@ function finCanto(base, eje, c, lo, hi, e) {
   if (c - mn <= e / 2 + 0.6 && mx - c > e) return -1;
   return 0;
 }
+/* ---------- herrajes desmontables (mueble de kit) ----------
+   La pieza que termina (Pt) se corta a tope contra la cara de la otra (Pc) y se une con:
+   - perno y tuerca de barril: el perno M6 atraviesa Pc (taladro pasante), entra por el canto de Pt y rosca en una
+     tuerca de barril metida en un taladro pasante de Ø 10 en la cara de Pt;
+   - excéntrica (tipo minifix): la excéntrica Ø 15 va en un taladro ciego en la cara de Pt, a 34 mm del canto, y el
+     perno se rosca en un taladro ciego de Ø 5 en la cara de Pc; entre los dos, un taladro de Ø 8 en el canto de Pt.
+   Los taladros de las caras van en el DXF; los del canto se hacen a mano (en el DXF, una raya en la capa CANTO). */
+const NOMBRE_HERRAJE = { barril: 'perno y tuerca de barril', excentrica: 'excéntrica (minifix)' };
+const herrajesTotales = res => { const n = { barril: 0, excentrica: 0 }; (res || R).uniones.forEach(u => { if (u.tipo === 'herraje') n[u.herraje] += u.puntos.length; }); return n; };
+function datosHerraje(tipo, e) {
+  if (tipo === 'excentrica') { const dB = e >= 15 ? 34 : 24; return { dB, rC: 7.5, profC: Math.min(14, Math.max(8, e - 4.5)), rP: 2.5, profP: 11, rCanto: 4, profCanto: dB + 2 }; }
+  const L = [40, 50, 60, 70, 80].find(l => l - e - 5 >= 20) || 80, dB = L - e - 5;
+  return { L, dB, rC: 5, rP: 3.5, rCanto: 3.5, profCanto: dB + 8 };
+}
+function ponerHerraje(u, Pt, Pc, ej, ejC, sT, e) {
+  const D = datosHerraje(u.herraje, e), L = u.hi - u.lo, m = Math.min(50, L / 4);
+  const n = L < 140 ? 1 : clamp(1 + Math.floor((L - 2 * m) / 300), 2, 5);
+  const ls = n === 1 ? [(u.lo + u.hi) / 2] : Array.from({ length: n }, (_, k) => u.lo + m + (L - 2 * m) * k / (n - 1));
+  const P2 = (eje, x, l) => eje === 'v' ? [x, l] : [l, x], borde = Pc.x - sT * e / 2;
+  Pt.cantos = Pt.cantos || [];
+  u.puntos = ls; u.datos = D;
+  ls.forEach(l => {
+    const qB = P2(ej, borde - sT * D.dB, l);
+    if (u.herraje === 'excentrica') { Pt.taladros.push([...qB, D.rC, 'ciego', D.profC]); Pc.taladros.push([...P2(ejC, Pt.x, l), D.rP, 'ciego', D.profP]); }
+    else { Pt.taladros.push([...qB, D.rC, 'pasante']); Pc.taladros.push([...P2(ejC, Pt.x, l), D.rP, 'pasante']); }
+    Pt.cantos.push({ a: P2(ej, borde, l), b: P2(ej, borde - sT * D.profCanto, l), r: D.rCanto });
+  });
+}
 // recorta los dientes: en los tramos k con k % 2 === quita, el canto se retira hasta la cara de dentro de la otra pieza
 function aplicarDientes(p, w, hol) {
   const big = 1e5, cortes = [], esqObj = [];
   p.dientes.forEach(d => {
-    const ia = d.eje === 'v' ? 0 : 1, Pt = (x, l) => ia === 0 ? [x, l] : [l, x], n = d.t.length - 1, borde = d.c - d.s * w / 2;
+    const ia = d.eje === 'v' ? 0 : 1, Pt = (x, l) => ia === 0 ? [x, l] : [l, x], n = d.t.length - 1, borde = d.c - d.s * (d.tope ? w - hol : w) / 2;
     for (let k = 0; k < n; k++) {
       if (k % 2 !== d.quita) continue;
       const l0 = k === 0 ? -big : d.t[k] - hol / 2, l1 = k === n - 1 ? big : d.t[k + 1] + hol / 2;
@@ -2702,6 +2741,11 @@ function avisosPlano(res) {
   res.uniones.forEach(u => {
     if (u.tipo === 'solape' && !u.puntos.length) add('atencion', `${nomP(res, u.a)} y ${nomP(res, u.b)} se solapan, pero la zona común es demasiado estrecha para un ${solapeP().tipo === 'tornillos' ? 'tornillo' : 'taco'} de Ø ${fmt(solapeP().diam, 1)} mm: agranda el solape o encólalas.`, u.a);
     else if (u.tipo === 'solape' && u.puntos.length < 2) add('atencion', `Solape de ${nomP(res, u.a)} y ${nomP(res, u.b)} con una sola fijación: puede girar. Agranda la zona común.`, u.a);
+    if (u.tipo === 'herraje') {
+      const Pt = res.costillas[u.pasa], fuera = (Pt.taladros || []).filter(t => !dentro(Pt.poly, t[0], t[1]) || distBorde(Pt.poly, t[0], t[1]) < t[2] + 3).length;
+      if (fuera) add('atencion', `${Pt.nombre}: ${fuera === 1 ? 'un taladro' : fuera + ' taladros'} de ${u.herraje === 'excentrica' ? 'la excéntrica' : 'la tuerca de barril'} ${fuera === 1 ? 'cae' : 'caen'} fuera de la pieza o en el borde (está a ${fmt(u.datos.dB)} mm del canto): la pieza es demasiado estrecha para este herraje.`, Pt.i);
+      if (u.herraje === 'excentrica' && e < 15) add('atencion', `Las excéntricas piden tablero de 15 mm o más (este es de ${fmt(e, 1)} mm): usa perno y tuerca de barril.`, u.pasa);
+    }
     if (u.tipo === 'media' && u.hi - u.lo < 2 * e) add('atencion', `Media madera corta entre ${nomP(res, u.a)} y ${nomP(res, u.b)} (${fmt(u.hi - u.lo)} mm de cruce): unión floja.`, u.a);
     if (u.tipo === 'caja' && u.hi - u.lo < 1.5 * e) add('atencion', `Espiga estrecha de ${nomP(res, u.pasa)} en ${nomP(res, u.en)} (${fmt(u.hi - u.lo)} mm): se puede partir.`, u.pasa);
   });
@@ -2712,12 +2756,13 @@ function avisosPlano(res) {
     if (malo) add('atencion', `${p.nombre}: alguna caja (agujero de una espiga) queda muy cerca del borde y la pieza se puede partir.`, p.i);
   });
   avisosAsiento(res, add);
+  avisosFlexion(res, add);
   const M = P.maqueta;
   if (M && M.activa && Math.abs(M.grosor * M.escala - e) > e * 0.2) add('info', `Maqueta 1:${M.escala}: ${fmt(M.grosor, 1)} mm equivalen a ${fmt(M.grosor * M.escala)} mm reales (el tablero real es de ${fmt(e, 1)} mm): las ranuras y las cajas de la maqueta se hacen con el grosor de la maqueta.`);
   if (!A.some(a => a.tipo === 'error' || a.tipo === 'atencion')) {
     const nM = res.uniones.filter(u => u.tipo === 'media').length, nC = res.uniones.filter(u => u.tipo === 'caja').length, nS = res.uniones.filter(u => u.tipo === 'solape').length;
     const nE = res.uniones.filter(u => u.tipo === 'dentada' && u.esquina).length, nT = res.uniones.filter(u => u.tipo === 'dentada' && !u.esquina).length;
-    const partes = [nE ? nE + (nE > 1 ? ' esquinas dentadas' : ' esquina dentada') : '', nT ? nT + (nT > 1 ? ' cantos con espigas en T' : ' canto con espigas en T') : '', nM ? nM + ' a media madera' : '', nC ? nC + (nC > 1 ? ' espigas en caja pasante' : ' espiga en caja pasante') : '', nS ? nS + (nS > 1 ? ' solapes' : ' solape') + ` con ${solapeP().tipo}` : ''].filter(Boolean);
+    const partes = [nE ? nE + (nE > 1 ? ' esquinas dentadas' : ' esquina dentada') : '', nT ? nT + (nT > 1 ? ' cantos con espigas en T' : ' canto con espigas en T') : '', nM ? nM + ' a media madera' : '', nC ? nC + (nC > 1 ? ' espigas en caja pasante' : ' espiga en caja pasante') : '', nS ? nS + (nS > 1 ? ' solapes' : ' solape') + ` con ${solapeP().tipo}` : '', res.uniones.some(u => u.tipo === 'herraje') ? `${res.uniones.filter(u => u.tipo === 'herraje').length} a tope con ${NOMBRE_HERRAJE[planoP().herraje] || 'herraje'}` : ''].filter(Boolean);
     add('ok', `Todo correcto: ${res.n} piezas con ${res.uniones.length} ${res.uniones.length === 1 ? 'unión' : 'uniones'}` + (partes.length ? ` (${partes.length > 1 ? partes.slice(0, -1).join(', ') + ' y ' + partes[partes.length - 1] : partes[0]})` : '') + '.');
   }
 }
@@ -2783,11 +2828,100 @@ function avisosAsiento(res, add) {
   if (a.delante < 1.5) add(a.delante < 1 ? 'error' : 'atencion', `Sentado en el borde de delante, ${a.delante < 1 ? 'vuelca hacia delante' : 'tiene poco margen hacia delante'}: el asiento sale ${fmt(a.saleDelante)} mm por delante de las patas (margen ×${fmt(a.delante, 1)}).`, a.S.i);
   if (a.lado < 1.5) add(a.lado < 1 ? 'error' : 'atencion', `Sentado en un extremo, ${a.lado < 1 ? 'vuelca de costado' : 'tiene poco margen de costado'}: el asiento sale ${fmt(a.saleLado)} mm por fuera de las patas (margen ×${fmt(a.lado, 1)}).`, a.S.i);
 }
+/* ---------- flexión de asientos y baldas ----------
+   Cada tablero horizontal se calcula como una viga entre las piezas que lo sostienen (las que se cruzan con él):
+   el asiento, con una persona en el centro de la luz (o en la punta del vuelo); las baldas y tapas, con una carga
+   repartida por m². Flecha con E del tablero y su fluencia (lo que se dobla con los meses), y tensión contra su
+   resistencia a flexión. Orientativo: los valores de cada tablero son medios y varían mucho entre fabricantes. */
+const MECANICA = {   // E (N/mm²), resistencia a flexión (N/mm²), factor de fluencia
+  abedul: { E: 7000, f: 50, k: 1.8 }, chopo: { E: 4500, f: 35, k: 1.8 }, pino_ply: { E: 5500, f: 40, k: 1.8 },
+  roble: { E: 5500, f: 40, k: 1.8 }, nogal: { E: 5500, f: 40, k: 1.8 }, pino: { E: 8000, f: 40, k: 1.6 },
+  mdf: { E: 2800, f: 30, k: 2.25 }, lacado: { E: 2800, f: 30, k: 2.25 },
+};
+function apoyosPieza(res, H) {   // rectas de apoyo de H en sus coordenadas: { d: 0 (luz en u) | 1 (luz en v), s: posición }
+  const out = [];
+  H.uniones.forEach(u => {
+    if (u.tipo === 'solape' || !u.geo || !u.geo[H.i]) return;
+    const o = res.costillas[u.a === H.i ? u.b : u.a]; if (!o || o.plano === 'horizontal' || o.cuna) return;
+    const g = u.geo[H.i], [cs, sn] = g.rot, m = (g.lo + g.hi) / 2, q = desgirarP([g.c, m], cs, sn);
+    if (Math.abs(cs) > 0.9) out.push({ d: 0, s: q[0], o: o.i }); else if (Math.abs(sn) > 0.9) out.push({ d: 1, s: q[1], o: o.i });
+  });
+  return out;
+}
+function analisisFlexion(res) {
+  const Pp = planoP(), e = grosor(), mec = MECANICA[P.costillas.material] || MECANICA.mdf, out = [];
+  const S = Pp.asiento !== false ? (analisisAsiento(res) || {}).S : null;
+  res.costillas.forEach(H => {
+    if (!H.ok || H.cuna || H.plano !== 'horizontal' || H.giro) return;
+    const ap = apoyosPieza(res, H); if (!ap.length) return;
+    const ext = [[H.caja.x0, H.caja.x1], [H.caja.y0, H.caja.y1]];
+    const tramos = d => {   // luces entre apoyos (a ejes) y vuelos
+      const s = [...new Set(ap.filter(a => a.d === d).map(a => Math.round(a.s)))].sort((x, y) => x - y).filter((v, i, A) => !i || v - A[i - 1] > e);
+      if (!s.length) return null;
+      let L = 0; for (let i = 1; i < s.length; i++) L = Math.max(L, s[i] - s[i - 1]);
+      return { n: s.length, L, vuelo: Math.max(s[0] - ext[d][0], ext[d][1] - s[s.length - 1]) - e / 2 };
+    };
+    const T = [tramos(0), tramos(1)];
+    // dirección que trabaja: la de luz más corta entre las que tienen dos apoyos o más
+    const con2 = [0, 1].filter(d => T[d] && T[d].n >= 2);
+    const d = con2.length ? con2.sort((a, b) => T[a].L - T[b].L)[0] : [0, 1].filter(x => T[x]).sort((a, b) => T[b].vuelo - T[a].vuelo)[0];
+    const t = T[d], ancho = ext[1 - d][1] - ext[1 - d][0], asiento = S && S.i === H.i;
+    const I = b => b * e ** 3 / 12, Wm = b => b * e * e / 6;
+    const caso = (L, vuelo) => {
+      if (L < 30) return null;
+      let flecha, sigma, carga;
+      if (asiento) {   // una persona: carga puntual, repartida en un ancho de unos 400 mm
+        const F = Pp.persona * 9.81, b = Math.min(ancho, 400); carga = `${fmt(Pp.persona)} kg ${vuelo ? 'en la punta' : 'en el centro'}`;
+        flecha = vuelo ? F * L ** 3 / (3 * mec.E * I(b)) : F * L ** 3 / (48 * mec.E * I(b)); sigma = (vuelo ? F * L : F * L / 4) / Wm(b);
+      } else {         // carga repartida por m², para siempre: con fluencia
+        const w = Pp.cargaBalda * 9.81e-6 * ancho; carga = `${fmt(Pp.cargaBalda)} kg/m² (${fmt(Pp.cargaBalda * ancho * L / 1e6, 1)} kg)`;
+        flecha = (vuelo ? w * L ** 4 / (8 * mec.E * I(ancho)) : 5 * w * L ** 4 / (384 * mec.E * I(ancho))) * mec.k; sigma = (vuelo ? w * L * L / 2 : w * L * L / 8) / Wm(ancho);
+      }
+      const lim = (vuelo ? 2 * L : L) / (asiento ? 150 : 200);
+      return { L, vuelo: !!vuelo, flecha, lim, sigma, seg: mec.f / sigma, carga, eNec: e * Math.cbrt(flecha / lim) };
+    };
+    const casos = [];
+    if (t.n >= 2) casos.push(caso(t.L, false));
+    if (t.vuelo > 40) casos.push(caso(t.vuelo, true));
+    casos.filter(Boolean).forEach(c => out.push(Object.assign(c, { H, asiento })));
+  });
+  // asiento de lamas de canto: la persona se reparte entre las lamas que caben en unos 400 mm
+  if (S && S.plano === 'frente') {
+    const L = res.costillas.filter(c => c.ok && !c.giro && c.plano === 'frente' && c.caja.h < 150 && c.caja.y1 > 250 && c.caja.y1 < 800 && c.caja.w >= 250).sort((x, y) => x.x - y.x);
+    const paso = L.length > 1 ? (L[L.length - 1].x - L[0].x) / (L.length - 1) : 400, n = Math.max(1, Math.min(L.length, Math.round(400 / Math.max(paso, 1))));
+    let peor = null;
+    L.forEach(H => {
+      const s0 = [...new Set(apoyosPieza(res, H).filter(a => a.d === 0).map(a => Math.round(a.s)))].sort((x, y) => x - y);
+      const F = Pp.persona * 9.81 / n, h = H.caja.h, I = e * h ** 3 / 12, Wm = e * h * h / 6, cs = [];
+      for (let i = 1; i < s0.length; i++) cs.push({ L: s0[i] - s0[i - 1], vuelo: false });
+      if (s0.length) { const v = Math.max(s0[0] - H.caja.x0, H.caja.x1 - s0[s0.length - 1]) - e / 2; if (v > 40) cs.push({ L: v, vuelo: true }); }
+      cs.forEach(({ L: Lz, vuelo }) => {
+        if (Lz < 30) return;
+        const flecha = vuelo ? F * Lz ** 3 / (3 * mec.E * I) : F * Lz ** 3 / (48 * mec.E * I), sigma = (vuelo ? F * Lz : F * Lz / 4) / Wm, lim = (vuelo ? 2 * Lz : Lz) / 150;
+        const c = { L: Lz, vuelo, flecha, lim, sigma, seg: mec.f / sigma, carga: `${fmt(Pp.persona)} kg repartidos en ${n} lama${n > 1 ? 's' : ''}`, eNec: e * Math.cbrt(flecha / lim), H, asiento: true, lamas: true };
+        if (!peor || c.flecha / c.lim > peor.flecha / peor.lim) peor = c;
+      });
+    });
+    if (peor) out.push(peor);
+  }
+  return out;
+}
+function avisosFlexion(res, add) {
+  if (planoP().flexion === false) return;
+  analisisFlexion(res).forEach(c => {
+    const que = c.lamas ? 'Las lamas del asiento' : c.asiento ? 'El asiento' : c.H.nombre, base = `${que}: ${c.vuelo ? 'vuelo' : 'luz'} de ${fmt(c.L)} mm con ${c.carga} → se dobla ${fmt(c.flecha, 1)} mm (máximo aconsejable ${fmt(c.lim, 1)} mm), resistencia ×${fmt(c.seg, 1)}.`;
+    const arreglo = c.lamas ? ` Pon más lamas, lamas más altas o un apoyo ${c.vuelo ? 'más cerca de la punta' : 'en medio'}.` : ` Pon un apoyo ${c.vuelo ? 'más cerca de la punta' : 'en medio'}, un listón o un faldón bajo el canto, o un tablero más grueso (unos ${fmt(Math.ceil(c.eNec))} mm).`;
+    if (c.seg < 1.5) add('error', base + ' Se puede romper.' + arreglo, c.H.i);
+    else if (c.flecha > 2 * c.lim) add('error', base + ' Se dobla mucho.' + arreglo, c.H.i);
+    else if (c.flecha > c.lim || c.seg < 3) add('atencion', base + (c.seg < 3 ? ' Poco margen de resistencia.' : ' Se notará al cargarlo.') + arreglo, c.H.i);
+    else add('info', base, c.H.i);
+  });
+}
 // texto de las uniones de una pieza (para la vista de la pieza, el plano y el despiece)
 function textoUnionesPieza(c) {
   if (!R || !c.uniones) return '';
   const de = c.uniones.filter(u => u.tipo === 'dentada').length, so = c.uniones.filter(u => u.tipo === 'solape').length, nt = (c.taladros || []).length, m = c.uniones.filter(u => u.tipo === 'media').length, cj = c.uniones.filter(u => u.tipo === 'caja' && u.en === c.i).length, es = c.uniones.filter(u => u.tipo === 'caja' && u.pasa === c.i).length;
-  return [de ? `${de} ${de > 1 ? 'dentadas' : 'dentada'}` : '', so ? `${so} ${so > 1 ? 'solapes' : 'solape'} (${nt} ${solapeP().tipo === 'tornillos' ? 'taladros' : 'tacos'})` : '', m ? m + ' a media madera' : '', cj ? cj + (cj > 1 ? ' cajas' : ' caja') : '', es ? es + (es > 1 ? ' espigas' : ' espiga') : ''].filter(Boolean).join(' · ') || 'sin uniones';
+  return [de ? `${de} ${de > 1 ? 'dentadas' : 'dentada'}` : '', so ? `${so} ${so > 1 ? 'solapes' : 'solape'} (${nt} ${solapeP().tipo === 'tornillos' ? 'taladros' : 'tacos'})` : '', m ? m + ' a media madera' : '', cj ? cj + (cj > 1 ? ' cajas' : ' caja') : '', es ? es + (es > 1 ? ' espigas' : ' espiga') : '', c.uniones.some(u => u.tipo === 'herraje') ? `${c.uniones.filter(u => u.tipo === 'herraje').reduce((s, u) => s + u.puntos.length, 0)} herrajes` : ''].filter(Boolean).join(' · ') || 'sin uniones';
 }
 /* ---------- piezas inclinadas ----------
    Una pieza puede girar «giro» grados alrededor de su eje horizontal (a) por la línea b = pivote (por defecto, su borde de
@@ -3372,6 +3506,31 @@ PLANTILLAS.mesilla_dentada = {
     ], asiento: false });
   },
 };
+PLANTILLAS.estanteria_kit = {
+  nombre: 'Estantería de kit', grupo: 'plano',
+  desc: 'Laterales, tapa, base, baldas, zócalo y travesaño trasero unidos a tope con excéntricas (o perno y tuerca de barril): se monta y se desmonta con un destornillador.',
+  params: [
+    { id: 'ancho', nombre: 'Ancho', min: 300, max: 1200, paso: 5, valor: 800 },
+    { id: 'fondo', nombre: 'Fondo', min: 150, max: 600, paso: 5, valor: 300 },
+    { id: 'alto', nombre: 'Altura', min: 300, max: 2200, paso: 5, valor: 1200 },
+    { id: 'baldas', nombre: 'Baldas intermedias', min: 0, max: 8, paso: 1, valor: 3 },
+    { id: 'zocalo', nombre: 'Alto del zócalo', min: 30, max: 150, paso: 1, valor: 70 },
+    { id: 'trasero', nombre: 'Alto del travesaño trasero', min: 40, max: 200, paso: 1, valor: 80 },
+  ],
+  generar(p, e) {
+    const W = p.ancho, D = p.fondo, H = p.alto, z = clamp(p.zocalo, 30, H / 4), tr = clamp(p.trasero, 40, H / 4);
+    const yBase = z + e / 2, yTop = H - e - tr - e / 2 - 10, n = Math.round(p.baldas), paso = (yTop - yBase) / (n + 1);
+    const piezas = [
+      piezaPlana('Lateral izquierdo', 'lado', -(W / 2 - e / 2), rectPlano(-D / 2, 0, D / 2, H, 0)), igualQue('Lateral derecho', 'lado', W / 2 - e / 2, 0),
+      piezaPlana('Tapa', 'horizontal', H - e / 2, rectPlano(-W / 2, -D / 2, W / 2, D / 2, 0)),
+      piezaPlana('Base', 'horizontal', yBase, rectPlano(-W / 2, -D / 2, W / 2, D / 2 - 20 - e, 0)),
+      piezaPlana('Zócalo', 'frente', D / 2 - 20 - e / 2, rectPlano(-W / 2, 0, W / 2, z, 0)),
+      piezaPlana('Travesaño trasero', 'frente', -D / 2 + e / 2, rectPlano(-W / 2, H - e - tr, W / 2, H - e, 0)),
+    ];
+    for (let i = 1; i <= n; i++) piezas.push(piezaPlana('Balda ' + i, 'horizontal', yBase + paso * i, rectPlano(-W / 2, -D / 2, W / 2, D / 2 - 10, 0)));
+    return Object.assign({}, CLAVE_PLANO, { piezas, asiento: false, herraje: 'excentrica' });
+  },
+};
 PLANTILLAS.plano_vacio = {
   nombre: 'Vacío: piezas planas', grupo: 'plano',
   desc: 'Un tablero de frente y otro de lado que se cruzan, para construir el mueble pieza a pieza o traer los contornos de un DXF o SVG.',
@@ -3402,6 +3561,7 @@ function aplicarPlantilla(soloLargo) {
   }
   const g = pl.generar(P.params, grosor());
   P.largo = g.largo; P.esquinas = g.esquinas; P.claves = g.claves; P.editado = false;
+  if (g.piezas && g.herraje && planoP().herraje == null) planoP().herraje = g.herraje;
   if (g.piezas) { planoP().asiento = g.asiento !== false; planoP().piezas = g.piezas; UI.costilla = Math.min(UI.costilla || 0, g.piezas.length - 1); }
   UI.clave = Math.min(UI.clave, P.claves.length - 1); UI.punto = -1;
 }
@@ -4745,6 +4905,10 @@ function iniciarPanel() {
   // piezas planas
   enlazar('#plHolgura', () => { planoP().holgura = clamp(+$('#plHolgura').value || 0, 0, 3); cambio('Holgura de las uniones ' + fmt(planoP().holgura, 2) + ' mm'); });
   enlazar('#plAsiento', () => { planoP().asiento = $('#plAsiento').checked; cambio(planoP().asiento ? 'Comprobaciones de asiento' : 'Sin comprobaciones de asiento'); });
+  enlazar('#plHerraje', () => { planoP().herraje = $('#plHerraje').value; cambio($('#plHerraje').value === 'no' ? 'Cantos con uniones dentadas' : 'Cantos a tope con ' + NOMBRE_HERRAJE[$('#plHerraje').value]); });
+  enlazar('#plFlexion', () => { planoP().flexion = $('#plFlexion').checked; cambio(planoP().flexion ? 'Comprobación de flexión' : 'Sin comprobación de flexión'); });
+  enlazar('#plPersona', () => { planoP().persona = clamp(+$('#plPersona').value || 100, 20, 200); cambio('Persona de ' + fmt(planoP().persona) + ' kg'); });
+  enlazar('#plCarga', () => { planoP().cargaBalda = clamp(+$('#plCarga').value || 0, 0, 500); cambio('Carga de las baldas ' + fmt(planoP().cargaBalda) + ' kg/m²'); });
   enlazar('#plCunas', () => { planoP().cunas = $('#plCunas').checked; cambio(planoP().cunas ? 'Espigas pasantes con cuña' : 'Espigas sin cuña'); });
   enlazar('#plSolTipo', () => { solapeP().tipo = $('#plSolTipo').value; if (solapeP().tipo === 'tornillos' && solapeP().diam > 6) { solapeP().diam = 4; $('#plSolDiam').value = 4; } else if (solapeP().tipo === 'tacos' && solapeP().diam < 6) { solapeP().diam = 8; $('#plSolDiam').value = 8; } cambio('Solapes con ' + solapeP().tipo); });
   enlazar('#plSolDiam', () => { solapeP().diam = clamp(+$('#plSolDiam').value || 8, 2, 30); cambio('Ø ' + fmt(solapeP().diam, 1) + ' mm'); });
@@ -5040,7 +5204,7 @@ function ponerControles() {
   const Pl = P.planta; $('#plForma').value = Pl.forma; $('#plRadio').value = Pl.radio; $('#plSentido').value = String(Pl.sentido === -1 ? -1 : 1); $('#plAmp').value = Pl.amplitud; $('#plOndas').value = Pl.ondas;
   const Ra = P.radial; $('#raNum').value = P.costillas.numero; $('#raTubo').value = Ra.tubo; $('#raHolTubo').value = Ra.holguraTubo; $('#raDiscos').value = Ra.discos; $('#raRDisco').value = Ra.rDisco; $('#raHolgura').value = Ra.holgura;
   ponerPartir();
-  $('#plHolgura').value = planoP().holgura; $('#plCunas').checked = !!planoP().cunas; $('#plAsiento').checked = planoP().asiento !== false; $('#plSolTipo').value = solapeP().tipo; $('#plSolDiam').value = solapeP().diam; $('#plSolN').value = solapeP().n; $('#pzRejilla').value = $('#kRejilla').value;
+  $('#plHolgura').value = planoP().holgura; $('#plCunas').checked = !!planoP().cunas; $('#plAsiento').checked = planoP().asiento !== false; $('#plFlexion').checked = planoP().flexion !== false; $('#plHerraje').value = planoP().herraje || 'no'; $('#plPersona').value = planoP().persona; $('#plCarga').value = planoP().cargaBalda; $('#plSolTipo').value = solapeP().tipo; $('#plSolDiam').value = solapeP().diam; $('#plSolN').value = solapeP().n; $('#pzRejilla').value = $('#kRejilla').value;
   const Pa = P.pared; $('#paNum').value = Pa.rastreles; $('#paAlto').value = Pa.alto; $('#paGrueso').value = Pa.grueso; $('#paMargen').value = Pa.margen; $('#paHolgura').value = Pa.holgura; $('#paVer').checked = Pa.verPared;
   $('#cClaves3d').checked = P.vista.claves !== false;
   const Fg = P.figura; $('#fgAlto').value = Fg.alto; $('#fgEje').value = Fg.eje; $('#fgGiro').value = String(Fg.giro || 0); $('#fgMin').value = Fg.minArea; $('#fgUnir').checked = Fg.unir !== false;
@@ -5322,7 +5486,8 @@ function geoFab(c) {
   return {
     c, poly, interiores, caja: cajaDe(poly), r: radioFab(), area: Math.abs(c.area) * k * k, huesosMal, nHuesos, nEsq: esq.length,
     // agujeros [x, y, radio]: los de las varillas y los propios de la pieza (el tubo en los discos)
-    agujeros: c.agujeros.map(j => [P.varillas.lista[j][0] * k, P.varillas.lista[j][1] * k, radioFab()]).concat((c.huecos || []).map(h => [h.x * k, h.y * k, h.r * k])).concat((c.taladros || []).map(t => [t[0] * k, t[1] * k, t[2] * k])),
+    agujeros: c.agujeros.map(j => [P.varillas.lista[j][0] * k, P.varillas.lista[j][1] * k, radioFab()]).concat((c.huecos || []).map(h => [h.x * k, h.y * k, h.r * k])).concat((c.taladros || []).map(t => [t[0] * k, t[1] * k, t[2] * k, t[3] === 'ciego' && t[4] ? t[4] * k : 0])),
+    cantos: (c.cantos || []).map(q => ({ a: [q.a[0] * k, q.a[1] * k], b: [q.b[0] * k, q.b[1] * k], r: q.r * k })),
     etiqueta: puntoEtiqueta(c).map(v => v * k),
   };
 }
@@ -5423,7 +5588,7 @@ function abrirFabricar() {
         <label class="fila chk" title="El contorno sale en rectas y arcos (G01, G02, G03) en vez de muchos tramos rectos"><input type="checkbox" id="fArcos" ${P.cnc.arcos ? 'checked' : ''}> Contornos con arcos</label>
         <label class="fila" title="Lo que se puede separar el arco de la curva original">Tolerancia de los arcos (mm) <input type="number" id="fTol" value="${P.cnc.tolArco}" min="0.005" max="1" step="0.01"></label>
         <div class="info" id="fInfo"></div>
-        <p class="nota" style="margin-top:10px">El DXF lleva las capas <b>CORTE</b> (contornos, con las ranuras), <b>TALADROS</b> (agujeros de las varillas), <b>GRABADO</b> (números) y <b>TABLERO</b> (borde del tablero).</p>
+        <p class="nota" style="margin-top:10px">El DXF lleva las capas <b>CORTE</b> (contornos, con las ranuras), <b>TALADROS</b> (agujeros de las varillas), <b>GRABADO</b> (números) y <b>TABLERO</b> (borde del tablero); los taladros ciegos van en capas <b>CIEGO_…MM</b> con su profundidad y los taladros de canto de los herrajes, como una raya en la capa <b>CANTO</b> (se hacen a mano).</p>
         <p class="nota">Esta colocación usa el rectángulo de cada costilla. Para encajarlas por su forma real, usa <b>🧩 Anidador</b>.</p>
       </div>
       <div><canvas id="fPrev" width="900" height="520"></canvas></div>
@@ -5540,8 +5705,10 @@ function dxf() {
   const g = (c, v) => out.push(String(c), String(v));
   const n = v => (Math.round(v * 1000) / 1000).toString();
   g(0, 'SECTION'); g(2, 'HEADER'); g(9, '$ACADVER'); g(1, 'AC1009'); g(9, '$INSUNITS'); g(70, 4); g(9, '$MEASUREMENT'); g(70, 1); g(0, 'ENDSEC');
-  g(0, 'SECTION'); g(2, 'TABLES'); g(0, 'TABLE'); g(2, 'LAYER'); g(70, 4);
-  [['CORTE', 7], ['TALADROS', 1], ['GRABADO', 5], ['TABLERO', 8]].forEach(([nom, c]) => { g(0, 'LAYER'); g(2, nom); g(70, 0); g(62, c); g(6, 'CONTINUOUS'); });
+  const capaCiego = p => 'CIEGO_' + String(Math.round(p * 10) / 10).replace('.', '_') + 'MM';
+  const ciegos = [...new Set(col.tableros.flatMap(t => t.piezas.flatMap(pz => pz.g.agujeros.filter(a => a[3]).map(a => capaCiego(a[3])))))], hayCanto = col.tableros.some(t => t.piezas.some(pz => (pz.g.cantos || []).length));
+  g(0, 'SECTION'); g(2, 'TABLES'); g(0, 'TABLE'); g(2, 'LAYER'); g(70, 4 + ciegos.length + (hayCanto ? 1 : 0));
+  [['CORTE', 7], ['TALADROS', 1], ['GRABADO', 5], ['TABLERO', 8], ...ciegos.map(c => [c, 3]), ...(hayCanto ? [['CANTO', 6]] : [])].forEach(([nom, c]) => { g(0, 'LAYER'); g(2, nom); g(70, 0); g(62, c); g(6, 'CONTINUOUS'); });
   g(0, 'ENDTAB'); g(0, 'ENDSEC');
   g(0, 'SECTION'); g(2, 'ENTITIES');
   const poli = (capa, pts, bs) => {
@@ -5560,7 +5727,8 @@ function dxf() {
       // primero los huecos de dentro (así la pieza no se suelta antes de tiempo) y luego el contorno
       (pz.g.interiores || []).forEach(hh => { const ci = contornoCNC(hh); poli('CORTE', ci.pts.map(p => { const q = aTablero(pz, p); return [ox + q[0], q[1]]; }), ci.b); });
       poli('CORTE', cc.pts.map(p => { const q = aTablero(pz, p); return [ox + q[0], q[1]]; }), cc.b);
-      pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); g(0, 'CIRCLE'); g(8, 'TALADROS'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(a[2])); });
+      (pz.g.cantos || []).forEach(m => { const a = aTablero(pz, m.a), b = aTablero(pz, m.b); g(0, 'LINE'); g(8, 'CANTO'); g(10, n(ox + a[0])); g(20, n(a[1])); g(30, 0); g(11, n(ox + b[0])); g(21, n(b[1])); g(31, 0); });
+      pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); g(0, 'CIRCLE'); g(8, a[3] ? capaCiego(a[3]) : 'TALADROS'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(a[2])); });
       if (f.numeros) {
         const q = aTablero(pz, pz.g.etiqueta), h = altoTexto(pz.g);
         g(0, 'TEXT'); g(8, 'GRABADO'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(h)); g(1, pz.c.etq); g(72, 1); g(11, n(ox + q[0])); g(21, n(q[1] - h / 2)); g(31, 0);
@@ -5646,8 +5814,12 @@ function listaCompra() {
     const nF = R.uniones.reduce((s, u) => s + (u.puntos || []).length, 0), So = solapeP(), lt = largoTaco(grosorFab());
     if (nF && So.tipo === 'tornillos') L.push([`Tornillos para madera Ø ${fmt(So.diam, 1)} mm, de unos ${fmt(Math.round(grosorFab() * 1.7))} mm (cabeza avellanada)`, String(nF)]);
     else if (nF) { L.push([`Tacos de madera Ø ${fmt(So.diam, 1)} × ${fmt(lt.largo)} mm (taladros ciegos de ${fmt(lt.prof)} mm)`, String(nF)]); L.push(['Cola blanca', 'para los tacos y los solapes']); }
+    const nh = herrajesTotales(), Dh = datosHerraje(planoP().herraje, grosorFab());
+    if (nh.barril) L.push([`Perno M6 × ${fmt(Dh.L)} mm (cabeza Allen plana) y tuerca de barril M6 Ø 10`, `${nh.barril} juegos`]);
+    if (nh.excentrica) L.push(['Excéntrica Ø 15 (tipo minifix) con su perno', `${nh.excentrica} juegos`]);
     if (R.costillas.some(c => c.cuna)) L.push(['Cuñas', `${R.costillas.filter(c => c.cuna).length}, del mismo tablero (van en el corte)`]);
-    L.push(['Herrajes', nF && So.tipo === 'tornillos' ? 'solo los tornillos de los solapes' : 'ninguno (cola en las uniones, si se quiere fijo)']);
+    if (!nh.barril && !nh.excentrica) L.push(['Herrajes', nF && So.tipo === 'tornillos' ? 'solo los tornillos de los solapes' : 'ninguno (cola en las uniones, si se quiere fijo)']);
+    else L.push(['Herramientas', nh.excentrica ? 'broca de Ø 8 y guía para el canto; destornillador' : 'broca de Ø 7 y guía para el canto; llave Allen']);
     return L;
   }
   if (P.tipo === 'reticula') {
@@ -5833,7 +6005,7 @@ function captura3D(expl) {
   return { bin: atob(url.split(',')[1]), w, h };
 }
 
-function planoPDF() {
+function planoPDF(F = null) {   // F: opciones de la ficha de práctica (enunciado y rúbrica)
   const ret = P.tipo === 'reticula', D = new PDFDoc(), k = escalaFab(), W = 297, H = 210, M = 12, maq = enMaqueta();
   const e = grosorFab(), cm = calcularCompraFab(), V = P.varillas, fecha = new Date().toLocaleDateString('es-ES');
   const gris = [110, 116, 125], azul = [31, 79, 138], madera = [168, 116, 63], rojo = [192, 57, 43];
@@ -5841,7 +6013,7 @@ function planoPDF() {
   const cabecera = titulo => {
     D.pagina(W, H); hojas.push(D.p);
     D.texto(M, M + 4, P.nombre, { pt: 14, b: true });
-    D.texto(W - M, M + 4, 'Plano de montaje · ' + (maq ? 'maqueta 1:' + P.maqueta.escala : 'medidas en mm') + ' · ' + fecha, { pt: 9, al: 'r', col: gris });
+    D.texto(W - M, M + 4, (F ? 'Ficha de práctica · ' : 'Plano de montaje · ') + (maq ? 'maqueta 1:' + P.maqueta.escala : 'medidas en mm') + ' · ' + fecha, { pt: 9, al: 'r', col: gris });
     D.texto(M, M + 11, titulo, { pt: 11, b: true, col: azul });
     D.trazo([200, 200, 200]).grosor(0.3).linea(M, M + 13.5, W - M, M + 13.5).trazo();
   };
@@ -5858,6 +6030,7 @@ function planoPDF() {
     return y;
   };
 
+  if (F) hojaEnunciado(D, cabecera, { M, W, H, gris, azul, madera, F });
   // ---- hoja 1: conjunto, datos y compra ----
   cabecera('1. Conjunto, datos y lista de compra');
   const cap = captura3D(), iw = 165, ih = Math.min(150, iw * cap.h / cap.w);
@@ -5873,7 +6046,9 @@ function planoPDF() {
     ['Espigas en caja pasante', String(R.uniones.filter(u => u.tipo === 'caja').length)],
     ...(R.uniones.some(u => u.tipo === 'dentada') ? [['Uniones dentadas', `${R.uniones.filter(u => u.tipo === 'dentada' && u.esquina).length} esquinas y ${R.uniones.filter(u => u.tipo === 'dentada' && !u.esquina).length} cantos en T`]] : []),
     ...(R.uniones.some(u => u.tipo === 'solape') ? [['Piezas solapadas', `${R.uniones.filter(u => u.tipo === 'solape').length}, con ${R.uniones.reduce((s, u) => s + (u.puntos || []).length, 0)} ${solapeP().tipo} de Ø ${fmt(solapeP().diam, 1)} mm`]] : []),
+    ...(R.uniones.some(u => u.tipo === 'herraje') ? [['Uniones con herraje', `${R.uniones.filter(u => u.tipo === 'herraje').length} a tope, ${R.uniones.reduce((s, u) => s + (u.tipo === 'herraje' ? u.puntos.length : 0), 0)} × ${NOMBRE_HERRAJE[planoP().herraje] || 'herraje'}`]] : []),
     ['Ancho de ranuras y cajas', `${fmt(grosorFab() + holguraRanuraFab(), 2)} mm`],
+    ...(planoP().flexion !== false ? analisisFlexion(R).slice(0, 4).map(c => [`Flexión: ${c.lamas ? 'lamas del asiento' : c.asiento ? 'asiento' : c.H.nombre.toLowerCase()}`, `${fmt(c.flecha, 1)} mm (máx. ${fmt(c.lim, 1)}) con ${c.carga.replace('²', '2')}`]) : []),
   ]) : tabla(x2, M + 18, a2, [
     { titulo: 'Datos' },
     ['Medidas (largo × fondo × alto)', `${fmt(P.largo * k)} × ${fmt(fondo * k)} × ${fmt(alto * k)} mm`],
@@ -5966,6 +6141,8 @@ function planoPDF() {
       (c.int || []).forEach(hh => D.relleno([255, 255, 255]).trazo(madera).grosor(0.35).poli(hh.map(p => [PX(p[0]), PY(p[1])]), true, 'b'));
       D.relleno([255, 255, 255]).trazo(rojo).grosor(0.25);
       c.agujeros.forEach(j2 => D.circulo(PX(V.lista[j2][0]), PY(V.lista[j2][1]), Math.max(0.6, radioAgujero() * s3), 'b'));
+      (c.taladros || []).forEach(t => D.circulo(PX(t[0]), PY(t[1]), Math.max(0.5, t[2] * s3), 'b'));
+      (c.cantos || []).forEach(m => D.linea(PX(m.a[0]), PY(m.a[1]), PX(m.b[0]), PY(m.b[1])));
       D.relleno([0, 0, 0]).trazo();
       const et = puntoEtiqueta(c);
       D.texto(PX(et[0]), PY(et[1]) + 2.2, c.etq, { pt: 14, b: true, al: 'c', col: azul });
@@ -6014,7 +6191,7 @@ function planoPDF() {
   }
   // ---- tableros ----
   const f = fabActual(), col = colocarEnTableros(f);
-  if (f.modo !== 'fila' && col.tableros.length) {
+  if (f.modo !== 'fila' && col.tableros.length && (!F || F.corte !== false)) {
     const porH = 4;
     for (let t0 = 0; t0 < col.tableros.length; t0 += porH) {
       const variosG = (col.grosores || []).length > 1;
@@ -6095,8 +6272,9 @@ function planoPDF() {
   });
   D.texto(M, H - M - 4, 'Herramientas: ' + (esPlano() ? (maq ? 'cortadora láser, lija fina; cola si se quiere fijo.' : 'CNC (o sierra de calar y escoplo), lija, maza de goma; cola si se quiere fijo.') : P.tipo === 'radial' ? (maq ? 'cortadora láser o cúter, cola.' : 'CNC o láser, sierra para el tubo, cola, lija.') : P.tipo === 'pared' ? 'CNC o sierra de calar, taladro, tacos y tornillos, nivel, taco separador.' : ret ? (maq ? 'cortadora láser o cúter, lija fina.' : 'CNC (fresa menor que la ranura), formón o lima, mazo de goma, lija.') : maq ? 'cortadora láser o cúter, cola blanca.' : `CNC o sierra de calar, broca de Ø ${fmt(2 * radioFab(), 1)}, lija, llaves para las tuercas M${V.diam}.`), { pt: 9, col: gris });
 
-  // ---- última hoja: tiempo de mecanizado y presupuesto ----
-  { const r = calcularPresupuesto(), fl = filasPresupuesto(r).map(f => f.titulo ? f : f.map(t => String(t).replace(/²/g, '2'))), i = fl.findIndex(f => f.titulo && /^Presupuesto/.test(f.titulo));
+  // ---- última hoja: tiempo de mecanizado y presupuesto (o, en la ficha, la rúbrica) ----
+  if (F) hojaRubrica(D, cabecera, { M, W, H, gris, azul, madera, F });
+  else { const r = calcularPresupuesto(), fl = filasPresupuesto(r).map(f => f.titulo ? f : f.map(t => String(t).replace(/²/g, '2'))), i = fl.findIndex(f => f.titulo && /^Presupuesto/.test(f.titulo));
     cabecera('Tiempo de mecanizado y presupuesto');
     const a = (W - 2 * M - 12) / 2;
     tabla(M, M + 18, a, fl.slice(0, i), { c1: a * 0.55 });
@@ -6283,6 +6461,7 @@ function hojaPlano(D, cabecera, tabla, o) {
   R.uniones.forEach(u => {
     if (u.tipo === 'dentada') { fU.push([`${nom(u.a)} + ${nom(u.b)}`, u.esquina ? `esquina dentada de ${u.dientes} dientes` : `${(u.dientes - 1) / 2} espigas de ${nom(u.pasa)} en cajas de ${nom(u.en)}`]); return; }
     if (u.tipo === 'solape') { const So = solapeP(), lt = largoTaco(grosorFab()); fU.push([`${nom(u.a)} + ${nom(u.b)}`, So.tipo === 'tornillos' ? `solapadas: ${u.puntos.length} tornillos Ø ${fmt(So.diam, 1)} desde la ${R.costillas[u.fuera].etq}` : `solapadas: ${u.puntos.length} tacos Ø ${fmt(So.diam, 1)} × ${fmt(lt.largo)} mm`]); return; }
+    if (u.tipo === 'herraje') { fU.push([`${nom(u.pasa)} a tope en ${nom(u.en)}`, `${u.puntos.length} × ${NOMBRE_HERRAJE[u.herraje]}`]); return; }
     if (u.tipo === 'caja') fU.push([`${nom(u.pasa)} en ${nom(u.en)}`, `espiga en caja de ${fmt((u.hi - u.lo + holguraRanuraFab()) * k, 1)} × ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm`]);
     else { const arriba = u.aArriba ? u.a : u.b, abajo = u.aArriba ? u.b : u.a; fU.push([`${nom(arriba)} × ${nom(abajo)}`, `media madera de ${fmt((u.hi - u.lo) / 2 * k, 1)} mm (la ${R.costillas[arriba].etq} desde arriba)`]); }
   });
@@ -6312,6 +6491,18 @@ function pasosPlano(k, maq) {
   Object.entries(enT).forEach(([p, en]) => pasos.push(`Mete las espigas de ${nom(+p)} en las cajas de ${lista2([...new Set(en)].map(nom))}. Si va entre dos piezas, presenta las dos a la vez y cierra apretando con sargentos.`));
   const esq = R.uniones.filter(u => u.tipo === 'dentada' && u.esquina);
   if (esq.length) pasos.push(`Esquinas dentadas: ${lista2(esq.map(u => `${R.costillas[u.a].etq} con ${R.costillas[u.b].etq}`))}. Encaja los dientes de cada esquina (con cola, si se quiere fijo) y aprieta con un sargento; los de una pieza entran en los huecos de la otra.`);
+  // uniones a tope con herraje desmontable
+  const hj = R.uniones.filter(u => u.tipo === 'herraje');
+  if (hj.length) {
+    const D = hj[0].datos, ex = hj[0].herraje === 'excentrica';
+    pasos.splice(2, 0, ex
+      ? `Taladros de las excéntricas (en el DXF salen los de las caras): Ø 15 a ${fmt(D.profC, 1)} mm de profundidad en las piezas que llegan a tope, a ${fmt(D.dB)} mm del canto, y Ø 5 a ${fmt(D.profP)} mm para los pernos en la otra pieza. Después, a mano y con una guía, el taladro de Ø 8 en el canto hasta la excéntrica (raya de la capa CANTO).`
+      : `Taladros de los pernos (en el DXF salen los de las caras): Ø 7 pasante en la pieza que recibe y Ø 10 pasante para la tuerca de barril a ${fmt(D.dB)} mm del canto en la que llega a tope. Después, a mano y con una guía, el taladro de Ø 7 en el canto, de ${fmt(D.profCanto)} mm, hasta el de la tuerca (raya de la capa CANTO).`);
+    const porP = {}; hj.forEach(u => { (porP[u.en] = porP[u.en] || []).push(u); });
+    Object.entries(porP).forEach(([en, us]) => pasos.push(ex
+      ? `${nom(+en)}: rosca sus ${us.reduce((s, u) => s + u.puntos.length, 0)} pernos en los taladros de Ø 5. Presenta ${lista2([...new Set(us.map(u => nom(u.pasa)))])} a tope (los pernos entran por el canto), mete las excéntricas con la flecha hacia el canto y gíralas con el destornillador hasta que aprieten.`
+      : `Une ${lista2([...new Set(us.map(u => nom(u.pasa)))])} a ${nom(+en)}: mete las tuercas de barril en sus taladros (con la ranura hacia el canto), pasa los pernos M6 de ${fmt(D.L)} mm desde fuera de ${R.costillas[+en].etq} y rosca con la llave Allen, sin apretar del todo hasta tener todas puestas.`));
+  }
   // cuñas de las espigas que asoman
   const cun = R.costillas.filter(c => c.cuna);
   if (cun.length) pasos.push(`Mete las cuñas (${lista2(cun.map(c => c.etq))}) en los agujeros de las espigas que asoman${cun.length > 1 ? '' : ''}: por el lado ancho hacia fuera, y golpéalas con la maza hasta que la unión quede apretada. Para desmontar, sácalas golpeando por el lado estrecho.`);
@@ -6323,6 +6514,7 @@ function pasosPlano(k, maq) {
   // 3) tableros horizontales (asientos, tapas, baldas) sobre sus espigas
   const tapas = {}; R.uniones.filter(u => u.tipo === 'caja' && horiz(u.en)).forEach(u => { (tapas[u.en] = tapas[u.en] || []).push(u.pasa); });
   Object.entries(tapas).forEach(([t, de]) => pasos.push(`Pon ${nom(+t)} encima: las espigas de ${lista2([...new Set(de)].map(nom))} entran por sus cajas. Presiona por igual por todos los lados.`));
+  if (hj.length) pasos.push('Aprieta todos los herrajes por igual, comprobando la escuadra con las diagonales (tienen que medir lo mismo). Se desmonta aflojándolos.');
   pasos.push('Comprueba que el mueble queda a escuadra y apoya bien. Si se quiere fijo, desmonta, pon cola en las uniones y vuelve a montar (o fija las espigas con una cuña).');
   pasos.push(maq ? 'Mira la maqueta desde todos los lados antes de cortar el mueble real.' : 'Acabado: aceite, cera o barniz (mejor antes de montar, para llegar a todas las caras).');
   return pasos;
@@ -6460,8 +6652,8 @@ function piezaCalcador(c) {
   (g.interiores || []).forEach(hh => { const ci = contornoCNC(gira ? hh.map(R90) : hh); contornos.push({ pts: ci.pts.map(p => ({ x: r3(p[0] - b.x0), y: r3(p[1] - b.y0) })), b: ci.b.map(v => +v.toFixed(6)), cerrado: true, tipo: 'interior', mec: { op: 'corte', prof: null, puentes: { ...PUENTES0 } } }); });
   // cada agujero: círculo de dos medias vueltas (bulge 1)
   g.agujeros.forEach(a0 => {
-    const a = gira ? [a0[1], -a0[0], a0[2]] : a0, x = a[0] - b.x0, y = a[1] - b.y0;
-    contornos.push({ pts: [{ x: r3(x + a[2]), y: r3(y) }, { x: r3(x - a[2]), y: r3(y) }], b: [1, 1], cerrado: true, tipo: 'interior', mec: { op: 'corte', prof: null, puentes: { ...PUENTES0 } } });
+    const a = gira ? [a0[1], -a0[0], a0[2], a0[3]] : a0, x = a[0] - b.x0, y = a[1] - b.y0;
+    contornos.push({ pts: [{ x: r3(x + a[2]), y: r3(y) }, { x: r3(x - a[2]), y: r3(y) }], b: [1, 1], cerrado: true, tipo: 'interior', mec: { op: a[3] ? 'cajera' : 'corte', prof: a[3] || null, puentes: { ...PUENTES0 } } });
   });
   return { nombre: c.nombre, cantidad: 1, veta: vetaOn() && vetaDe(c) !== 'libre', calcador: { contornos } };
 }
@@ -7108,6 +7300,9 @@ function calcularPresupuesto() {
   if (esPlano()) {
     const nF = R.uniones.reduce((s, u) => s + (u.puntos || []).length, 0);
     if (nF) filas.push([solapeP().tipo === 'tornillos' ? 'Tornillos' : 'Tacos de madera', nF, solapeP().tipo === 'tornillos' ? B.tornillo : B.taco]);
+    const nh = herrajesTotales();
+    if (nh.barril) filas.push(['Pernos con tuerca de barril', nh.barril, B.barril]);
+    if (nh.excentrica) filas.push(['Excéntricas con perno', nh.excentrica, B.excentrica]);
   }
   if (!maq && B.cola) filas.push(['Cola, lija y varios', 1, B.cola]);
   const m2 = cm.area / 1e6 * 2 * 1.1;   // las dos caras y un poco de canto
@@ -7153,14 +7348,14 @@ function dialogoPresupuesto() {
         ${P.tipo === 'costillas' ? n('psVar', 'Varilla o tubo (€/m)', B.varilla, 0.5) + n('psSep', 'Separador (€/m)', B.separador, 0.5) + n('psTue', 'Tuerca y arandela (cada)', B.tuerca, 0.05) : ''}
         ${P.tipo === 'radial' ? n('psVar', 'Tubo central (€/m)', B.varilla, 0.5) : ''}
         ${P.tipo === 'pared' ? n('psRas', 'Rastrel (€/m)', B.rastrel, 0.5) : ''}
-        ${esPlano() ? n('psTac', 'Taco de madera (cada)', B.taco, 0.01) + n('psTor', 'Tornillo (cada)', B.tornillo, 0.01) : ''}
+        ${esPlano() ? n('psTac', 'Taco de madera (cada)', B.taco, 0.01) + n('psTor', 'Tornillo (cada)', B.tornillo, 0.01) + n('psBar', 'Perno y tuerca de barril (juego)', B.barril, 0.05) + n('psExc', 'Excéntrica con perno (juego)', B.excentrica, 0.05) : ''}
         ${n('psCola', 'Cola, lija y varios (total)', B.cola, 1)}
         ${n('psAcab', 'Acabado (€/m²)', B.acabado, 1, 'Aceite, barniz o laca, por m² de superficie')}
         ${n('psMarg', 'Margen (%)', B.margen, 5)}
       </div>
       <div><div id="psRes" style="font-size:13px"></div></div>
     </div>`, [['Precios por defecto', () => { P.presupuesto = proyectoBase().presupuesto; guardado(); dialogoPresupuesto(); }], ['⬇ CSV', () => exportarCSVPresupuesto()]], true);
-  const mapa = { psAv: 'avance', psPas: 'pasada', psBaj: 'bajada', psEnt: 'entrada', psTab: 'minTablero', psExtra: 'extra', psHora: 'hora', psVar: 'varilla', psSep: 'separador', psTue: 'tuerca', psRas: 'rastrel', psTac: 'taco', psTor: 'tornillo', psCola: 'cola', psAcab: 'acabado', psMarg: 'margen' };
+  const mapa = { psAv: 'avance', psPas: 'pasada', psBaj: 'bajada', psEnt: 'entrada', psTab: 'minTablero', psExtra: 'extra', psHora: 'hora', psVar: 'varilla', psSep: 'separador', psTue: 'tuerca', psRas: 'rastrel', psTac: 'taco', psTor: 'tornillo', psBar: 'barril', psExc: 'excentrica', psCola: 'cola', psAcab: 'acabado', psMarg: 'margen' };
   const pintar = () => {
     const r = calcularPresupuesto(), filas = filasPresupuesto(r);
     $('#psRes').innerHTML = '<table class="tabla">' + filas.map(f => f.titulo ? `<tr><th colspan="2">${esc(f.titulo)}</th></tr>` : `<tr><td>${esc(f[0])}</td><td style="text-align:right"><b>${esc(f[1])}</b></td></tr>`).join('') + '</table>'
@@ -7178,6 +7373,163 @@ function exportarCSVPresupuesto() {
     [q('Tiempo total estimado'), q(fmtMin(r.minTotal))].join(';')];
   descargar(nombreArchivo(P.nombre) + '_presupuesto' + sufijoFab() + '.csv', '﻿' + lin.join('\r\n') + '\r\n', 'text/csv');
   aviso('CSV del presupuesto guardado');
+}
+
+/* ===================== FICHA DE PRÁCTICA PARA ALUMNOS =====================
+   El plano de montaje con una hoja de enunciado delante (datos del alumno, objetivos, tareas, registro de
+   mediciones) y una rúbrica de evaluación al final. Los textos salen solos según el mueble y se pueden cambiar;
+   se guardan con el proyecto (P.ficha). */
+const NIVELES_RUBRICA = ['Excelente (4)', 'Bien (3)', 'Suficiente (2)', 'Insuficiente (1)'];
+const RUBRICA_BASE = [
+  ['Interpretación del plano', 10, 'Lee todas las vistas, cotas y uniones sin ayuda', 'Con alguna duda puntual', 'Necesita ayuda con varias cotas o uniones', 'No interpreta el plano'],
+  ['Preparación del CAM (DXF, fresa, holgura, colocación)', 20, 'Archivo correcto a la primera y buen aprovechamiento del tablero', 'Pequeños errores que corrige por su cuenta', 'Errores que corrige con ayuda', 'El archivo no sirve para cortar'],
+  ['Mecanizado y seguridad', 20, 'Sujeción, cero, EPI y orden correctos; sin incidencias', 'Algún descuido menor', 'Necesita que se le recuerden las normas', 'Pone en riesgo la máquina o a las personas'],
+  ['Precisión de las piezas', 20, 'Medidas a +/- 0,5 mm y uniones que entran a mano', 'A +/- 1 mm; ajustes con poco repaso', 'A +/- 2 mm; hay que repasar varias uniones', 'Piezas fuera de medida'],
+  ['Montaje', 15, 'En orden, a escuadra y sin forzar', 'Pequeños desajustes', 'Necesita ayuda o fuerza las uniones', 'No llega a montarlo'],
+  ['Acabado y limpieza', 10, 'Lijado y acabado uniformes; puesto limpio', 'Algún defecto menor', 'Defectos a la vista', 'Sin acabar'],
+  ['Organización y tiempo', 5, 'Dentro del tiempo y con el registro completo', 'Ligero retraso', 'Retraso notable o registro incompleto', 'No termina'],
+];
+function fichaP() { return P.ficha = Object.assign(proyectoBase().ficha, P.ficha || {}); }
+const lineas = t => String(t || '').split('\n').map(s => s.trim()).filter(Boolean);
+function fichaDefecto() {
+  const pl = esPlano(), r = calcularPresupuesto(), maq = enMaqueta();
+  const horas = Math.max(2, Math.ceil(r.minTotal / 60 * 1.5 + (pl ? 1 : 2) + R.n * 0.05));
+  const obj = [
+    'Interpretar un plano de fabricación con vistas acotadas, despiece y orden de montaje.',
+    `Preparar el archivo de corte (DXF) con la fresa, la holgura de las ${pl || P.tipo === 'reticula' ? 'uniones' : 'ranuras y agujeros'} y el hueso de perro adecuados.`,
+    'Colocar las piezas en el tablero aprovechando el material.',
+    `Mecanizar las piezas en ${maq ? 'la cortadora láser' : 'la CNC'} con seguridad y comprobar sus medidas.`,
+    pl && R.uniones.some(u => u.tipo === 'herraje') ? `Montar un mueble de kit con uniones a tope y ${NOMBRE_HERRAJE[planoP().herraje]}, y hacer a mano los taladros de canto con una guía.`
+      : pl ? 'Montar un mueble de piezas planas con uniones a media madera, caja y espiga o dentadas, sin herrajes.'
+      : P.tipo === 'costillas' ? 'Montar un mueble de costillas con varillas y separadores, en orden y a escuadra.'
+      : 'Montar el mueble en el orden del plano y comprobar que ajusta.',
+  ];
+  const tar = [
+    'Estudia el plano: vistas acotadas, piezas y uniones. Comprueba en las vistas el ancho, el fondo y el alto.',
+    'Mide el grosor real del tablero con el calibre en tres puntos y corta la pieza de prueba de holgura (Fabricar). Apunta la holgura elegida en el registro.',
+    'Prepara el DXF en Fabricar y coloca las piezas en el tablero. Apunta cuántos tableros necesitas.',
+    `Mecaniza las piezas. Mide con el calibre ${pl ? 'dos piezas y el ancho de una ranura o caja' : 'dos piezas y un agujero'} y apúntalo en el registro.`,
+    'Lija y numera las piezas (cara que no se vea) y monta el mueble en el orden del plano.',
+    'Da el acabado. Compara el tiempo y el coste reales con los de Fabricar > Tiempo y presupuesto.',
+  ];
+  return { titulo: 'Práctica: ' + P.nombre, modulo: '', duracion: `${horas} h`, objetivos: obj.join('\n'), tareas: tar.join('\n'),
+    entrega: 'El mueble montado y acabado, el archivo DXF y esta ficha con el registro de mediciones.',
+    criterios: RUBRICA_BASE.map(c => c.join(' | ')).join('\n') };
+}
+function fichaTextos() {   // lo escrito por el profesor o, si está vacío, lo de por defecto
+  const F = fichaP(), d = fichaDefecto(), o = {};
+  Object.keys(d).forEach(k => o[k] = String(F[k] || '').trim() ? F[k] : d[k]);
+  return Object.assign({}, F, o);
+}
+function criteriosRubrica(t) {
+  return lineas(t).map(l => {
+    const p = l.split('|').map(s => s.trim()), base = RUBRICA_BASE.find(b => b[0].toLowerCase() === (p[0] || '').toLowerCase());
+    const gen = ['Lo hace sin errores y con autonomía', 'Con pequeños errores', 'Con errores que corrige con ayuda', 'No lo consigue'];
+    return { nombre: p[0] || '—', peso: isFinite(+String(p[1]).replace(',', '.')) && p[1] !== '' ? +String(p[1]).replace(',', '.') : (base ? base[1] : 10),
+      niveles: [2, 3, 4, 5].map((k, i) => p[k] || (base ? base[k] : gen[i])) };
+  }).filter(c => c.nombre !== '—');
+}
+function hojaEnunciado(D, cabecera, o) {
+  const { M, W, H, gris, azul, madera, F } = o;
+  cabecera('Enunciado de la práctica');
+  // título y casillas del alumno
+  D.texto(M, M + 23, F.titulo, { pt: 15, b: true });
+  const sub = [F.modulo, F.duracion ? 'Duración: ' + F.duracion : ''].filter(Boolean).join(' · ');
+  if (sub) D.texto(M, M + 29, sub, { pt: 9.5, col: gris });
+  const yA = M + 33, cajas = [['Alumno/a', 110], ['Grupo', 40], ['Fecha', 40], ['Nota', 25]];
+  let xA = M;
+  cajas.forEach(([t, w]) => { D.trazo([170, 170, 170]).grosor(0.25).rect(xA, yA, w, 9).trazo(); D.texto(xA + 1.5, yA + 3.3, t, { pt: 6.5, col: gris }); xA += w + 4; });
+  // imagen del mueble
+  const cap = captura3D(), iw = 112, ih = Math.min(80, iw * cap.h / cap.w), wImg = ih * cap.w / cap.h;   // sin deformar
+  D.imagen(cap.bin, cap.w, cap.h, M + (iw - wImg) / 2, yA + 14, wImg, ih);
+  D.trazo([210, 210, 210]).grosor(0.2).rect(M, yA + 14, iw, ih).trazo();
+  // registro de mediciones, bajo la imagen
+  let yR = yA + 14 + ih + 7;
+  D.texto(M, yR, 'Registro de mediciones', { pt: 9.5, b: true, col: azul }); yR += 2.5;
+  const cols = [['Medida', 40], ['Plano (mm)', 24], ['Real (mm)', 24], ['Diferencia', 24]], filas = ['Grosor del tablero', 'Holgura elegida', 'Pieza …', 'Pieza …', 'Ranura / caja / agujero', 'Tableros usados', 'Tiempo de máquina'];
+  const fh = 5.2;
+  let xx = M; cols.forEach(([t, w]) => { D.relleno([236, 241, 248]).rect(xx, yR, w, fh, 'f').relleno([0, 0, 0]); D.texto(xx + 1.5, yR + 3.9, t, { pt: 7, b: true }); xx += w; });
+  filas.forEach((t, i) => { const y = yR + fh * (i + 1); xx = M; cols.forEach(([, w], j) => { D.trazo([200, 200, 200]).grosor(0.2).rect(xx, y, w, fh).trazo(); if (!j) D.texto(xx + 1.5, y + 3.9, t, { pt: 7 }); xx += w; }); });
+  // a la derecha: objetivos, tareas y entrega
+  const x2 = M + iw + 9, a2 = W - M - x2;
+  let y = yA + 17;
+  const bloque = (titulo, items, num) => {
+    D.texto(x2, y, titulo, { pt: 10, b: true, col: azul }); y += 5;
+    items.forEach((t, i) => {
+      if (num) { D.relleno(madera).circulo(x2 + 2.4, y - 1.1, 2.3, 'f').relleno([0, 0, 0]); D.texto(x2 + 2.4, y - 0.1, String(i + 1), { pt: 7.5, b: true, al: 'c', col: [255, 255, 255] }); }
+      else D.relleno(madera).circulo(x2 + 1.6, y - 1.1, 0.8, 'f').relleno([0, 0, 0]);
+      y = D.parrafo(x2 + (num ? 6.5 : 4.5), y, a2 - (num ? 6.5 : 4.5), t, { pt: 8.5 }) + 1.2;
+    });
+    y += 2.5;
+  };
+  bloque('Objetivos', lineas(F.objetivos));
+  bloque('Tareas', lineas(F.tareas), true);
+  if (String(F.entrega || '').trim()) { D.texto(x2, y, 'Qué se entrega', { pt: 10, b: true, col: azul }); y = D.parrafo(x2, y + 5, a2, F.entrega, { pt: 8.5 }) + 2; }
+  D.parrafo(x2, Math.max(y + 1, H - M - 22), a2, `Material: ${enMaqueta() ? `tablero de maqueta de ${fmt(P.maqueta.grosor, 1)} mm` : `${MATERIALES[P.costillas.material].nombre.toLowerCase()} de ${fmt(grosor(), 1)} mm`}. Las hojas siguientes traen el conjunto y la lista de compra, las vistas acotadas, las piezas, el corte y el montaje paso a paso; la última, la rúbrica de evaluación.`, { pt: 7.5, col: gris });
+}
+function hojaRubrica(D, cabecera, o) {
+  const { M, W, H, gris, azul } = o, cs = criteriosRubrica(o.F.criterios), total = cs.reduce((s, c) => s + c.peso, 0) || 1;
+  cabecera('Rúbrica de evaluación');
+  const wC = 54, wP = 13, wN = 16, wL = (W - 2 * M - wC - wP - wN) / 4, cab = 7;
+  let y = M + 18, x = M;
+  [['Criterio', wC], ['Peso', wP], ...NIVELES_RUBRICA.map(n => [n, wL]), ['Nivel', wN]].forEach(([t, w]) => { D.relleno([31, 79, 138]).rect(x, y, w, cab, 'f').relleno([0, 0, 0]); D.texto(x + 1.5, y + 4.8, t, { pt: 8, b: true, col: [255, 255, 255] }); x += w; });
+  y += cab;
+  // altura de cada fila: la del texto más largo (se mide sin dibujar, con un documento de prueba)
+  const prueba = new PDFDoc(); prueba.pagina(W, H);
+  cs.forEach((c, i) => {
+    const hTxt = Math.max(prueba.parrafo(0, 0, wC - 3, c.nombre, { pt: 8, b: true }), ...c.niveles.map(t => prueba.parrafo(0, 0, wL - 3, t, { pt: 7.5 })));
+    const h = Math.max(11, hTxt + 3.5);
+    if (i % 2) D.relleno([247, 248, 250]).rect(M, y, W - 2 * M, h, 'f').relleno([0, 0, 0]);
+    x = M;
+    D.parrafo(x + 1.5, y + 4.3, wC - 3, c.nombre, { pt: 8, b: true }); x += wC;
+    D.texto(x + wP / 2, y + 4.3, fmt(Math.round(c.peso / total * 1000) / 10, 1) + ' %', { pt: 8, al: 'c' }); x += wP;
+    c.niveles.forEach(t => { D.parrafo(x + 1.5, y + 4.3, wL - 3, t, { pt: 7.5 }); x += wL; });
+    D.trazo([170, 170, 170]).grosor(0.25).rect(x + 3, y + 2.5, wN - 6, 6).trazo();
+    D.trazo([215, 215, 215]).grosor(0.2).linea(M, y + h, W - M, y + h).trazo();
+    y += h;
+  });
+  // líneas verticales de la tabla
+  x = M; [wC, wP, wL, wL, wL, wL, wN].reduce((xx, w) => { D.trazo([215, 215, 215]).grosor(0.2).linea(xx, M + 18, xx, y).trazo(); return xx + w; }, M);
+  D.trazo([215, 215, 215]).grosor(0.2).linea(W - M, M + 18, W - M, y).trazo();
+  y += 6;
+  D.texto(M, y, `Nota (sobre 10) = suma de (nivel × peso) / 40. Con todo en «Excelente» sale 10; con todo en «Suficiente», 5.`, { pt: 8.5, col: gris });
+  D.texto(W - M - 30, y, 'Nota final:', { pt: 10, b: true, al: 'r', col: azul });
+  D.trazo([170, 170, 170]).grosor(0.3).rect(W - M - 27, y - 5, 27, 8).trazo();
+  y += 7;
+  const hO = Math.max(14, H - M - 10 - y);
+  D.trazo([190, 190, 190]).grosor(0.25).rect(M, y, W - 2 * M - 70, hO).rect(W - M - 64, y, 64, hO).trazo();
+  D.texto(M + 2, y + 4, 'Observaciones', { pt: 8, b: true, col: gris });
+  D.texto(W - M - 62, y + 4, 'Firma del profesor/a', { pt: 8, b: true, col: gris });
+}
+function fichaPDF() { return planoPDF(fichaTextos()); }
+function exportarFicha() {
+  if (!R) return;
+  try {
+    const b = fichaPDF();
+    descargar(nombreArchivo(P.nombre) + '_ficha_practica' + sufijoFab() + '.pdf', new Blob([b], { type: 'application/pdf' }));
+    aviso('Ficha de práctica guardada (PDF)');
+  } catch (e) { console.error(e); aviso('⚠ No se pudo crear la ficha: ' + esc(e.message), 5000); }
+}
+function dialogoFicha() {
+  if (!R) return;
+  const F = fichaP(), d = fichaDefecto(), v = k => esc(String(F[k] || '').trim() ? F[k] : d[k]);
+  modal('🎓 Ficha de práctica para alumnos', `
+    <p class="nota">Un PDF para repartir: el <b>enunciado</b> (datos del alumno, objetivos, tareas y un registro de mediciones), el <b>plano</b> con las vistas acotadas, las piezas, el corte y el montaje, y una <b>rúbrica</b> de evaluación. Los textos salen solos del mueble; cámbialos a tu gusto (se guardan con el proyecto) o vacía un campo para volver al de por defecto.</p>
+    <label class="fila">Título <input type="text" id="fiTit" value="${v('titulo')}" style="width:62%"></label>
+    <label class="fila">Módulo o curso <input type="text" id="fiMod" value="${esc(F.modulo || '')}" placeholder="p. ej. Mecanizado por CNC · 1.º" style="width:62%"></label>
+    <label class="fila">Duración <input type="text" id="fiDur" value="${v('duracion')}" style="width:62%"></label>
+    <label class="bloque">Objetivos (uno por línea)<textarea id="fiObj" rows="5" style="width:100%">${v('objetivos')}</textarea></label>
+    <label class="bloque">Tareas (una por línea; salen numeradas)<textarea id="fiTar" rows="6" style="width:100%">${v('tareas')}</textarea></label>
+    <label class="bloque">Qué se entrega<textarea id="fiEnt" rows="2" style="width:100%">${v('entrega')}</textarea></label>
+    <label class="bloque" title="Criterio | peso | Excelente | Bien | Suficiente | Insuficiente. Si solo pones el criterio y el peso, los niveles salen genéricos">Rúbrica: criterio | peso | excelente | bien | suficiente | insuficiente<textarea id="fiRub" rows="7" style="width:100%;font-size:12px">${v('criterios')}</textarea></label>
+    <label class="fila chk"><input type="checkbox" id="fiCorte" ${F.corte !== false ? 'checked' : ''}> Incluir la colocación en los tableros (si no, la hacen los alumnos)</label>`,
+    [['Textos por defecto', () => { P.ficha = proyectoBase().ficha; guardado(); dialogoFicha(); }], ['📄 Descargar la ficha (PDF)', () => { leer(); exportarFicha(); }, true]], true);
+  const campos = { fiTit: 'titulo', fiMod: 'modulo', fiDur: 'duracion', fiObj: 'objetivos', fiTar: 'tareas', fiEnt: 'entrega', fiRub: 'criterios' };
+  const leer = () => {   // solo se guarda lo que difiere del texto de por defecto
+    Object.entries(campos).forEach(([id, k]) => { const t = $('#' + id).value; F[k] = t.trim() === String(d[k] || '').trim() ? '' : t; });
+    F.corte = $('#fiCorte').checked; guardado();
+  };
+  Object.keys(campos).concat('fiCorte').forEach(id => $('#' + id).onchange = leer);
 }
 
 /* ===================== VENTANAS, ARCHIVOS, DESHACER, EJEMPLOS ===================== */
@@ -7263,6 +7615,7 @@ function validarProyecto(o) {
   p.vista = Object.assign(proyectoBase().vista, o.vista || {});
   p.maqueta = Object.assign(proyectoBase().maqueta, o.maqueta || {});
   p.cnc = Object.assign(proyectoBase().cnc, o.cnc || {});
+  p.ficha = Object.assign(proyectoBase().ficha, o.ficha || {});
   p.presupuesto = Object.assign(proyectoBase().presupuesto, o.presupuesto || {});
   p.reticula = Object.assign(proyectoBase().reticula, o.reticula || {});
   ['planta', 'radial', 'pared', 'relieve', 'figura'].forEach(k => p[k] = Object.assign(proyectoBase()[k], o[k] || {}));
@@ -7408,6 +7761,7 @@ function iniciar() {
   $('#bImagen').onclick = imagenPNG;
   $('#b3D').onclick = dialogo3D;
   $('#bPlano').onclick = exportarPlano;
+  $('#bFicha').onclick = dialogoFicha;
   $('#bAnidador').onclick = abrirAnidador;
   $('#anidCerrar').onclick = cerrarAnidador;
   $('#bTema').onclick = () => ponerTema(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
@@ -7439,7 +7793,7 @@ function iniciar() {
   requestAnimationFrame(() => { ajustar3D(); VP.ajustar(); VC.ajustar(); cargarProyecto(P, true); });
 }
 // para las pruebas automáticas
-window.MadeRebanadas = { get P() { return P; }, get R() { return R; }, calcular: () => { const t = performance.now(); R = calcular(); return performance.now() - t; }, autoVar: () => autoVarillas(P.varillas.autoN), construir3D: () => { const t = performance.now(); construir3D(); return performance.now() - t; }, cargar: o => cargarProyecto(validarProyecto(o)), dxf: () => dxf(), svg: () => svg(), plano: () => planoPDF(), malla3D: o => piezasMalla3D(o || {}), pieza: i => piezaCalcador([...R.costillas, ...R.otras][i]), geo: i => geoFab([...R.costillas, ...R.otras][i]), camara: t => camara(t), selCostilla: i => selCostilla(i), slugEjemplo: n => slugEjemplo(n), formasTexto: h => formasTexto(h), leerSVG: t => leerSVG(t), leerMalla: (b, n) => leerMalla(b, n), polyVista: i => { const c = [...R.costillas, ...R.otras][i]; return { poly: c.poly, vista: polyVista(c.poly), esq: c.poly.esq || [] }; }, presupuesto: () => calcularPresupuesto(), prueba: o => { const g = geoPrueba(o); return { g, dxf: dxfPrueba(g), svg: svgPrueba(g) }; }, ordenMontaje: () => ordenMontaje(), montaje: () => montajeAnimado(), cerradas: o => piezasCerradas(o || { zArriba: true, escala: 1, herrajes: true }),
+window.MadeRebanadas = { get P() { return P; }, get R() { return R; }, calcular: () => { const t = performance.now(); R = calcular(); return performance.now() - t; }, autoVar: () => autoVarillas(P.varillas.autoN), construir3D: () => { const t = performance.now(); construir3D(); return performance.now() - t; }, cargar: o => cargarProyecto(validarProyecto(o)), dxf: () => dxf(), svg: () => svg(), plano: () => planoPDF(), malla3D: o => piezasMalla3D(o || {}), pieza: i => piezaCalcador([...R.costillas, ...R.otras][i]), geo: i => geoFab([...R.costillas, ...R.otras][i]), camara: t => camara(t), selCostilla: i => selCostilla(i), slugEjemplo: n => slugEjemplo(n), formasTexto: h => formasTexto(h), leerSVG: t => leerSVG(t), leerMalla: (b, n) => leerMalla(b, n), polyVista: i => { const c = [...R.costillas, ...R.otras][i]; return { poly: c.poly, vista: polyVista(c.poly), esq: c.poly.esq || [] }; }, presupuesto: () => calcularPresupuesto(), ficha: () => fichaPDF(), flexion: () => analisisFlexion(R).map(c => ({ pieza: c.H.nombre, asiento: !!c.asiento, L: c.L, vuelo: c.vuelo, flecha: c.flecha, lim: c.lim, seg: c.seg })), prueba: o => { const g = geoPrueba(o); return { g, dxf: dxfPrueba(g), svg: svgPrueba(g) }; }, ordenMontaje: () => ordenMontaje(), montaje: () => montajeAnimado(), cerradas: o => piezasCerradas(o || { zArriba: true, escala: 1, herrajes: true }),
   leerDXF: t => leerDXF(t), colocar: () => colocarEnTableros(fabActual()), compra: () => listaCompra(), despiece: () => filasDespiece(), csvCortes: () => { let out; const d0 = descargar; descargar = (n, c) => { out = c; }; try { exportarCSVCortes(); } finally { descargar = d0; } return out; }, vetaDe: c => vetaDe(c), ponVeta: (c, v) => ponVeta(c, v),
   pantallaPunto: i => { const k = claveActual().pts[i], r = $('#cPerfil').getBoundingClientRect(), q = VP.aPantalla(k[0], k[1]); return [r.left + q[0], r.top + q[1]]; },
   pantallaVarilla: i => { const k = P.varillas.lista[i], r = $('#cPerfil').getBoundingClientRect(), q = VP.aPantalla(k[0], k[1]); return [r.left + q[0], r.top + q[1]]; } };

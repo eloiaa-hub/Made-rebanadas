@@ -18,7 +18,7 @@ const PLANOS = {
   horizontal: { n: 1, a: 0, b: 2, nombre: 'Horizontal', ejes: ['ancho (x)', 'fondo (z)'], normal: 'y' },
 };
 const esPlano = () => P && P.tipo === 'plano';
-const planoP = () => P.plano || (P.plano = { holgura: 0.3, piezas: [], solape: { tipo: 'tacos', diam: 8, n: 0 }, cunas: false });
+const planoP = () => { const p = P.plano || (P.plano = { holgura: 0.3, piezas: [], solape: { tipo: 'tacos', diam: 8, n: 0 }, cunas: false }); if (p.persona == null) p.persona = 100; if (p.cargaBalda == null) p.cargaBalda = 150; return p; };
 const solapeP = () => { const Pp = planoP(); return Pp.solape || (Pp.solape = { tipo: 'tacos', diam: 8, n: 0 }); };
 // la pieza de la que se toma el contorno (las simétricas usan el de su pareja)
 function piezaFuente(k) {
@@ -85,6 +85,16 @@ function calcularPlano() {
       const u = { a: i, b: j, lo, hi, geo: { [i]: geoRecta(ejeA, B.x, lo, hi), [j]: geoRecta(ejeB, A.x, lo, hi) } };
       // ¿termina alguna de las dos dentro del grosor de la otra? (esquina o canto contra una cara)
       const fA = window.ClipperLib ? finCanto(A.base, ejeA, B.x, lo, hi, e) : 0, fB = window.ClipperLib ? finCanto(B.base, ejeB, A.x, lo, hi, e) : 0;
+      const Hm = planoP().herraje || 'no';
+      if (Hm !== 'no' && (fA || fB)) {   // unión a tope con herraje desmontable (perno y tuerca de barril, o excéntrica)
+        let tA = fA && !fB;
+        if (fA && fB) tA = A.plano === 'horizontal' ? true : B.plano === 'horizontal' ? false : A.plano === 'frente' ? true : B.plano === 'frente' ? false : true;
+        const [Pt, Pc, ej, ejC, sT] = tA ? [A, B, ejeA, ejeB, fA] : [B, A, ejeB, ejeA, fB];
+        u.tipo = 'herraje'; u.en = Pc.i; u.pasa = Pt.i; u.herraje = Hm;
+        Pt.dientes.push({ eje: ej, c: Pc.x, s: sT, t: [lo, hi], quita: 0, tope: true });
+        ponerHerraje(u, Pt, Pc, ej, ejC, sT, e);
+        res.uniones.push(u); A.uniones.push(u); B.uniones.push(u); return;
+      }
       if ((fA && fB) || ((fA || fB) && hi - lo >= 100)) {
         const n = Math.max(3, Math.round((hi - lo) / Math.max(2 * e, 30)) | 1), t = Array.from({ length: n + 1 }, (_, k) => lo + (hi - lo) * k / n);
         u.tipo = 'dentada'; u.dientes = n;
@@ -169,7 +179,7 @@ function calcularPlano() {
     const rT = dT / 2;
     u.puntos.forEach(q => {
       if (So.tipo === 'tornillos') { ps[fuera].taladros.push([q[0], q[1], rT, 'pasante']); ps[fuera === i ? j : i].taladros.push([q[0], q[1], Math.max(1, rT * 0.6), 'guia']); }
-      else { A.taladros.push([q[0], q[1], rT, 'ciego']); B.taladros.push([q[0], q[1], rT, 'ciego']); }
+      else { const pr = largoTaco(e).prof; A.taladros.push([q[0], q[1], rT, 'ciego', pr]); B.taladros.push([q[0], q[1], rT, 'ciego', pr]); }
     });
     res.uniones.push(u); A.uniones.push(u); B.uniones.push(u);
   });
@@ -196,11 +206,39 @@ function finCanto(base, eje, c, lo, hi, e) {
   if (c - mn <= e / 2 + 0.6 && mx - c > e) return -1;
   return 0;
 }
+/* ---------- herrajes desmontables (mueble de kit) ----------
+   La pieza que termina (Pt) se corta a tope contra la cara de la otra (Pc) y se une con:
+   - perno y tuerca de barril: el perno M6 atraviesa Pc (taladro pasante), entra por el canto de Pt y rosca en una
+     tuerca de barril metida en un taladro pasante de Ø 10 en la cara de Pt;
+   - excéntrica (tipo minifix): la excéntrica Ø 15 va en un taladro ciego en la cara de Pt, a 34 mm del canto, y el
+     perno se rosca en un taladro ciego de Ø 5 en la cara de Pc; entre los dos, un taladro de Ø 8 en el canto de Pt.
+   Los taladros de las caras van en el DXF; los del canto se hacen a mano (en el DXF, una raya en la capa CANTO). */
+const NOMBRE_HERRAJE = { barril: 'perno y tuerca de barril', excentrica: 'excéntrica (minifix)' };
+const herrajesTotales = res => { const n = { barril: 0, excentrica: 0 }; (res || R).uniones.forEach(u => { if (u.tipo === 'herraje') n[u.herraje] += u.puntos.length; }); return n; };
+function datosHerraje(tipo, e) {
+  if (tipo === 'excentrica') { const dB = e >= 15 ? 34 : 24; return { dB, rC: 7.5, profC: Math.min(14, Math.max(8, e - 4.5)), rP: 2.5, profP: 11, rCanto: 4, profCanto: dB + 2 }; }
+  const L = [40, 50, 60, 70, 80].find(l => l - e - 5 >= 20) || 80, dB = L - e - 5;
+  return { L, dB, rC: 5, rP: 3.5, rCanto: 3.5, profCanto: dB + 8 };
+}
+function ponerHerraje(u, Pt, Pc, ej, ejC, sT, e) {
+  const D = datosHerraje(u.herraje, e), L = u.hi - u.lo, m = Math.min(50, L / 4);
+  const n = L < 140 ? 1 : clamp(1 + Math.floor((L - 2 * m) / 300), 2, 5);
+  const ls = n === 1 ? [(u.lo + u.hi) / 2] : Array.from({ length: n }, (_, k) => u.lo + m + (L - 2 * m) * k / (n - 1));
+  const P2 = (eje, x, l) => eje === 'v' ? [x, l] : [l, x], borde = Pc.x - sT * e / 2;
+  Pt.cantos = Pt.cantos || [];
+  u.puntos = ls; u.datos = D;
+  ls.forEach(l => {
+    const qB = P2(ej, borde - sT * D.dB, l);
+    if (u.herraje === 'excentrica') { Pt.taladros.push([...qB, D.rC, 'ciego', D.profC]); Pc.taladros.push([...P2(ejC, Pt.x, l), D.rP, 'ciego', D.profP]); }
+    else { Pt.taladros.push([...qB, D.rC, 'pasante']); Pc.taladros.push([...P2(ejC, Pt.x, l), D.rP, 'pasante']); }
+    Pt.cantos.push({ a: P2(ej, borde, l), b: P2(ej, borde - sT * D.profCanto, l), r: D.rCanto });
+  });
+}
 // recorta los dientes: en los tramos k con k % 2 === quita, el canto se retira hasta la cara de dentro de la otra pieza
 function aplicarDientes(p, w, hol) {
   const big = 1e5, cortes = [], esqObj = [];
   p.dientes.forEach(d => {
-    const ia = d.eje === 'v' ? 0 : 1, Pt = (x, l) => ia === 0 ? [x, l] : [l, x], n = d.t.length - 1, borde = d.c - d.s * w / 2;
+    const ia = d.eje === 'v' ? 0 : 1, Pt = (x, l) => ia === 0 ? [x, l] : [l, x], n = d.t.length - 1, borde = d.c - d.s * (d.tope ? w - hol : w) / 2;
     for (let k = 0; k < n; k++) {
       if (k % 2 !== d.quita) continue;
       const l0 = k === 0 ? -big : d.t[k] - hol / 2, l1 = k === n - 1 ? big : d.t[k + 1] + hol / 2;
@@ -250,6 +288,11 @@ function avisosPlano(res) {
   res.uniones.forEach(u => {
     if (u.tipo === 'solape' && !u.puntos.length) add('atencion', `${nomP(res, u.a)} y ${nomP(res, u.b)} se solapan, pero la zona común es demasiado estrecha para un ${solapeP().tipo === 'tornillos' ? 'tornillo' : 'taco'} de Ø ${fmt(solapeP().diam, 1)} mm: agranda el solape o encólalas.`, u.a);
     else if (u.tipo === 'solape' && u.puntos.length < 2) add('atencion', `Solape de ${nomP(res, u.a)} y ${nomP(res, u.b)} con una sola fijación: puede girar. Agranda la zona común.`, u.a);
+    if (u.tipo === 'herraje') {
+      const Pt = res.costillas[u.pasa], fuera = (Pt.taladros || []).filter(t => !dentro(Pt.poly, t[0], t[1]) || distBorde(Pt.poly, t[0], t[1]) < t[2] + 3).length;
+      if (fuera) add('atencion', `${Pt.nombre}: ${fuera === 1 ? 'un taladro' : fuera + ' taladros'} de ${u.herraje === 'excentrica' ? 'la excéntrica' : 'la tuerca de barril'} ${fuera === 1 ? 'cae' : 'caen'} fuera de la pieza o en el borde (está a ${fmt(u.datos.dB)} mm del canto): la pieza es demasiado estrecha para este herraje.`, Pt.i);
+      if (u.herraje === 'excentrica' && e < 15) add('atencion', `Las excéntricas piden tablero de 15 mm o más (este es de ${fmt(e, 1)} mm): usa perno y tuerca de barril.`, u.pasa);
+    }
     if (u.tipo === 'media' && u.hi - u.lo < 2 * e) add('atencion', `Media madera corta entre ${nomP(res, u.a)} y ${nomP(res, u.b)} (${fmt(u.hi - u.lo)} mm de cruce): unión floja.`, u.a);
     if (u.tipo === 'caja' && u.hi - u.lo < 1.5 * e) add('atencion', `Espiga estrecha de ${nomP(res, u.pasa)} en ${nomP(res, u.en)} (${fmt(u.hi - u.lo)} mm): se puede partir.`, u.pasa);
   });
@@ -260,12 +303,13 @@ function avisosPlano(res) {
     if (malo) add('atencion', `${p.nombre}: alguna caja (agujero de una espiga) queda muy cerca del borde y la pieza se puede partir.`, p.i);
   });
   avisosAsiento(res, add);
+  avisosFlexion(res, add);
   const M = P.maqueta;
   if (M && M.activa && Math.abs(M.grosor * M.escala - e) > e * 0.2) add('info', `Maqueta 1:${M.escala}: ${fmt(M.grosor, 1)} mm equivalen a ${fmt(M.grosor * M.escala)} mm reales (el tablero real es de ${fmt(e, 1)} mm): las ranuras y las cajas de la maqueta se hacen con el grosor de la maqueta.`);
   if (!A.some(a => a.tipo === 'error' || a.tipo === 'atencion')) {
     const nM = res.uniones.filter(u => u.tipo === 'media').length, nC = res.uniones.filter(u => u.tipo === 'caja').length, nS = res.uniones.filter(u => u.tipo === 'solape').length;
     const nE = res.uniones.filter(u => u.tipo === 'dentada' && u.esquina).length, nT = res.uniones.filter(u => u.tipo === 'dentada' && !u.esquina).length;
-    const partes = [nE ? nE + (nE > 1 ? ' esquinas dentadas' : ' esquina dentada') : '', nT ? nT + (nT > 1 ? ' cantos con espigas en T' : ' canto con espigas en T') : '', nM ? nM + ' a media madera' : '', nC ? nC + (nC > 1 ? ' espigas en caja pasante' : ' espiga en caja pasante') : '', nS ? nS + (nS > 1 ? ' solapes' : ' solape') + ` con ${solapeP().tipo}` : ''].filter(Boolean);
+    const partes = [nE ? nE + (nE > 1 ? ' esquinas dentadas' : ' esquina dentada') : '', nT ? nT + (nT > 1 ? ' cantos con espigas en T' : ' canto con espigas en T') : '', nM ? nM + ' a media madera' : '', nC ? nC + (nC > 1 ? ' espigas en caja pasante' : ' espiga en caja pasante') : '', nS ? nS + (nS > 1 ? ' solapes' : ' solape') + ` con ${solapeP().tipo}` : '', res.uniones.some(u => u.tipo === 'herraje') ? `${res.uniones.filter(u => u.tipo === 'herraje').length} a tope con ${NOMBRE_HERRAJE[planoP().herraje] || 'herraje'}` : ''].filter(Boolean);
     add('ok', `Todo correcto: ${res.n} piezas con ${res.uniones.length} ${res.uniones.length === 1 ? 'unión' : 'uniones'}` + (partes.length ? ` (${partes.length > 1 ? partes.slice(0, -1).join(', ') + ' y ' + partes[partes.length - 1] : partes[0]})` : '') + '.');
   }
 }
@@ -331,11 +375,100 @@ function avisosAsiento(res, add) {
   if (a.delante < 1.5) add(a.delante < 1 ? 'error' : 'atencion', `Sentado en el borde de delante, ${a.delante < 1 ? 'vuelca hacia delante' : 'tiene poco margen hacia delante'}: el asiento sale ${fmt(a.saleDelante)} mm por delante de las patas (margen ×${fmt(a.delante, 1)}).`, a.S.i);
   if (a.lado < 1.5) add(a.lado < 1 ? 'error' : 'atencion', `Sentado en un extremo, ${a.lado < 1 ? 'vuelca de costado' : 'tiene poco margen de costado'}: el asiento sale ${fmt(a.saleLado)} mm por fuera de las patas (margen ×${fmt(a.lado, 1)}).`, a.S.i);
 }
+/* ---------- flexión de asientos y baldas ----------
+   Cada tablero horizontal se calcula como una viga entre las piezas que lo sostienen (las que se cruzan con él):
+   el asiento, con una persona en el centro de la luz (o en la punta del vuelo); las baldas y tapas, con una carga
+   repartida por m². Flecha con E del tablero y su fluencia (lo que se dobla con los meses), y tensión contra su
+   resistencia a flexión. Orientativo: los valores de cada tablero son medios y varían mucho entre fabricantes. */
+const MECANICA = {   // E (N/mm²), resistencia a flexión (N/mm²), factor de fluencia
+  abedul: { E: 7000, f: 50, k: 1.8 }, chopo: { E: 4500, f: 35, k: 1.8 }, pino_ply: { E: 5500, f: 40, k: 1.8 },
+  roble: { E: 5500, f: 40, k: 1.8 }, nogal: { E: 5500, f: 40, k: 1.8 }, pino: { E: 8000, f: 40, k: 1.6 },
+  mdf: { E: 2800, f: 30, k: 2.25 }, lacado: { E: 2800, f: 30, k: 2.25 },
+};
+function apoyosPieza(res, H) {   // rectas de apoyo de H en sus coordenadas: { d: 0 (luz en u) | 1 (luz en v), s: posición }
+  const out = [];
+  H.uniones.forEach(u => {
+    if (u.tipo === 'solape' || !u.geo || !u.geo[H.i]) return;
+    const o = res.costillas[u.a === H.i ? u.b : u.a]; if (!o || o.plano === 'horizontal' || o.cuna) return;
+    const g = u.geo[H.i], [cs, sn] = g.rot, m = (g.lo + g.hi) / 2, q = desgirarP([g.c, m], cs, sn);
+    if (Math.abs(cs) > 0.9) out.push({ d: 0, s: q[0], o: o.i }); else if (Math.abs(sn) > 0.9) out.push({ d: 1, s: q[1], o: o.i });
+  });
+  return out;
+}
+function analisisFlexion(res) {
+  const Pp = planoP(), e = grosor(), mec = MECANICA[P.costillas.material] || MECANICA.mdf, out = [];
+  const S = Pp.asiento !== false ? (analisisAsiento(res) || {}).S : null;
+  res.costillas.forEach(H => {
+    if (!H.ok || H.cuna || H.plano !== 'horizontal' || H.giro) return;
+    const ap = apoyosPieza(res, H); if (!ap.length) return;
+    const ext = [[H.caja.x0, H.caja.x1], [H.caja.y0, H.caja.y1]];
+    const tramos = d => {   // luces entre apoyos (a ejes) y vuelos
+      const s = [...new Set(ap.filter(a => a.d === d).map(a => Math.round(a.s)))].sort((x, y) => x - y).filter((v, i, A) => !i || v - A[i - 1] > e);
+      if (!s.length) return null;
+      let L = 0; for (let i = 1; i < s.length; i++) L = Math.max(L, s[i] - s[i - 1]);
+      return { n: s.length, L, vuelo: Math.max(s[0] - ext[d][0], ext[d][1] - s[s.length - 1]) - e / 2 };
+    };
+    const T = [tramos(0), tramos(1)];
+    // dirección que trabaja: la de luz más corta entre las que tienen dos apoyos o más
+    const con2 = [0, 1].filter(d => T[d] && T[d].n >= 2);
+    const d = con2.length ? con2.sort((a, b) => T[a].L - T[b].L)[0] : [0, 1].filter(x => T[x]).sort((a, b) => T[b].vuelo - T[a].vuelo)[0];
+    const t = T[d], ancho = ext[1 - d][1] - ext[1 - d][0], asiento = S && S.i === H.i;
+    const I = b => b * e ** 3 / 12, Wm = b => b * e * e / 6;
+    const caso = (L, vuelo) => {
+      if (L < 30) return null;
+      let flecha, sigma, carga;
+      if (asiento) {   // una persona: carga puntual, repartida en un ancho de unos 400 mm
+        const F = Pp.persona * 9.81, b = Math.min(ancho, 400); carga = `${fmt(Pp.persona)} kg ${vuelo ? 'en la punta' : 'en el centro'}`;
+        flecha = vuelo ? F * L ** 3 / (3 * mec.E * I(b)) : F * L ** 3 / (48 * mec.E * I(b)); sigma = (vuelo ? F * L : F * L / 4) / Wm(b);
+      } else {         // carga repartida por m², para siempre: con fluencia
+        const w = Pp.cargaBalda * 9.81e-6 * ancho; carga = `${fmt(Pp.cargaBalda)} kg/m² (${fmt(Pp.cargaBalda * ancho * L / 1e6, 1)} kg)`;
+        flecha = (vuelo ? w * L ** 4 / (8 * mec.E * I(ancho)) : 5 * w * L ** 4 / (384 * mec.E * I(ancho))) * mec.k; sigma = (vuelo ? w * L * L / 2 : w * L * L / 8) / Wm(ancho);
+      }
+      const lim = (vuelo ? 2 * L : L) / (asiento ? 150 : 200);
+      return { L, vuelo: !!vuelo, flecha, lim, sigma, seg: mec.f / sigma, carga, eNec: e * Math.cbrt(flecha / lim) };
+    };
+    const casos = [];
+    if (t.n >= 2) casos.push(caso(t.L, false));
+    if (t.vuelo > 40) casos.push(caso(t.vuelo, true));
+    casos.filter(Boolean).forEach(c => out.push(Object.assign(c, { H, asiento })));
+  });
+  // asiento de lamas de canto: la persona se reparte entre las lamas que caben en unos 400 mm
+  if (S && S.plano === 'frente') {
+    const L = res.costillas.filter(c => c.ok && !c.giro && c.plano === 'frente' && c.caja.h < 150 && c.caja.y1 > 250 && c.caja.y1 < 800 && c.caja.w >= 250).sort((x, y) => x.x - y.x);
+    const paso = L.length > 1 ? (L[L.length - 1].x - L[0].x) / (L.length - 1) : 400, n = Math.max(1, Math.min(L.length, Math.round(400 / Math.max(paso, 1))));
+    let peor = null;
+    L.forEach(H => {
+      const s0 = [...new Set(apoyosPieza(res, H).filter(a => a.d === 0).map(a => Math.round(a.s)))].sort((x, y) => x - y);
+      const F = Pp.persona * 9.81 / n, h = H.caja.h, I = e * h ** 3 / 12, Wm = e * h * h / 6, cs = [];
+      for (let i = 1; i < s0.length; i++) cs.push({ L: s0[i] - s0[i - 1], vuelo: false });
+      if (s0.length) { const v = Math.max(s0[0] - H.caja.x0, H.caja.x1 - s0[s0.length - 1]) - e / 2; if (v > 40) cs.push({ L: v, vuelo: true }); }
+      cs.forEach(({ L: Lz, vuelo }) => {
+        if (Lz < 30) return;
+        const flecha = vuelo ? F * Lz ** 3 / (3 * mec.E * I) : F * Lz ** 3 / (48 * mec.E * I), sigma = (vuelo ? F * Lz : F * Lz / 4) / Wm, lim = (vuelo ? 2 * Lz : Lz) / 150;
+        const c = { L: Lz, vuelo, flecha, lim, sigma, seg: mec.f / sigma, carga: `${fmt(Pp.persona)} kg repartidos en ${n} lama${n > 1 ? 's' : ''}`, eNec: e * Math.cbrt(flecha / lim), H, asiento: true, lamas: true };
+        if (!peor || c.flecha / c.lim > peor.flecha / peor.lim) peor = c;
+      });
+    });
+    if (peor) out.push(peor);
+  }
+  return out;
+}
+function avisosFlexion(res, add) {
+  if (planoP().flexion === false) return;
+  analisisFlexion(res).forEach(c => {
+    const que = c.lamas ? 'Las lamas del asiento' : c.asiento ? 'El asiento' : c.H.nombre, base = `${que}: ${c.vuelo ? 'vuelo' : 'luz'} de ${fmt(c.L)} mm con ${c.carga} → se dobla ${fmt(c.flecha, 1)} mm (máximo aconsejable ${fmt(c.lim, 1)} mm), resistencia ×${fmt(c.seg, 1)}.`;
+    const arreglo = c.lamas ? ` Pon más lamas, lamas más altas o un apoyo ${c.vuelo ? 'más cerca de la punta' : 'en medio'}.` : ` Pon un apoyo ${c.vuelo ? 'más cerca de la punta' : 'en medio'}, un listón o un faldón bajo el canto, o un tablero más grueso (unos ${fmt(Math.ceil(c.eNec))} mm).`;
+    if (c.seg < 1.5) add('error', base + ' Se puede romper.' + arreglo, c.H.i);
+    else if (c.flecha > 2 * c.lim) add('error', base + ' Se dobla mucho.' + arreglo, c.H.i);
+    else if (c.flecha > c.lim || c.seg < 3) add('atencion', base + (c.seg < 3 ? ' Poco margen de resistencia.' : ' Se notará al cargarlo.') + arreglo, c.H.i);
+    else add('info', base, c.H.i);
+  });
+}
 // texto de las uniones de una pieza (para la vista de la pieza, el plano y el despiece)
 function textoUnionesPieza(c) {
   if (!R || !c.uniones) return '';
   const de = c.uniones.filter(u => u.tipo === 'dentada').length, so = c.uniones.filter(u => u.tipo === 'solape').length, nt = (c.taladros || []).length, m = c.uniones.filter(u => u.tipo === 'media').length, cj = c.uniones.filter(u => u.tipo === 'caja' && u.en === c.i).length, es = c.uniones.filter(u => u.tipo === 'caja' && u.pasa === c.i).length;
-  return [de ? `${de} ${de > 1 ? 'dentadas' : 'dentada'}` : '', so ? `${so} ${so > 1 ? 'solapes' : 'solape'} (${nt} ${solapeP().tipo === 'tornillos' ? 'taladros' : 'tacos'})` : '', m ? m + ' a media madera' : '', cj ? cj + (cj > 1 ? ' cajas' : ' caja') : '', es ? es + (es > 1 ? ' espigas' : ' espiga') : ''].filter(Boolean).join(' · ') || 'sin uniones';
+  return [de ? `${de} ${de > 1 ? 'dentadas' : 'dentada'}` : '', so ? `${so} ${so > 1 ? 'solapes' : 'solape'} (${nt} ${solapeP().tipo === 'tornillos' ? 'taladros' : 'tacos'})` : '', m ? m + ' a media madera' : '', cj ? cj + (cj > 1 ? ' cajas' : ' caja') : '', es ? es + (es > 1 ? ' espigas' : ' espiga') : '', c.uniones.some(u => u.tipo === 'herraje') ? `${c.uniones.filter(u => u.tipo === 'herraje').reduce((s, u) => s + u.puntos.length, 0)} herrajes` : ''].filter(Boolean).join(' · ') || 'sin uniones';
 }
 /* ---------- piezas inclinadas ----------
    Una pieza puede girar «giro» grados alrededor de su eje horizontal (a) por la línea b = pivote (por defecto, su borde de

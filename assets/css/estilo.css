@@ -191,7 +191,7 @@ input:disabled,select:disabled{opacity:.55}
 .barra .grupo{flex-wrap:nowrap;min-width:0}
 .barra button{white-space:nowrap}
 @media (max-width:1500px){ .barra .autor{display:none} }
-@media (max-width:1380px){ .barra button .txt{display:none} .barra button{padding-left:8px;padding-right:8px} .barra button.primario .txt,.barra #bMueblecad .txt{display:inline} }
+@media (max-width:1480px){ .barra button .txt{display:none} .barra button{padding-left:8px;padding-right:8px} .barra button.primario .txt,.barra #bMueblecad .txt{display:inline} }
 @media (max-width:1000px){ .barra button.primario .txt,.barra #bMueblecad .txt{display:none} .barra .marca b{display:none} }
 
 /* ---- v3.4: ventana de ejemplos ---- */
@@ -278,3 +278,4 @@ input:disabled,select:disabled{opacity:.55}
 
 .vtit .ptCoord{pointer-events:auto;display:inline-flex;gap:3px;align-items:center;font-weight:400;font-size:11px;background:var(--panel);border:1px solid var(--borde);border-radius:5px;padding:1px 5px}
 .vtit .ptCoord input{width:62px;font-size:11px;padding:1px 3px}
+.bloque{display:block;margin:8px 0 4px;font-size:13px;color:var(--suave)}.bloque textarea{display:block;margin-top:3px;font:inherit;font-size:12.5px;color:var(--texto,inherit);background:var(--panel2);border:1px solid var(--borde);border-radius:6px;padding:5px 7px;box-sizing:border-box;resize:vertical}

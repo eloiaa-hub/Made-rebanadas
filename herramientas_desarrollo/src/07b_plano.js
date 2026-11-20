@@ -110,7 +110,7 @@ function captura3D(expl) {
   return { bin: atob(url.split(',')[1]), w, h };
 }
 
-function planoPDF() {
+function planoPDF(F = null) {   // F: opciones de la ficha de práctica (enunciado y rúbrica)
   const ret = P.tipo === 'reticula', D = new PDFDoc(), k = escalaFab(), W = 297, H = 210, M = 12, maq = enMaqueta();
   const e = grosorFab(), cm = calcularCompraFab(), V = P.varillas, fecha = new Date().toLocaleDateString('es-ES');
   const gris = [110, 116, 125], azul = [31, 79, 138], madera = [168, 116, 63], rojo = [192, 57, 43];
@@ -118,7 +118,7 @@ function planoPDF() {
   const cabecera = titulo => {
     D.pagina(W, H); hojas.push(D.p);
     D.texto(M, M + 4, P.nombre, { pt: 14, b: true });
-    D.texto(W - M, M + 4, 'Plano de montaje · ' + (maq ? 'maqueta 1:' + P.maqueta.escala : 'medidas en mm') + ' · ' + fecha, { pt: 9, al: 'r', col: gris });
+    D.texto(W - M, M + 4, (F ? 'Ficha de práctica · ' : 'Plano de montaje · ') + (maq ? 'maqueta 1:' + P.maqueta.escala : 'medidas en mm') + ' · ' + fecha, { pt: 9, al: 'r', col: gris });
     D.texto(M, M + 11, titulo, { pt: 11, b: true, col: azul });
     D.trazo([200, 200, 200]).grosor(0.3).linea(M, M + 13.5, W - M, M + 13.5).trazo();
   };
@@ -135,6 +135,7 @@ function planoPDF() {
     return y;
   };
 
+  if (F) hojaEnunciado(D, cabecera, { M, W, H, gris, azul, madera, F });
   // ---- hoja 1: conjunto, datos y compra ----
   cabecera('1. Conjunto, datos y lista de compra');
   const cap = captura3D(), iw = 165, ih = Math.min(150, iw * cap.h / cap.w);
@@ -150,7 +151,9 @@ function planoPDF() {
     ['Espigas en caja pasante', String(R.uniones.filter(u => u.tipo === 'caja').length)],
     ...(R.uniones.some(u => u.tipo === 'dentada') ? [['Uniones dentadas', `${R.uniones.filter(u => u.tipo === 'dentada' && u.esquina).length} esquinas y ${R.uniones.filter(u => u.tipo === 'dentada' && !u.esquina).length} cantos en T`]] : []),
     ...(R.uniones.some(u => u.tipo === 'solape') ? [['Piezas solapadas', `${R.uniones.filter(u => u.tipo === 'solape').length}, con ${R.uniones.reduce((s, u) => s + (u.puntos || []).length, 0)} ${solapeP().tipo} de Ø ${fmt(solapeP().diam, 1)} mm`]] : []),
+    ...(R.uniones.some(u => u.tipo === 'herraje') ? [['Uniones con herraje', `${R.uniones.filter(u => u.tipo === 'herraje').length} a tope, ${R.uniones.reduce((s, u) => s + (u.tipo === 'herraje' ? u.puntos.length : 0), 0)} × ${NOMBRE_HERRAJE[planoP().herraje] || 'herraje'}`]] : []),
     ['Ancho de ranuras y cajas', `${fmt(grosorFab() + holguraRanuraFab(), 2)} mm`],
+    ...(planoP().flexion !== false ? analisisFlexion(R).slice(0, 4).map(c => [`Flexión: ${c.lamas ? 'lamas del asiento' : c.asiento ? 'asiento' : c.H.nombre.toLowerCase()}`, `${fmt(c.flecha, 1)} mm (máx. ${fmt(c.lim, 1)}) con ${c.carga.replace('²', '2')}`]) : []),
   ]) : tabla(x2, M + 18, a2, [
     { titulo: 'Datos' },
     ['Medidas (largo × fondo × alto)', `${fmt(P.largo * k)} × ${fmt(fondo * k)} × ${fmt(alto * k)} mm`],
@@ -243,6 +246,8 @@ function planoPDF() {
       (c.int || []).forEach(hh => D.relleno([255, 255, 255]).trazo(madera).grosor(0.35).poli(hh.map(p => [PX(p[0]), PY(p[1])]), true, 'b'));
       D.relleno([255, 255, 255]).trazo(rojo).grosor(0.25);
       c.agujeros.forEach(j2 => D.circulo(PX(V.lista[j2][0]), PY(V.lista[j2][1]), Math.max(0.6, radioAgujero() * s3), 'b'));
+      (c.taladros || []).forEach(t => D.circulo(PX(t[0]), PY(t[1]), Math.max(0.5, t[2] * s3), 'b'));
+      (c.cantos || []).forEach(m => D.linea(PX(m.a[0]), PY(m.a[1]), PX(m.b[0]), PY(m.b[1])));
       D.relleno([0, 0, 0]).trazo();
       const et = puntoEtiqueta(c);
       D.texto(PX(et[0]), PY(et[1]) + 2.2, c.etq, { pt: 14, b: true, al: 'c', col: azul });
@@ -291,7 +296,7 @@ function planoPDF() {
   }
   // ---- tableros ----
   const f = fabActual(), col = colocarEnTableros(f);
-  if (f.modo !== 'fila' && col.tableros.length) {
+  if (f.modo !== 'fila' && col.tableros.length && (!F || F.corte !== false)) {
     const porH = 4;
     for (let t0 = 0; t0 < col.tableros.length; t0 += porH) {
       const variosG = (col.grosores || []).length > 1;
@@ -372,8 +377,9 @@ function planoPDF() {
   });
   D.texto(M, H - M - 4, 'Herramientas: ' + (esPlano() ? (maq ? 'cortadora láser, lija fina; cola si se quiere fijo.' : 'CNC (o sierra de calar y escoplo), lija, maza de goma; cola si se quiere fijo.') : P.tipo === 'radial' ? (maq ? 'cortadora láser o cúter, cola.' : 'CNC o láser, sierra para el tubo, cola, lija.') : P.tipo === 'pared' ? 'CNC o sierra de calar, taladro, tacos y tornillos, nivel, taco separador.' : ret ? (maq ? 'cortadora láser o cúter, lija fina.' : 'CNC (fresa menor que la ranura), formón o lima, mazo de goma, lija.') : maq ? 'cortadora láser o cúter, cola blanca.' : `CNC o sierra de calar, broca de Ø ${fmt(2 * radioFab(), 1)}, lija, llaves para las tuercas M${V.diam}.`), { pt: 9, col: gris });
 
-  // ---- última hoja: tiempo de mecanizado y presupuesto ----
-  { const r = calcularPresupuesto(), fl = filasPresupuesto(r).map(f => f.titulo ? f : f.map(t => String(t).replace(/²/g, '2'))), i = fl.findIndex(f => f.titulo && /^Presupuesto/.test(f.titulo));
+  // ---- última hoja: tiempo de mecanizado y presupuesto (o, en la ficha, la rúbrica) ----
+  if (F) hojaRubrica(D, cabecera, { M, W, H, gris, azul, madera, F });
+  else { const r = calcularPresupuesto(), fl = filasPresupuesto(r).map(f => f.titulo ? f : f.map(t => String(t).replace(/²/g, '2'))), i = fl.findIndex(f => f.titulo && /^Presupuesto/.test(f.titulo));
     cabecera('Tiempo de mecanizado y presupuesto');
     const a = (W - 2 * M - 12) / 2;
     tabla(M, M + 18, a, fl.slice(0, i), { c1: a * 0.55 });
@@ -560,6 +566,7 @@ function hojaPlano(D, cabecera, tabla, o) {
   R.uniones.forEach(u => {
     if (u.tipo === 'dentada') { fU.push([`${nom(u.a)} + ${nom(u.b)}`, u.esquina ? `esquina dentada de ${u.dientes} dientes` : `${(u.dientes - 1) / 2} espigas de ${nom(u.pasa)} en cajas de ${nom(u.en)}`]); return; }
     if (u.tipo === 'solape') { const So = solapeP(), lt = largoTaco(grosorFab()); fU.push([`${nom(u.a)} + ${nom(u.b)}`, So.tipo === 'tornillos' ? `solapadas: ${u.puntos.length} tornillos Ø ${fmt(So.diam, 1)} desde la ${R.costillas[u.fuera].etq}` : `solapadas: ${u.puntos.length} tacos Ø ${fmt(So.diam, 1)} × ${fmt(lt.largo)} mm`]); return; }
+    if (u.tipo === 'herraje') { fU.push([`${nom(u.pasa)} a tope en ${nom(u.en)}`, `${u.puntos.length} × ${NOMBRE_HERRAJE[u.herraje]}`]); return; }
     if (u.tipo === 'caja') fU.push([`${nom(u.pasa)} en ${nom(u.en)}`, `espiga en caja de ${fmt((u.hi - u.lo + holguraRanuraFab()) * k, 1)} × ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm`]);
     else { const arriba = u.aArriba ? u.a : u.b, abajo = u.aArriba ? u.b : u.a; fU.push([`${nom(arriba)} × ${nom(abajo)}`, `media madera de ${fmt((u.hi - u.lo) / 2 * k, 1)} mm (la ${R.costillas[arriba].etq} desde arriba)`]); }
   });
@@ -589,6 +596,18 @@ function pasosPlano(k, maq) {
   Object.entries(enT).forEach(([p, en]) => pasos.push(`Mete las espigas de ${nom(+p)} en las cajas de ${lista2([...new Set(en)].map(nom))}. Si va entre dos piezas, presenta las dos a la vez y cierra apretando con sargentos.`));
   const esq = R.uniones.filter(u => u.tipo === 'dentada' && u.esquina);
   if (esq.length) pasos.push(`Esquinas dentadas: ${lista2(esq.map(u => `${R.costillas[u.a].etq} con ${R.costillas[u.b].etq}`))}. Encaja los dientes de cada esquina (con cola, si se quiere fijo) y aprieta con un sargento; los de una pieza entran en los huecos de la otra.`);
+  // uniones a tope con herraje desmontable
+  const hj = R.uniones.filter(u => u.tipo === 'herraje');
+  if (hj.length) {
+    const D = hj[0].datos, ex = hj[0].herraje === 'excentrica';
+    pasos.splice(2, 0, ex
+      ? `Taladros de las excéntricas (en el DXF salen los de las caras): Ø 15 a ${fmt(D.profC, 1)} mm de profundidad en las piezas que llegan a tope, a ${fmt(D.dB)} mm del canto, y Ø 5 a ${fmt(D.profP)} mm para los pernos en la otra pieza. Después, a mano y con una guía, el taladro de Ø 8 en el canto hasta la excéntrica (raya de la capa CANTO).`
+      : `Taladros de los pernos (en el DXF salen los de las caras): Ø 7 pasante en la pieza que recibe y Ø 10 pasante para la tuerca de barril a ${fmt(D.dB)} mm del canto en la que llega a tope. Después, a mano y con una guía, el taladro de Ø 7 en el canto, de ${fmt(D.profCanto)} mm, hasta el de la tuerca (raya de la capa CANTO).`);
+    const porP = {}; hj.forEach(u => { (porP[u.en] = porP[u.en] || []).push(u); });
+    Object.entries(porP).forEach(([en, us]) => pasos.push(ex
+      ? `${nom(+en)}: rosca sus ${us.reduce((s, u) => s + u.puntos.length, 0)} pernos en los taladros de Ø 5. Presenta ${lista2([...new Set(us.map(u => nom(u.pasa)))])} a tope (los pernos entran por el canto), mete las excéntricas con la flecha hacia el canto y gíralas con el destornillador hasta que aprieten.`
+      : `Une ${lista2([...new Set(us.map(u => nom(u.pasa)))])} a ${nom(+en)}: mete las tuercas de barril en sus taladros (con la ranura hacia el canto), pasa los pernos M6 de ${fmt(D.L)} mm desde fuera de ${R.costillas[+en].etq} y rosca con la llave Allen, sin apretar del todo hasta tener todas puestas.`));
+  }
   // cuñas de las espigas que asoman
   const cun = R.costillas.filter(c => c.cuna);
   if (cun.length) pasos.push(`Mete las cuñas (${lista2(cun.map(c => c.etq))}) en los agujeros de las espigas que asoman${cun.length > 1 ? '' : ''}: por el lado ancho hacia fuera, y golpéalas con la maza hasta que la unión quede apretada. Para desmontar, sácalas golpeando por el lado estrecho.`);
@@ -600,6 +619,7 @@ function pasosPlano(k, maq) {
   // 3) tableros horizontales (asientos, tapas, baldas) sobre sus espigas
   const tapas = {}; R.uniones.filter(u => u.tipo === 'caja' && horiz(u.en)).forEach(u => { (tapas[u.en] = tapas[u.en] || []).push(u.pasa); });
   Object.entries(tapas).forEach(([t, de]) => pasos.push(`Pon ${nom(+t)} encima: las espigas de ${lista2([...new Set(de)].map(nom))} entran por sus cajas. Presiona por igual por todos los lados.`));
+  if (hj.length) pasos.push('Aprieta todos los herrajes por igual, comprobando la escuadra con las diagonales (tienen que medir lo mismo). Se desmonta aflojándolos.');
   pasos.push('Comprueba que el mueble queda a escuadra y apoya bien. Si se quiere fijo, desmonta, pon cola en las uniones y vuelve a montar (o fija las espigas con una cuña).');
   pasos.push(maq ? 'Mira la maqueta desde todos los lados antes de cortar el mueble real.' : 'Acabado: aceite, cera o barniz (mejor antes de montar, para llegar a todas las caras).');
   return pasos;

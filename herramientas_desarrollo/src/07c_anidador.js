@@ -13,8 +13,8 @@ function piezaCalcador(c) {
   (g.interiores || []).forEach(hh => { const ci = contornoCNC(gira ? hh.map(R90) : hh); contornos.push({ pts: ci.pts.map(p => ({ x: r3(p[0] - b.x0), y: r3(p[1] - b.y0) })), b: ci.b.map(v => +v.toFixed(6)), cerrado: true, tipo: 'interior', mec: { op: 'corte', prof: null, puentes: { ...PUENTES0 } } }); });
   // cada agujero: círculo de dos medias vueltas (bulge 1)
   g.agujeros.forEach(a0 => {
-    const a = gira ? [a0[1], -a0[0], a0[2]] : a0, x = a[0] - b.x0, y = a[1] - b.y0;
-    contornos.push({ pts: [{ x: r3(x + a[2]), y: r3(y) }, { x: r3(x - a[2]), y: r3(y) }], b: [1, 1], cerrado: true, tipo: 'interior', mec: { op: 'corte', prof: null, puentes: { ...PUENTES0 } } });
+    const a = gira ? [a0[1], -a0[0], a0[2], a0[3]] : a0, x = a[0] - b.x0, y = a[1] - b.y0;
+    contornos.push({ pts: [{ x: r3(x + a[2]), y: r3(y) }, { x: r3(x - a[2]), y: r3(y) }], b: [1, 1], cerrado: true, tipo: 'interior', mec: { op: a[3] ? 'cajera' : 'corte', prof: a[3] || null, puentes: { ...PUENTES0 } } });
   });
   return { nombre: c.nombre, cantidad: 1, veta: vetaOn() && vetaDe(c) !== 'libre', calcador: { contornos } };
 }

@@ -51,7 +51,8 @@ function geoFab(c) {
   return {
     c, poly, interiores, caja: cajaDe(poly), r: radioFab(), area: Math.abs(c.area) * k * k, huesosMal, nHuesos, nEsq: esq.length,
     // agujeros [x, y, radio]: los de las varillas y los propios de la pieza (el tubo en los discos)
-    agujeros: c.agujeros.map(j => [P.varillas.lista[j][0] * k, P.varillas.lista[j][1] * k, radioFab()]).concat((c.huecos || []).map(h => [h.x * k, h.y * k, h.r * k])).concat((c.taladros || []).map(t => [t[0] * k, t[1] * k, t[2] * k])),
+    agujeros: c.agujeros.map(j => [P.varillas.lista[j][0] * k, P.varillas.lista[j][1] * k, radioFab()]).concat((c.huecos || []).map(h => [h.x * k, h.y * k, h.r * k])).concat((c.taladros || []).map(t => [t[0] * k, t[1] * k, t[2] * k, t[3] === 'ciego' && t[4] ? t[4] * k : 0])),
+    cantos: (c.cantos || []).map(q => ({ a: [q.a[0] * k, q.a[1] * k], b: [q.b[0] * k, q.b[1] * k], r: q.r * k })),
     etiqueta: puntoEtiqueta(c).map(v => v * k),
   };
 }
@@ -152,7 +153,7 @@ function abrirFabricar() {
         <label class="fila chk" title="El contorno sale en rectas y arcos (G01, G02, G03) en vez de muchos tramos rectos"><input type="checkbox" id="fArcos" ${P.cnc.arcos ? 'checked' : ''}> Contornos con arcos</label>
         <label class="fila" title="Lo que se puede separar el arco de la curva original">Tolerancia de los arcos (mm) <input type="number" id="fTol" value="${P.cnc.tolArco}" min="0.005" max="1" step="0.01"></label>
         <div class="info" id="fInfo"></div>
-        <p class="nota" style="margin-top:10px">El DXF lleva las capas <b>CORTE</b> (contornos, con las ranuras), <b>TALADROS</b> (agujeros de las varillas), <b>GRABADO</b> (números) y <b>TABLERO</b> (borde del tablero).</p>
+        <p class="nota" style="margin-top:10px">El DXF lleva las capas <b>CORTE</b> (contornos, con las ranuras), <b>TALADROS</b> (agujeros de las varillas), <b>GRABADO</b> (números) y <b>TABLERO</b> (borde del tablero); los taladros ciegos van en capas <b>CIEGO_…MM</b> con su profundidad y los taladros de canto de los herrajes, como una raya en la capa <b>CANTO</b> (se hacen a mano).</p>
         <p class="nota">Esta colocación usa el rectángulo de cada costilla. Para encajarlas por su forma real, usa <b>🧩 Anidador</b>.</p>
       </div>
       <div><canvas id="fPrev" width="900" height="520"></canvas></div>
@@ -269,8 +270,10 @@ function dxf() {
   const g = (c, v) => out.push(String(c), String(v));
   const n = v => (Math.round(v * 1000) / 1000).toString();
   g(0, 'SECTION'); g(2, 'HEADER'); g(9, '$ACADVER'); g(1, 'AC1009'); g(9, '$INSUNITS'); g(70, 4); g(9, '$MEASUREMENT'); g(70, 1); g(0, 'ENDSEC');
-  g(0, 'SECTION'); g(2, 'TABLES'); g(0, 'TABLE'); g(2, 'LAYER'); g(70, 4);
-  [['CORTE', 7], ['TALADROS', 1], ['GRABADO', 5], ['TABLERO', 8]].forEach(([nom, c]) => { g(0, 'LAYER'); g(2, nom); g(70, 0); g(62, c); g(6, 'CONTINUOUS'); });
+  const capaCiego = p => 'CIEGO_' + String(Math.round(p * 10) / 10).replace('.', '_') + 'MM';
+  const ciegos = [...new Set(col.tableros.flatMap(t => t.piezas.flatMap(pz => pz.g.agujeros.filter(a => a[3]).map(a => capaCiego(a[3])))))], hayCanto = col.tableros.some(t => t.piezas.some(pz => (pz.g.cantos || []).length));
+  g(0, 'SECTION'); g(2, 'TABLES'); g(0, 'TABLE'); g(2, 'LAYER'); g(70, 4 + ciegos.length + (hayCanto ? 1 : 0));
+  [['CORTE', 7], ['TALADROS', 1], ['GRABADO', 5], ['TABLERO', 8], ...ciegos.map(c => [c, 3]), ...(hayCanto ? [['CANTO', 6]] : [])].forEach(([nom, c]) => { g(0, 'LAYER'); g(2, nom); g(70, 0); g(62, c); g(6, 'CONTINUOUS'); });
   g(0, 'ENDTAB'); g(0, 'ENDSEC');
   g(0, 'SECTION'); g(2, 'ENTITIES');
   const poli = (capa, pts, bs) => {
@@ -289,7 +292,8 @@ function dxf() {
       // primero los huecos de dentro (así la pieza no se suelta antes de tiempo) y luego el contorno
       (pz.g.interiores || []).forEach(hh => { const ci = contornoCNC(hh); poli('CORTE', ci.pts.map(p => { const q = aTablero(pz, p); return [ox + q[0], q[1]]; }), ci.b); });
       poli('CORTE', cc.pts.map(p => { const q = aTablero(pz, p); return [ox + q[0], q[1]]; }), cc.b);
-      pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); g(0, 'CIRCLE'); g(8, 'TALADROS'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(a[2])); });
+      (pz.g.cantos || []).forEach(m => { const a = aTablero(pz, m.a), b = aTablero(pz, m.b); g(0, 'LINE'); g(8, 'CANTO'); g(10, n(ox + a[0])); g(20, n(a[1])); g(30, 0); g(11, n(ox + b[0])); g(21, n(b[1])); g(31, 0); });
+      pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); g(0, 'CIRCLE'); g(8, a[3] ? capaCiego(a[3]) : 'TALADROS'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(a[2])); });
       if (f.numeros) {
         const q = aTablero(pz, pz.g.etiqueta), h = altoTexto(pz.g);
         g(0, 'TEXT'); g(8, 'GRABADO'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(h)); g(1, pz.c.etq); g(72, 1); g(11, n(ox + q[0])); g(21, n(q[1] - h / 2)); g(31, 0);
@@ -375,8 +379,12 @@ function listaCompra() {
     const nF = R.uniones.reduce((s, u) => s + (u.puntos || []).length, 0), So = solapeP(), lt = largoTaco(grosorFab());
     if (nF && So.tipo === 'tornillos') L.push([`Tornillos para madera Ø ${fmt(So.diam, 1)} mm, de unos ${fmt(Math.round(grosorFab() * 1.7))} mm (cabeza avellanada)`, String(nF)]);
     else if (nF) { L.push([`Tacos de madera Ø ${fmt(So.diam, 1)} × ${fmt(lt.largo)} mm (taladros ciegos de ${fmt(lt.prof)} mm)`, String(nF)]); L.push(['Cola blanca', 'para los tacos y los solapes']); }
+    const nh = herrajesTotales(), Dh = datosHerraje(planoP().herraje, grosorFab());
+    if (nh.barril) L.push([`Perno M6 × ${fmt(Dh.L)} mm (cabeza Allen plana) y tuerca de barril M6 Ø 10`, `${nh.barril} juegos`]);
+    if (nh.excentrica) L.push(['Excéntrica Ø 15 (tipo minifix) con su perno', `${nh.excentrica} juegos`]);
     if (R.costillas.some(c => c.cuna)) L.push(['Cuñas', `${R.costillas.filter(c => c.cuna).length}, del mismo tablero (van en el corte)`]);
-    L.push(['Herrajes', nF && So.tipo === 'tornillos' ? 'solo los tornillos de los solapes' : 'ninguno (cola en las uniones, si se quiere fijo)']);
+    if (!nh.barril && !nh.excentrica) L.push(['Herrajes', nF && So.tipo === 'tornillos' ? 'solo los tornillos de los solapes' : 'ninguno (cola en las uniones, si se quiere fijo)']);
+    else L.push(['Herramientas', nh.excentrica ? 'broca de Ø 8 y guía para el canto; destornillador' : 'broca de Ø 7 y guía para el canto; llave Allen']);
     return L;
   }
   if (P.tipo === 'reticula') {

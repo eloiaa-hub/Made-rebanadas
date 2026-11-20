@@ -504,6 +504,31 @@ PLANTILLAS.mesilla_dentada = {
     ], asiento: false });
   },
 };
+PLANTILLAS.estanteria_kit = {
+  nombre: 'Estantería de kit', grupo: 'plano',
+  desc: 'Laterales, tapa, base, baldas, zócalo y travesaño trasero unidos a tope con excéntricas (o perno y tuerca de barril): se monta y se desmonta con un destornillador.',
+  params: [
+    { id: 'ancho', nombre: 'Ancho', min: 300, max: 1200, paso: 5, valor: 800 },
+    { id: 'fondo', nombre: 'Fondo', min: 150, max: 600, paso: 5, valor: 300 },
+    { id: 'alto', nombre: 'Altura', min: 300, max: 2200, paso: 5, valor: 1200 },
+    { id: 'baldas', nombre: 'Baldas intermedias', min: 0, max: 8, paso: 1, valor: 3 },
+    { id: 'zocalo', nombre: 'Alto del zócalo', min: 30, max: 150, paso: 1, valor: 70 },
+    { id: 'trasero', nombre: 'Alto del travesaño trasero', min: 40, max: 200, paso: 1, valor: 80 },
+  ],
+  generar(p, e) {
+    const W = p.ancho, D = p.fondo, H = p.alto, z = clamp(p.zocalo, 30, H / 4), tr = clamp(p.trasero, 40, H / 4);
+    const yBase = z + e / 2, yTop = H - e - tr - e / 2 - 10, n = Math.round(p.baldas), paso = (yTop - yBase) / (n + 1);
+    const piezas = [
+      piezaPlana('Lateral izquierdo', 'lado', -(W / 2 - e / 2), rectPlano(-D / 2, 0, D / 2, H, 0)), igualQue('Lateral derecho', 'lado', W / 2 - e / 2, 0),
+      piezaPlana('Tapa', 'horizontal', H - e / 2, rectPlano(-W / 2, -D / 2, W / 2, D / 2, 0)),
+      piezaPlana('Base', 'horizontal', yBase, rectPlano(-W / 2, -D / 2, W / 2, D / 2 - 20 - e, 0)),
+      piezaPlana('Zócalo', 'frente', D / 2 - 20 - e / 2, rectPlano(-W / 2, 0, W / 2, z, 0)),
+      piezaPlana('Travesaño trasero', 'frente', -D / 2 + e / 2, rectPlano(-W / 2, H - e - tr, W / 2, H - e, 0)),
+    ];
+    for (let i = 1; i <= n; i++) piezas.push(piezaPlana('Balda ' + i, 'horizontal', yBase + paso * i, rectPlano(-W / 2, -D / 2, W / 2, D / 2 - 10, 0)));
+    return Object.assign({}, CLAVE_PLANO, { piezas, asiento: false, herraje: 'excentrica' });
+  },
+};
 PLANTILLAS.plano_vacio = {
   nombre: 'Vacío: piezas planas', grupo: 'plano',
   desc: 'Un tablero de frente y otro de lado que se cruzan, para construir el mueble pieza a pieza o traer los contornos de un DXF o SVG.',
@@ -534,6 +559,7 @@ function aplicarPlantilla(soloLargo) {
   }
   const g = pl.generar(P.params, grosor());
   P.largo = g.largo; P.esquinas = g.esquinas; P.claves = g.claves; P.editado = false;
+  if (g.piezas && g.herraje && planoP().herraje == null) planoP().herraje = g.herraje;
   if (g.piezas) { planoP().asiento = g.asiento !== false; planoP().piezas = g.piezas; UI.costilla = Math.min(UI.costilla || 0, g.piezas.length - 1); }
   UI.clave = Math.min(UI.clave, P.claves.length - 1); UI.punto = -1;
 }
