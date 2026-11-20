@@ -27,12 +27,13 @@ No hacen falta para usar el programa: solo para cambiarlo.
 | `02c_disposicion.js` | Dónde va cada costilla (recta, curva, radial, pared), varillas curvas, tubo y discos, rastreles, comprobaciones de radial y pared |
 | `02h_plano.js` | Piezas planas (flat-pack): cada pieza con su plano (`lado`, `frente`, `horizontal`), su posición y su contorno; busca los cruces y hace las uniones (media madera, caja pasante con `rectCaja`, solape de piezas paralelas pegadas con tacos o tornillos repartidos por `puntosFijacion`, esquinas dentadas y espigas en T con `finCanto` y `aplicarDientes`, cuñas), piezas inclinadas (`marcoPieza`, `cruceGeneral`: gira el contorno para poner la recta de cruce vertical), comprobaciones de asiento y vuelco (`analisisAsiento`), comprobaciones, posición 3D (`basePieza`) |
 | `07f_prueba.js` | Pieza de prueba de holgura: retal con ranuras y cajas de varios anchos (`geoPrueba`), DXF y SVG |
+| `07g_presupuesto.js` | Tiempo de mecanizado (largo de corte × pasadas, entradas, taladros, tableros) y presupuesto (`calcularPresupuesto`, ventana, CSV, hoja del plano) |
 | `03_plantillas.js` | Plantillas paramétricas (banco, tumbona, pouf, mesa, estantería, libre…; las de piezas planas devuelven `piezas`) |
 | `04_editor2d.js` | Editor del perfil clave y vista de la costilla |
 | `05_tres.js` | Vista 3D (Three.js) |
 | `06_panel.js` | Paneles, recálculo y resumen |
 | `07_fabricacion.js` | Maqueta a escala, colocación en tableros, DXF, SVG, despiece y CSV |
-| `07b_plano.js` | Escritor de PDF propio y plano de montaje |
+| `07b_plano.js` | Escritor de PDF propio y plano de montaje (con las vistas acotadas: `capturaOrto`, `hojaVistas`) |
 | `07c_anidador.js` | Ventana del Anidador y paso de las costillas (formato .json del Calcador) |
 | `07d_cnc.js` | Hueso de perro y ajuste de rectas y arcos (bulge) para el DXF, el SVG y el Anidador |
 | `07e_exportar3d.js` | Guardar el mueble montado en STL binario, OBJ + MTL (una pieza por objeto), GLB (glTF 2.0 con materiales y texturas incrustadas, `exportarGLB`) o SolidCraft (`.sc`: ZIP sin comprimir con `container.json`, `document.json` y `blobs/<sha256>.mesh` en formato `SCMESH01`; o JSON plano con las mallas dentro). Suelda y cierra las mallas (`soldarMalla`, `taparAgujeros`) |

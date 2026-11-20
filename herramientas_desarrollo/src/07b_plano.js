@@ -169,6 +169,7 @@ function planoPDF() {
 
   const cs = R.costillas.filter(c => c.ok);
   const oH = { M, W, H, k, e, maq, gris, azul, madera, rojo, cm };
+  hojaVistas(D, cabecera, oH);
   if (esPlano()) hojaPlano(D, cabecera, tabla, oH);
   else if (ret) hojaReticula(D, cabecera, tabla, oH);
   else if (P.tipo === 'radial') hojaRadial(D, cabecera, tabla, oH);
@@ -371,6 +372,14 @@ function planoPDF() {
   });
   D.texto(M, H - M - 4, 'Herramientas: ' + (esPlano() ? (maq ? 'cortadora láser, lija fina; cola si se quiere fijo.' : 'CNC (o sierra de calar y escoplo), lija, maza de goma; cola si se quiere fijo.') : P.tipo === 'radial' ? (maq ? 'cortadora láser o cúter, cola.' : 'CNC o láser, sierra para el tubo, cola, lija.') : P.tipo === 'pared' ? 'CNC o sierra de calar, taladro, tacos y tornillos, nivel, taco separador.' : ret ? (maq ? 'cortadora láser o cúter, lija fina.' : 'CNC (fresa menor que la ranura), formón o lima, mazo de goma, lija.') : maq ? 'cortadora láser o cúter, cola blanca.' : `CNC o sierra de calar, broca de Ø ${fmt(2 * radioFab(), 1)}, lija, llaves para las tuercas M${V.diam}.`), { pt: 9, col: gris });
 
+  // ---- última hoja: tiempo de mecanizado y presupuesto ----
+  { const r = calcularPresupuesto(), fl = filasPresupuesto(r).map(f => f.titulo ? f : f.map(t => String(t).replace(/²/g, '2'))), i = fl.findIndex(f => f.titulo && /^Presupuesto/.test(f.titulo));
+    cabecera('Tiempo de mecanizado y presupuesto');
+    const a = (W - 2 * M - 12) / 2;
+    tabla(M, M + 18, a, fl.slice(0, i), { c1: a * 0.55 });
+    tabla(M + a + 12, M + 18, a, fl.slice(i), { c1: a * 0.55 });
+    D.parrafo(M, H - M - 14, W - 2 * M, `Estimación orientativa con fresa de Ø ${fmt(fresaFab(), 1)} mm, pasadas de ${fmt(r.B.pasada, 1)} mm, avance de ${fmt(r.B.avance)} mm/min y tableros de ${fmt(fabActual().ancho)} × ${fmt(fabActual().alto)} mm. Los datos y los precios se cambian en Fabricar > Tiempo y presupuesto.`, { pt: 8, col: gris });
+  }
   // pies de página
   hojas.forEach((p, i) => { D.p = p; D.trazo([200, 200, 200]).grosor(0.2).linea(M, H - 8, W - M, H - 8); D.texto(M, H - 4.5, 'Made-rebanadas', { pt: 7.5, col: gris }); D.texto(W - M, H - 4.5, `Hoja ${i + 1} de ${hojas.length}`, { pt: 7.5, al: 'r', col: gris }); });
   return D.generar();
@@ -594,4 +603,122 @@ function pasosPlano(k, maq) {
   pasos.push('Comprueba que el mueble queda a escuadra y apoya bien. Si se quiere fijo, desmonta, pon cola en las uniones y vuelve a montar (o fija las espigas con una cuña).');
   pasos.push(maq ? 'Mira la maqueta desde todos los lados antes de cortar el mueble real.' : 'Acabado: aceite, cera o barniz (mejor antes de montar, para llegar a todas las caras).');
   return pasos;
+}
+
+/* ---------- vistas acotadas (sistema europeo): alzado, planta y perfil izquierdo ----------
+   Se dibujan desde el 3D con cámara ortográfica: piezas en blanco y sus aristas en negro (las ocultas no se ven).
+   Escala normalizada (1:1, 1:2, 1:5, 1:10, 1:20, 1:25, 1:50, 1:100) y cotas generales y parciales. */
+const VISTAS_ORTO = {
+  alzado: { R: [1, 0, 0], U: [0, 1, 0], B: [0, 0, 1] },
+  planta: { R: [1, 0, 0], U: [0, 0, -1], B: [0, 1, 0] },
+  perfil: { R: [0, 0, 1], U: [0, 1, 0], B: [-1, 0, 0] },
+};
+function mallasVista() {
+  const ms = [];
+  G.modelo.updateMatrixWorld(true);
+  G.modelo.traverse(o => { if (o.isMesh && o.visible && o.userData.extra !== 'pared' && o !== G.fantasma) ms.push(o); });
+  return ms;
+}
+function cajaModelo3D() {
+  const b = new T.Box3(); mallasVista().forEach(m => b.expandByObject(m));
+  return b;
+}
+function capturaOrto(vista, sK, pxmm) {
+  if (G.montaje) pararMontaje();
+  const r = G.renderer, pr = r.getPixelRatio(), fondo = G.scene.background, ex = P.vista.explosion, res = P.vista.resalta, fan = P.vista.fantasma;
+  P.vista.explosion = 0; P.vista.resalta = false; P.vista.fantasma = false; colocarExplosion(); resaltar3D(); construirFantasma();
+  const ms = mallasVista(), V = VISTAS_ORTO[vista], box = new T.Box3(); ms.forEach(m => box.expandByObject(m));
+  const ocultos = []; G.modelo.children.forEach(o => { if (o.visible && !ms.includes(o) && !o.isGroup) { o.visible = false; ocultos.push(o); } });
+  [G.suelo, G.rejilla].forEach(o => { if (o && o.visible) { o.visible = false; ocultos.push(o); } });
+  const blanco = new T.MeshBasicMaterial({ color: 0xffffff, side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }), negro = new T.LineBasicMaterial({ color: 0x111111 });
+  const mats = ms.map(m => m.material), lineas = ms.map(m => { const l = new T.LineSegments(new T.EdgesGeometry(m.geometry, 25), negro); m.add(l); return l; });
+  ms.forEach(m => { m.material = blanco; });
+  const dot = (p, d) => p.x * d[0] + p.y * d[1] + p.z * d[2];
+  const cs = []; for (let i = 0; i < 8; i++) cs.push(new T.Vector3(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z));
+  const us = cs.map(p => dot(p, V.R)), vs = cs.map(p => dot(p, V.U)), u0 = Math.min(...us), u1 = Math.max(...us), v0 = Math.min(...vs), v1 = Math.max(...vs);
+  const pad = Math.max(u1 - u0, v1 - v0) * 0.01 + 1, c = box.getCenter(new T.Vector3()), cu = dot(c, V.R), cv = dot(c, V.U), dist = box.getSize(new T.Vector3()).length() + 100;
+  const cam = new T.OrthographicCamera(u0 - pad - cu, u1 + pad - cu, v1 + pad - cv, v0 - pad - cv, 1, dist * 2 + 10);
+  cam.position.set(c.x + V.B[0] * dist, c.y + V.B[1] * dist, c.z + V.B[2] * dist); cam.up.set(V.U[0], V.U[1], V.U[2]); cam.lookAt(c); cam.updateProjectionMatrix();
+  const wpx = Math.round(clamp((u1 - u0 + 2 * pad) * sK * pxmm, 50, 3000)), hpx = Math.round(clamp((v1 - v0 + 2 * pad) * sK * pxmm, 50, 3000));
+  G.scene.background = new T.Color('#ffffff');
+  r.setPixelRatio(1); r.setSize(wpx, hpx, false); r.render(G.scene, cam);
+  const url = r.domElement.toDataURL('image/jpeg', 0.92);
+  // deja todo como estaba
+  ms.forEach((m, i) => { m.material = mats[i]; m.remove(lineas[i]); lineas[i].geometry.dispose(); });
+  blanco.dispose(); negro.dispose(); ocultos.forEach(o => { o.visible = true; });
+  G.scene.background = fondo; P.vista.explosion = ex; P.vista.resalta = res; P.vista.fantasma = fan;
+  r.setPixelRatio(pr); ajustar3D(); colocarExplosion(); resaltar3D(); construirFantasma(); pedirRender();
+  return { bin: atob(url.split(',')[1]), w: wpx, h: hpx, u0: u0 - pad, u1: u1 + pad, v0: v0 - pad, v1: v1 + pad };
+}
+// una cota: de p1 a p2 (en el papel), con la línea de cota desplazada «off» mm hacia fuera (eje 'h' o 'v')
+function cotaPDF(D, eje, a, b, ref, pos, txt, o = {}) {
+  const col = o.col || [31, 79, 138], fl = 1.8, an = 0.55;
+  if (Math.abs(b - a) < 0.3) return;
+  D.trazo(col).relleno(col).grosor(0.15);
+  if (eje === 'h') {
+    const s = pos < ref ? -1 : 1;
+    D.linea(a, ref + s * 1, a, pos + s * 1.5).linea(b, ref + s * 1, b, pos + s * 1.5).linea(a, pos, b, pos);
+    const dirF = b - a > 2 * fl + 1 ? 1 : -1;   // flechas por dentro o, si no caben, por fuera
+    D.poli([[a, pos], [a + dirF * fl, pos - an], [a + dirF * fl, pos + an]], true, 'f').poli([[b, pos], [b - dirF * fl, pos - an], [b - dirF * fl, pos + an]], true, 'f');
+    D.texto((a + b) / 2, pos - 1, txt, { pt: o.pt || 7, al: 'c', col });
+  } else {
+    const s = pos < ref ? -1 : 1;
+    D.linea(ref + s * 1, a, pos + s * 1.5, a).linea(ref + s * 1, b, pos + s * 1.5, b).linea(pos, a, pos, b);
+    const dirF = Math.abs(b - a) > 2 * fl + 1 ? 1 : -1, sg = b > a ? 1 : -1;
+    D.poli([[pos, a], [pos - an, a + sg * dirF * fl], [pos + an, a + sg * dirF * fl]], true, 'f').poli([[pos, b], [pos - an, b - sg * dirF * fl], [pos + an, b - sg * dirF * fl]], true, 'f');
+    D.texto(pos + (s < 0 ? -1 : 1), (a + b) / 2 + 1.1, txt, { pt: o.pt || 7, al: s < 0 ? 'r' : 'l', col });
+  }
+  D.trazo([0, 0, 0]).relleno([0, 0, 0]);
+}
+// cotas parciales: valores únicos ordenados entre min y max, sin tramos de menos de «minimo»
+const cadenaCotas = (vals, mn, mx, minimo) => { const v = [mn, ...vals.filter(x => x > mn + minimo && x < mx - minimo), mx].sort((a, b) => a - b); const r = [v[0]]; v.slice(1).forEach((x, i) => { if (i === v.length - 2) { if (x - r[r.length - 1] < minimo && r.length > 1) r.pop(); r.push(x); } else if (x - r[r.length - 1] >= minimo) r.push(x); }); return r; };
+function hojaVistas(D, cabecera, o) {
+  const { M, W, H, k, gris, azul } = o, box = cajaModelo3D();
+  if (box.isEmpty()) return;
+  const X0 = box.min.x, X1 = box.max.x, Y0 = box.min.y, Y1 = box.max.y, Z0 = box.min.z, Z1 = box.max.z;
+  const lx = (X1 - X0) * k, ly = (Y1 - Y0) * k, lz = (Z1 - Z0) * k;
+  const AW = W - 2 * M - 46, AH = H - (M + 26) - M - 34;   // sitio para las tres vistas, quitando el de las cotas
+  const escalas = [1, 2, 5, 10, 20, 25, 50, 100, 200];
+  const N = escalas.find(n => (lx + lz) / n <= AW && (ly + lz) / n <= AH) || 200, sO = 1 / N, sK = k * sO;
+  cabecera('1b. Vistas acotadas');
+  D.texto(M, M + 19.5, `Escala 1:${N} · sistema europeo (el perfil izquierdo va a la derecha del alzado y la planta, debajo) · medidas en mm${enMaqueta() ? ' de la maqueta' : ''}`, { pt: 8.5, col: gris });
+  // posiciones de las vistas en el papel
+  const gx = 30, gy = 26, ancho = (X1 - X0) * sK, alto = (Y1 - Y0) * sK, fondo = (Z1 - Z0) * sK;
+  const totW = ancho + gx + fondo, totH = alto + gy + fondo;
+  const xA = M + 16 + Math.max(0, (W - 2 * M - 46 - totW) / 2), yA = M + 34 + Math.max(0, (H - (M + 26) - M - 34 - totH) / 2);
+  const xL = xA + ancho + gx, yP = yA + alto + gy;
+  const poner = (vista, x, y) => {
+    const c = capturaOrto(vista, sK, 10);
+    // la imagen cubre [u0, u1] × [v0, v1]; el punto (u = mín. del modelo, v = máx.) cae en (x, y)
+    const umin = vista === 'perfil' ? Z0 : X0, vmax = vista === 'planta' ? -Z0 : Y1;
+    D.imagen(c.bin, c.w, c.h, x - (umin - c.u0) * sK, y - (c.v1 - vmax) * sK, (c.u1 - c.u0) * sK, (c.v1 - c.v0) * sK);
+  };
+  poner('alzado', xA, yA); poner('perfil', xL, yA); poner('planta', xA, yP);
+  const tit = (x, y, t) => D.texto(x, y, t, { pt: 8, b: true, col: gris });
+  tit(xA, yA + alto + 6.5, 'ALZADO'); tit(xL, yA + alto + 6.5, 'PERFIL IZQUIERDO'); tit(xA + ancho + 8, yP + fondo / 2 + 1, 'PLANTA');
+  const f = v => fmt(v * k);
+  // posiciones en el papel
+  const AX = x => xA + (x - X0) * sK, AY = y => yA + (Y1 - y) * sK, LX = z => xL + (z - Z0) * sK, PY = z => yP + (z - Z0) * sK;
+  // cotas generales
+  cotaPDF(D, 'h', AX(X0), AX(X1), yA, yA - 7, f(X1 - X0));
+  cotaPDF(D, 'v', AY(Y1), AY(Y0), xA, xA - 8, f(Y1 - Y0));
+  cotaPDF(D, 'h', LX(Z0), LX(Z1), yA, yA - 7, f(Z1 - Z0));
+  cotaPDF(D, 'v', PY(Z0), PY(Z1), xA, xA - 8, f(Z1 - Z0));
+  // cotas parciales: alturas de los tableros horizontales (perfil), laterales (planta)
+  const e = grosor(), hz = [], lados = []; let aEjes = false;
+  void e;
+  if (esPlano()) mallasVista().forEach(m => {   // medidas tomadas del propio 3D (ya colocado y centrado)
+    const c = m.userData.i != null && R.costillas[m.userData.i]; if (!c || !c.ok || c.giro || c.cuna) return;
+    const bb = new T.Box3().setFromObject(m);
+    if (c.plano === 'horizontal') hz.push(bb.max.y); if (c.plano === 'lado') { if (bb.max.x - bb.min.x >= Math.max(6, 3 / sK)) lados.push(bb.min.x, bb.max.x); else { lados.push((bb.min.x + bb.max.x) / 2); aEjes = true; } }
+  });
+  const cadY = cadenaCotas(hz, Y0, Y1, Math.max(8, 4 / sK));
+  if (cadY.length > 2) for (let i = 1; i < cadY.length; i++) cotaPDF(D, 'v', AY(cadY[i]), AY(cadY[i - 1]), xL + fondo, xL + fondo + 7, f(cadY[i] - cadY[i - 1]));
+  cotaPDF(D, 'v', AY(Y1), AY(Y0), xL + fondo, xL + fondo + (cadY.length > 2 ? 17 : 7), f(Y1 - Y0));
+  const cadX = cadenaCotas(lados, X0, X1, Math.max(6, 3 / sK));
+  if (cadX.length > 2 && cadX.length <= 10) for (let i = 1; i < cadX.length; i++) cotaPDF(D, 'h', AX(cadX[i - 1]), AX(cadX[i]), yP + fondo, yP + fondo + 7, f(cadX[i] - cadX[i - 1]));
+  cotaPDF(D, 'h', AX(X0), AX(X1), yP + fondo, yP + fondo + (cadX.length > 2 && cadX.length <= 10 ? 15 : 7), f(X1 - X0));
+  if (aEjes && cadX.length > 2 && cadX.length <= 10) D.texto(xA + ancho + 4, yP + fondo + 8, 'a ejes de las piezas', { pt: 6.5, col: gris });
+  // cuadro de datos
+  D.texto(W - M, H - M - 6, `${P.nombre} · ${fmt(lx)} × ${fmt(lz)} × ${fmt(ly)} mm (ancho × fondo × alto)`, { pt: 8, al: 'r', col: azul });
 }

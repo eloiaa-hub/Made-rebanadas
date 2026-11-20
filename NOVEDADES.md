@@ -2,6 +2,8 @@
 
 ## v1.5
 
+- **Vistas acotadas en el plano PDF** (hoja nueva tras el conjunto): alzado, planta y perfil izquierdo en sistema europeo, dibujados en línea desde el 3D, a escala normalizada (1:5, 1:10, 1:20…), con las cotas generales y, en piezas planas, las parciales (alturas de los tableros horizontales y posición de los laterales).
+- **Tiempo de mecanizado y presupuesto** (Fabricar → ⏱ Tiempo y presupuesto): largo de corte con sus pasadas, entradas de fresa, taladros y tiempo por tablero; coste de tableros, horas de máquina, herrajes, cola, acabado y margen. Los datos y precios se guardan con el proyecto, salen en CSV y en la última hoja del plano.
 - **Pieza de prueba de holgura** (Fabricar → 🧪 Pieza de prueba): un retal con ranuras y cajas de varios anchos, con la medida grabada, para probar con el tablero real y elegir la holgura buena. DXF o SVG.
 - **Coordenadas del punto seleccionado**: al hacer clic en un punto del perfil (o de una pieza plana), arriba salen sus dos medidas y se pueden escribir para dibujar a cota exacta.
 - Piezas planas: **espigas pasantes con cuña** (casilla en «Piezas planas: uniones»): la espiga asoma lo justo, lleva un agujero y la cuña sale del mismo tablero; firme sin cola y desmontable.

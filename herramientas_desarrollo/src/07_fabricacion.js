@@ -157,7 +157,7 @@ function abrirFabricar() {
       </div>
       <div><canvas id="fPrev" width="900" height="520"></canvas></div>
     </div>`,
-    [['🧪 Pieza de prueba', () => dialogoPrueba()], ['🧩 Anidador', () => { cerrarModal(); abrirAnidador(); }], ['⬇ CSV de cortes', () => exportarCSVCortes()], ['📄 SVG', () => exportarSVG()], ['📐 DXF', () => exportarDXF(), true]], true);
+    [['⏱ Tiempo y presupuesto', () => dialogoPresupuesto()], ['🧪 Pieza de prueba', () => dialogoPrueba()], ['🧩 Anidador', () => { cerrarModal(); abrirAnidador(); }], ['⬇ CSV de cortes', () => exportarCSVCortes()], ['📄 SVG', () => exportarSVG()], ['📐 DXF', () => exportarDXF(), true]], true);
   const leer = () => {
     const t = $('#fTab').value;
     if (t !== 'otro') { const [a, h] = t.split('x').map(Number); $('#fA').value = a; $('#fH').value = h; }

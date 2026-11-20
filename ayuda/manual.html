@@ -706,6 +706,17 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
   </div>
 </div>
 <p><b>⬇ CSV de cortes</b> guarda una línea por costilla (nombre, largo y ancho de su rectángulo, cantidad y veta) con el mismo formato de despiece que lee el <b>Anidador</b> y que abre cualquier hoja de cálculo. <b>🧩 Anidador</b> abre el Anidador con las costillas por su forma real (sección 23).</p>
+<h3 id="presupuesto">Tiempo de mecanizado y presupuesto</h3>
+<figure><img src="img/presupuesto.png" alt="Ventana de tiempo de mecanizado y presupuesto"></figure>
+<p><b>⏱ Tiempo y presupuesto</b> (en Fabricar) estima cuánto tarda la CNC y cuánto cuesta el mueble:</p>
+<ul>
+  <li><b>Tiempo de corte</b>: suma el largo de todos los contornos, los interiores (cajas, huecos) y los agujeros mayores que la fresa, y lo multiplica por el número de <b>pasadas</b> (grosor ÷ profundidad de pasada, redondeando hacia arriba). Se divide por el <b>avance</b>.</li>
+  <li><b>Entradas y taladros</b>: cada contorno y cada pasada tienen una entrada de la fresa (subir, moverse en vacío y bajar); los agujeros del tamaño de la fresa o menores se cuentan como taladros.</li>
+  <li><b>Tableros</b>: un tiempo fijo por cada tablero (sujetarlo, poner el cero, sacar las piezas y limpiar). El número de tableros es el de la colocación de Fabricar.</li>
+  <li>Un porcentaje de <b>imprevistos</b> cubre las aceleraciones y las curvas, que el cálculo no ve.</li>
+</ul>
+<p>El <b>presupuesto</b> suma los tableros (precio según el material), las horas de máquina, los herrajes del tipo de mueble (varilla, separadores y tuercas; tubo; rastrel; tacos o tornillos), la cola y los varios, el acabado por m² (las dos caras) y un margen. Todos los datos se pueden cambiar y <b>se guardan con el proyecto</b>; <b>Precios por defecto</b> los recupera y <b>⬇ CSV</b> guarda el presupuesto con el largo de corte de cada pieza. El plano en PDF lleva estos datos en su última hoja.</p>
+<div class="caja">Es una estimación para preparar el trabajo: compara una vez el tiempo calculado con el real de tu máquina y ajusta el avance o los imprevistos para que se parezcan.</div>
 <div class="caja taller">Taladra y vacía <b>los agujeros antes que el contorno</b>: si cortas primero la pieza, se puede mover al hacer los agujeros. Deja puentes (pestañas) si la pieza es pequeña.</div>
 
 <h2 id="despiece">20. Despiece y lista de compra</h2>
@@ -731,11 +742,14 @@ footer{margin-top:18px;break-before:avoid;border-top:1px solid var(--b);padding-
 <p><b>📄 Plano</b> descarga un PDF apaisado (A4) para llevar al taller. Lleva:</p>
 <ol>
   <li><b>Conjunto</b>: el mueble en 3D, sus datos y la lista de compra.</li>
+  <li><b>Vistas acotadas</b>: alzado, planta y perfil izquierdo en sistema europeo (el perfil a la derecha del alzado y la planta debajo), dibujados en línea a una escala normalizada (1:5, 1:10, 1:20…), con las cotas generales de ancho, fondo y alto. En los muebles de piezas planas añade cotas parciales: las alturas de los tableros horizontales en el perfil y la posición de los laterales en la planta (a ejes, si la pieza es fina).</li>
   <li><b>Orden de montaje</b>: vista lateral con todas las costillas numeradas y las varillas, el perfil con la posición de cada varilla (medida desde atrás y desde el suelo), su largo y las costillas que atraviesa.</li>
   <li><b>Costillas</b>: todas, a la misma escala, con su número, medidas, posición y agujeros (8 por hoja).</li>
   <li><b>Corte</b>: los tableros con las costillas colocadas, como en Fabricar.</li>
   <li><b>Montaje paso a paso</b> y herramientas.</li>
+  <li><b>Tiempo de mecanizado y presupuesto</b> (apartado 19).</li>
 </ol>
+<figure><img src="img/plano_vistas.jpg" alt="Hoja de vistas acotadas del plano"><figcaption>Hoja de vistas acotadas: alzado, perfil izquierdo y planta, con cotas generales y parciales.</figcaption></figure>
 <div class="dos">
   <figure><img src="img/plano1.jpg" alt="Hoja 1 del plano"><figcaption>Hoja 1: conjunto, datos y compra.</figcaption></figure>
   <figure><img src="img/plano2.jpg" alt="Hoja 2 del plano"><figcaption>Hoja 2: orden de montaje y varillas.</figcaption></figure>

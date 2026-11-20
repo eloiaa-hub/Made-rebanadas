@@ -95,6 +95,8 @@ function proyectoBase() {
     vista: { explosion: 0, fantasma: false, varillas: true, resalta: true, claves: true, rasante: false, rasAng: 30 },
     maqueta: { activa: false, escala: 5, grosor: 3, diam: 3, holgura: 0.2, fresa: 0 },
     cnc: { fresa: 6, hueso: true, arcos: true, tolArco: 0.05, veta: 'no' },
+    presupuesto: { avance: 3000, pasada: 6, bajada: 600, entrada: 3, minTablero: 5, extra: 15, hora: 30, precios: {}, precioMaqueta: 4,
+      varilla: 3, separador: 4, tuerca: 0.3, rastrel: 2.5, taco: 0.05, tornillo: 0.08, cola: 10, acabado: 8, margen: 0 },
     reticula: { num: 4, margen: 40, holgura: 0.3, xArriba: true, vuelo: 25 },
     planta: { forma: 'recta', radio: 2500, sentido: 1, amplitud: 150, ondas: 1 },
     radial: { tubo: 20, holguraTubo: 0.5, discos: 2, rDisco: 0, holgura: 0.3 },
