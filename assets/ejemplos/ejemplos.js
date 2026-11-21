@@ -82,5 +82,5 @@ window.MADE_EJEMPLOS = [
   { nombre: 'Silla de tableros de roble', plantilla: 'silla_plana', desc: 'Piezas planas: laterales con espigas por el asiento, respaldo y travesaños a media madera y pasantes.',
     params: {}, costillas: { grosor: 18, material: 'roble' } },
   { nombre: 'Estantería de kit en blanco', plantilla: 'estanteria_kit', desc: 'Piezas planas a tope con perno y tuerca de barril: se monta y se desmonta con una llave Allen. 1,8 m de alto y 4 baldas.',
-    params: { ancho: 700, fondo: 320, alto: 1800, baldas: 4 }, costillas: { grosor: 19, material: 'lacado', color: '#f2efe8' }, plano: { herraje: 'barril' } },
+    params: { ancho: 560, fondo: 320, alto: 1800, baldas: 4 }, costillas: { grosor: 19, material: 'lacado', color: '#f2efe8' }, plano: { herraje: 'barril' } },
 ];

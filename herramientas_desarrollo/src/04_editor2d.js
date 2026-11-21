@@ -349,7 +349,8 @@ function dibujarPerfilPlano(ctx, V) {
     const b = cajaDe(u.zonas[0].poly), [lx, ly] = V.aPantalla(b.x0 + b.w / 2, b.y1);
     ctx.fillStyle = '#5f6b78'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center'; ctx.fillText(`${otra.etq} (solape)`, lx, ly - 4); ctx.textAlign = 'left';
   });
-  (c.taladros || []).forEach(t => { const [x, y] = V.aPantalla(t[0], t[1]); ctx.strokeStyle = '#5f6b78'; ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(x, y, Math.max(3, t[2] * V.sc), 0, PI2); ctx.fill(); ctx.stroke(); });
+  (c.taladros || []).forEach(t => { const [x, y] = V.aPantalla(t[0], t[1]), ci = t[3] === 'ciego'; ctx.strokeStyle = '#5f6b78'; ctx.fillStyle = ci ? 'rgba(95,107,120,.18)' : 'rgba(255,255,255,.8)'; ctx.lineWidth = 1.4; ctx.setLineDash(ci ? [3, 2] : []); ctx.beginPath(); ctx.arc(x, y, Math.max(3, t[2] * V.sc), 0, PI2); ctx.fill(); ctx.stroke(); ctx.setLineDash([]); });
+  (c.cantos || []).forEach(m => { const a = V.aPantalla(m.a[0], m.a[1]), b = V.aPantalla(m.b[0], m.b[1]); ctx.strokeStyle = '#b5532f'; ctx.lineWidth = Math.max(1.5, 2 * m.r * V.sc); ctx.globalAlpha = 0.45; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); ctx.globalAlpha = 1; });
   // la pieza como se corta (con ranuras y cajas)
   if (c.ok) {
     ctx.fillStyle = conAlfa(acento, .12); ctx.beginPath();

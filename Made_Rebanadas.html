@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Made-rebanadas — Por Eloi A.A.</title>
-<link rel="stylesheet" href="assets/css/estilo.css?v=202611202354">
+<link rel="stylesheet" href="assets/css/estilo.css?v=202611210956">
 </head>
 <body>
 <header class="barra">
@@ -84,6 +84,8 @@
         <label class="fila" title="Lo que las ranuras y las cajas son más anchas que el tablero, para que entren a mano">Holgura de las uniones (mm) <input type="number" id="plHolgura" min="0" max="3" step="0.05" value="0.3"></label>
         <label class="fila chk" title="Comprueba las medidas del asiento (para un adulto) y si vuelca al sentarse en el borde o al apoyarse en el respaldo"><input type="checkbox" id="plAsiento"> Es para sentarse (medidas y vuelco)</label>
         <label class="fila" title="Cuando el canto de una pieza llega contra la cara de otra (laterales y baldas, esquinas): uniones dentadas, o a tope con un herraje desmontable de mueble de kit">Cantos a tope <select id="plHerraje"><option value="no">Dentadas (sin herraje)</option><option value="barril">Perno y tuerca de barril</option><option value="excentrica">Excéntrica (minifix)</option></select></label>
+        <label class="fila chk" title="Espigas de madera de Ø 8 × 30 mm a 32 mm de cada herraje: centran las piezas y aguantan el peso de las baldas; el herraje solo aprieta"><input type="checkbox" id="plTubillon" checked> Tubillones junto a los herrajes</label>
+        <label class="fila chk" title="El taladro de la tuerca de barril, ciego por la cara que no se ve (deja 2 mm de fondo). Si el tablero es delgado, sale pasante"><input type="checkbox" id="plBarrilCiego" checked> Tuerca de barril en taladro ciego</label>
         <label class="fila chk" title="Calcula cuánto se doblan el asiento y las baldas entre las piezas que los sostienen, según la luz, el grosor y el tablero"><input type="checkbox" id="plFlexion"> Comprobar la flexión de asientos y baldas</label>
         <label class="fila" title="Peso de la persona en el centro del asiento (o en la punta, si vuela)">Persona sentada (kg) <input type="number" id="plPersona" min="20" max="200" step="5" value="100"></label>
         <label class="fila" title="Carga repartida en baldas y tapas. Libros: 100 a 200 kg/m²; objetos ligeros: 50">Carga de las baldas (kg/m²) <input type="number" id="plCarga" min="0" max="500" step="10" value="150"></label>
@@ -476,15 +478,15 @@
 <input type="file" id="fLetra" class="oculto" accept=".ttf,.otf,.woff,.woff2">
 <div id="aviso" class="aviso"></div>
 
-<script src="assets/js/three-bundle.js?v=202611202354"></script>
-<script src="assets/texturas/texturas.js?v=202611202354"></script>
+<script src="assets/js/three-bundle.js?v=202611210956"></script>
+<script src="assets/texturas/texturas.js?v=202611210956"></script>
 <script src="assets/texturas/pbr/roble.js"></script>
 <script src="assets/texturas/pbr/nogal.js"></script>
 <script src="assets/texturas/pbr/fresno.js"></script>
 <script src="assets/texturas/pbr/haya.js"></script>
 <script src="assets/texturas/pbr/pino.js"></script>
-<script src="assets/ejemplos/ejemplos.js?v=202611202354"></script>
-<script src="assets/js/clipper.js?v=202611202354"></script>
-<script src="assets/js/app.js?v=202611202354"></script>
+<script src="assets/ejemplos/ejemplos.js?v=202611210956"></script>
+<script src="assets/js/clipper.js?v=202611210956"></script>
+<script src="assets/js/app.js?v=202611210956"></script>
 </body>
 </html>

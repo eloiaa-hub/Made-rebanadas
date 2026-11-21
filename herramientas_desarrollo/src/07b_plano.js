@@ -246,7 +246,7 @@ function planoPDF(F = null) {   // F: opciones de la ficha de práctica (enuncia
       (c.int || []).forEach(hh => D.relleno([255, 255, 255]).trazo(madera).grosor(0.35).poli(hh.map(p => [PX(p[0]), PY(p[1])]), true, 'b'));
       D.relleno([255, 255, 255]).trazo(rojo).grosor(0.25);
       c.agujeros.forEach(j2 => D.circulo(PX(V.lista[j2][0]), PY(V.lista[j2][1]), Math.max(0.6, radioAgujero() * s3), 'b'));
-      (c.taladros || []).forEach(t => D.circulo(PX(t[0]), PY(t[1]), Math.max(0.5, t[2] * s3), 'b'));
+      (c.taladros || []).forEach(t => D.circulo(PX(t[0]), PY(t[1]), Math.max(0.5, t[2] * s3), t[3] === 'ciego' ? 's' : 'b'));
       (c.cantos || []).forEach(m => D.linea(PX(m.a[0]), PY(m.a[1]), PX(m.b[0]), PY(m.b[1])));
       D.relleno([0, 0, 0]).trazo();
       const et = puntoEtiqueta(c);
@@ -599,14 +599,17 @@ function pasosPlano(k, maq) {
   // uniones a tope con herraje desmontable
   const hj = R.uniones.filter(u => u.tipo === 'herraje');
   if (hj.length) {
-    const D = hj[0].datos, ex = hj[0].herraje === 'excentrica';
-    pasos.splice(2, 0, ex
-      ? `Taladros de las excéntricas (en el DXF salen los de las caras): Ø 15 a ${fmt(D.profC, 1)} mm de profundidad en las piezas que llegan a tope, a ${fmt(D.dB)} mm del canto, y Ø 5 a ${fmt(D.profP)} mm para los pernos en la otra pieza. Después, a mano y con una guía, el taladro de Ø 8 en el canto hasta la excéntrica (raya de la capa CANTO).`
-      : `Taladros de los pernos (en el DXF salen los de las caras): Ø 7 pasante en la pieza que recibe y Ø 10 pasante para la tuerca de barril a ${fmt(D.dB)} mm del canto en la que llega a tope. Después, a mano y con una guía, el taladro de Ø 7 en el canto, de ${fmt(D.profCanto)} mm, hasta el de la tuerca (raya de la capa CANTO).`);
+    const D = hj[0].datos, ex = hj[0].herraje === 'excentrica', Tb = datosTubillon(grosor()), nTub = hj.reduce((s, u) => s + (u.tubillones || []).length, 0);
+    const volt = R.costillas.filter(c => c.ok && !c.cuna && geoFab(c).volteada).map(c => c.etq);
+    const tub = nTub ? ` Los ${nTub} tubillones de Ø 8 × ${Tb.largo} mm llevan un taladro ciego de ${fmt(Tb.prof)} mm en la cara (en el DXF) y otro de ${fmt(Tb.largo - Tb.prof + 2)} mm en el canto (a mano).` : '';
+    const caras = ` Los taladros ciegos van por la cara que no se ve (debajo de tapas y baldas, por dentro en las demás); ${volt.length ? `por eso las piezas ${lista2(volt)} salen en espejo en el DXF: se cortan con esa cara hacia arriba.` : 'en el DXF ya salen hacia arriba.'}`;
+    pasos.splice(2, 0, (ex
+      ? `Taladros de las excéntricas: ciego de Ø 15 y ${fmt(D.profC, 1)} mm en las piezas que llegan a tope, a ${fmt(D.dB)} mm del canto, y ciego de Ø 5 y ${fmt(D.profP)} mm para los pernos en la otra pieza. Después, a mano y con una guía, el taladro de Ø 8 en el canto hasta la excéntrica (raya de la capa CANTO).`
+      : `Taladros de los pernos: Ø 7 pasante en la pieza que recibe y ${D.ciego ? `ciego de Ø 10 y ${fmt(D.profC)} mm` : 'pasante de Ø 10'} para la tuerca de barril a ${fmt(D.dB)} mm del canto en la que llega a tope. Después, a mano y con una guía, el taladro de Ø 7 en el canto, de ${fmt(D.profCanto)} mm, hasta el de la tuerca (raya de la capa CANTO).`) + tub + caras);
     const porP = {}; hj.forEach(u => { (porP[u.en] = porP[u.en] || []).push(u); });
     Object.entries(porP).forEach(([en, us]) => pasos.push(ex
-      ? `${nom(+en)}: rosca sus ${us.reduce((s, u) => s + u.puntos.length, 0)} pernos en los taladros de Ø 5. Presenta ${lista2([...new Set(us.map(u => nom(u.pasa)))])} a tope (los pernos entran por el canto), mete las excéntricas con la flecha hacia el canto y gíralas con el destornillador hasta que aprieten.`
-      : `Une ${lista2([...new Set(us.map(u => nom(u.pasa)))])} a ${nom(+en)}: mete las tuercas de barril en sus taladros (con la ranura hacia el canto), pasa los pernos M6 de ${fmt(D.L)} mm desde fuera de ${R.costillas[+en].etq} y rosca con la llave Allen, sin apretar del todo hasta tener todas puestas.`));
+      ? `${nom(+en)}: rosca sus ${us.reduce((s, u) => s + u.puntos.length, 0)} pernos en los taladros de Ø 5${nTub ? ' y encola los tubillones en sus taladros' : ''}. Presenta ${lista2([...new Set(us.map(u => nom(u.pasa)))])} a tope (los pernos entran por el canto), mete las excéntricas con la flecha hacia el canto y gíralas con el destornillador hasta que aprieten.`
+      : `Une ${lista2([...new Set(us.map(u => nom(u.pasa)))])} a ${nom(+en)}${nTub ? ' (con los tubillones encolados en ' + R.costillas[+en].etq + ')' : ''}: mete las tuercas de barril en sus taladros (con la ranura hacia el canto), pasa los pernos M6 de ${fmt(D.L)} mm desde fuera de ${R.costillas[+en].etq} y rosca con la llave Allen, sin apretar del todo hasta tener todas puestas.`));
   }
   // cuñas de las espigas que asoman
   const cun = R.costillas.filter(c => c.cuna);

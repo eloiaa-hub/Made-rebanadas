@@ -506,7 +506,7 @@ PLANTILLAS.mesilla_dentada = {
 };
 PLANTILLAS.estanteria_kit = {
   nombre: 'Estantería de kit', grupo: 'plano',
-  desc: 'Laterales, tapa, base, baldas, zócalo y travesaño trasero unidos a tope con excéntricas (o perno y tuerca de barril): se monta y se desmonta con un destornillador.',
+  desc: 'Laterales, tapa, base, baldas, zócalo y travesaño trasero unidos a tope con excéntricas y tubillones: se monta y se desmonta con un destornillador. El herraje (excéntrica o perno y tuerca de barril) se elige en «Piezas planas: uniones → Cantos a tope».',
   params: [
     { id: 'ancho', nombre: 'Ancho', min: 300, max: 1200, paso: 5, valor: 800 },
     { id: 'fondo', nombre: 'Fondo', min: 150, max: 600, paso: 5, valor: 300 },

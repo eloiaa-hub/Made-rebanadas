@@ -65,6 +65,7 @@ function calcularPlano() {
   });
   res.n = res.costillas.length;
   const ps = res.costillas, tol = 0.05, solapes = [];
+  R0 = res;
   for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) {
     const A = ps[i], B = ps[j]; if (!A.ok || !B.ok) continue;
     const pa = PLANOS[A.plano], pb = PLANOS[B.plano];
@@ -179,7 +180,7 @@ function calcularPlano() {
     const rT = dT / 2;
     u.puntos.forEach(q => {
       if (So.tipo === 'tornillos') { ps[fuera].taladros.push([q[0], q[1], rT, 'pasante']); ps[fuera === i ? j : i].taladros.push([q[0], q[1], Math.max(1, rT * 0.6), 'guia']); }
-      else { const pr = largoTaco(e).prof; A.taladros.push([q[0], q[1], rT, 'ciego', pr]); B.taladros.push([q[0], q[1], rT, 'ciego', pr]); }
+      else { const pr = largoTaco(e).prof; A.taladros.push([q[0], q[1], rT, 'ciego', pr, Math.sign(B.x - A.x)]); B.taladros.push([q[0], q[1], rT, 'ciego', pr, Math.sign(A.x - B.x)]); }
     });
     res.uniones.push(u); A.uniones.push(u); B.uniones.push(u);
   });
@@ -214,12 +215,22 @@ function finCanto(base, eje, c, lo, hi, e) {
      perno se rosca en un taladro ciego de Ø 5 en la cara de Pc; entre los dos, un taladro de Ø 8 en el canto de Pt.
    Los taladros de las caras van en el DXF; los del canto se hacen a mano (en el DXF, una raya en la capa CANTO). */
 const NOMBRE_HERRAJE = { barril: 'perno y tuerca de barril', excentrica: 'excéntrica (minifix)' };
-const herrajesTotales = res => { const n = { barril: 0, excentrica: 0 }; (res || R).uniones.forEach(u => { if (u.tipo === 'herraje') n[u.herraje] += u.puntos.length; }); return n; };
+const herrajesTotales = res => { const n = { barril: 0, excentrica: 0, tubillones: 0 }; (res || R).uniones.forEach(u => { if (u.tipo === 'herraje') { n[u.herraje] += u.puntos.length; n.tubillones += (u.tubillones || []).length; } }); return n; };
 function datosHerraje(tipo, e) {
   if (tipo === 'excentrica') { const dB = e >= 15 ? 34 : 24; return { dB, rC: 7.5, profC: Math.min(14, Math.max(8, e - 4.5)), rP: 2.5, profP: 11, rCanto: 4, profCanto: dB + 2 }; }
-  const L = [40, 50, 60, 70, 80].find(l => l - e - 5 >= 20) || 80, dB = L - e - 5;
-  return { L, dB, rC: 5, rP: 3.5, rCanto: 3.5, profCanto: dB + 8 };
+  const L = [40, 50, 60, 70, 80].find(l => l - e - 5 >= 20) || 80, dB = L - e - 5, lb = e >= 18 ? 15 : 12;
+  const ciego = planoP().barrilCiego !== false && lb + 1 <= e - 2;   // la tuerca de barril, en taladro ciego si cabe dejando 2 mm
+  return { L, dB, rC: 5, rP: 3.5, rCanto: 3.5, profCanto: dB + 8, lb, ciego, profC: ciego ? lb + 1 : 0 };
 }
+// tubillones de Ø 8 × 30 junto a los herrajes: centran las piezas y aguantan el esfuerzo cortante
+const datosTubillon = e => ({ r: 4, prof: Math.min(12, Math.max(8, e - 5)), largo: 30 });
+// lado de la pieza que mira hacia dentro del mueble (+1 o −1 en su eje normal), con la caja de todas las piezas
+function haciaDentro(res, Pt) {
+  const n = PLANOS[Pt.plano].n, v = [];
+  res.costillas.forEach(c => { if (!c.ok || c.cuna) return; const pl = PLANOS[c.plano]; if (pl.n === n) v.push(c.x); else { const j = pl.a === n ? 0 : pl.b === n ? 1 : -1; if (j >= 0) v.push(c.caja[j ? 'y0' : 'x0'], c.caja[j ? 'y1' : 'x1']); } });
+  return (Math.min(...v) + Math.max(...v)) / 2 >= Pt.x ? 1 : -1;
+}
+let R0 = null;   // el resultado que se está calculando (para mirar las demás piezas)
 function ponerHerraje(u, Pt, Pc, ej, ejC, sT, e) {
   const D = datosHerraje(u.herraje, e), L = u.hi - u.lo, m = Math.min(50, L / 4);
   const n = L < 140 ? 1 : clamp(1 + Math.floor((L - 2 * m) / 300), 2, 5);
@@ -227,12 +238,26 @@ function ponerHerraje(u, Pt, Pc, ej, ejC, sT, e) {
   const P2 = (eje, x, l) => eje === 'v' ? [x, l] : [l, x], borde = Pc.x - sT * e / 2;
   Pt.cantos = Pt.cantos || [];
   u.puntos = ls; u.datos = D;
+  // caras de los taladros ciegos: en Pt, la que no se ve (debajo en tapas y baldas, la de dentro en las demás); en Pc, la que toca a Pt
+  const caraT = Pt.plano === 'horizontal' ? -1 : haciaDentro(R0, Pt), caraC = -sT;
   ls.forEach(l => {
     const qB = P2(ej, borde - sT * D.dB, l);
-    if (u.herraje === 'excentrica') { Pt.taladros.push([...qB, D.rC, 'ciego', D.profC]); Pc.taladros.push([...P2(ejC, Pt.x, l), D.rP, 'ciego', D.profP]); }
-    else { Pt.taladros.push([...qB, D.rC, 'pasante']); Pc.taladros.push([...P2(ejC, Pt.x, l), D.rP, 'pasante']); }
+    if (u.herraje === 'excentrica') { Pt.taladros.push([...qB, D.rC, 'ciego', D.profC, caraT]); Pc.taladros.push([...P2(ejC, Pt.x, l), D.rP, 'ciego', D.profP, caraC]); }
+    else { Pt.taladros.push(D.ciego ? [...qB, D.rC, 'ciego', D.profC, caraT] : [...qB, D.rC, 'pasante']); Pc.taladros.push([...P2(ejC, Pt.x, l), D.rP, 'pasante']); }
     Pt.cantos.push({ a: P2(ej, borde, l), b: P2(ej, borde - sT * D.profCanto, l), r: D.rCanto });
   });
+  // tubillones: a 32 mm de cada herraje, hacia el centro de la unión (a los dos lados si hay uno solo)
+  u.tubillones = [];
+  if (planoP().tubillones !== false) {
+    const T = datosTubillon(e), lim = 14, cand = [];
+    ls.forEach(l => { const hacia = l <= (u.lo + u.hi) / 2 ? 1 : -1; if (n === 1) cand.push(l - 32, l + 32); else cand.push(l + hacia * 32); });
+    cand.filter(l => l >= u.lo + lim && l <= u.hi - lim).forEach(l => {
+      if ([...ls, ...u.tubillones].some(o => Math.abs(o - l) < 20)) return;
+      u.tubillones.push(l);
+      Pc.taladros.push([...P2(ejC, Pt.x, l), T.r, 'ciego', T.prof, caraC]);
+      Pt.cantos.push({ a: P2(ej, borde, l), b: P2(ej, borde - sT * (T.largo - T.prof + 2), l), r: T.r });
+    });
+  }
 }
 // recorta los dientes: en los tramos k con k % 2 === quita, el canto se retira hasta la cara de dentro de la otra pieza
 function aplicarDientes(p, w, hol) {

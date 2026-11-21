@@ -97,7 +97,7 @@ function proyectoBase() {
     cnc: { fresa: 6, hueso: true, arcos: true, tolArco: 0.05, veta: 'no' },
     ficha: { titulo: '', modulo: '', duracion: '', objetivos: '', tareas: '', entrega: '', criterios: '', corte: true },
     presupuesto: { avance: 3000, pasada: 6, bajada: 600, entrada: 3, minTablero: 5, extra: 15, hora: 30, precios: {}, precioMaqueta: 4,
-      varilla: 3, separador: 4, tuerca: 0.3, rastrel: 2.5, taco: 0.05, tornillo: 0.08, barril: 0.45, excentrica: 0.35, cola: 10, acabado: 8, margen: 0 },
+      varilla: 3, separador: 4, tuerca: 0.3, rastrel: 2.5, taco: 0.05, tornillo: 0.08, barril: 0.45, excentrica: 0.35, tubillon: 0.03, cola: 10, acabado: 8, margen: 0 },
     reticula: { num: 4, margen: 40, holgura: 0.3, xArriba: true, vuelo: 25 },
     planta: { forma: 'recta', radio: 2500, sentido: 1, amplitud: 150, ondas: 1 },
     radial: { tubo: 20, holguraTubo: 0.5, discos: 2, rDisco: 0, holgura: 0.3 },
@@ -2518,6 +2518,7 @@ function calcularPlano() {
   });
   res.n = res.costillas.length;
   const ps = res.costillas, tol = 0.05, solapes = [];
+  R0 = res;
   for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) {
     const A = ps[i], B = ps[j]; if (!A.ok || !B.ok) continue;
     const pa = PLANOS[A.plano], pb = PLANOS[B.plano];
@@ -2632,7 +2633,7 @@ function calcularPlano() {
     const rT = dT / 2;
     u.puntos.forEach(q => {
       if (So.tipo === 'tornillos') { ps[fuera].taladros.push([q[0], q[1], rT, 'pasante']); ps[fuera === i ? j : i].taladros.push([q[0], q[1], Math.max(1, rT * 0.6), 'guia']); }
-      else { const pr = largoTaco(e).prof; A.taladros.push([q[0], q[1], rT, 'ciego', pr]); B.taladros.push([q[0], q[1], rT, 'ciego', pr]); }
+      else { const pr = largoTaco(e).prof; A.taladros.push([q[0], q[1], rT, 'ciego', pr, Math.sign(B.x - A.x)]); B.taladros.push([q[0], q[1], rT, 'ciego', pr, Math.sign(A.x - B.x)]); }
     });
     res.uniones.push(u); A.uniones.push(u); B.uniones.push(u);
   });
@@ -2667,12 +2668,22 @@ function finCanto(base, eje, c, lo, hi, e) {
      perno se rosca en un taladro ciego de Ø 5 en la cara de Pc; entre los dos, un taladro de Ø 8 en el canto de Pt.
    Los taladros de las caras van en el DXF; los del canto se hacen a mano (en el DXF, una raya en la capa CANTO). */
 const NOMBRE_HERRAJE = { barril: 'perno y tuerca de barril', excentrica: 'excéntrica (minifix)' };
-const herrajesTotales = res => { const n = { barril: 0, excentrica: 0 }; (res || R).uniones.forEach(u => { if (u.tipo === 'herraje') n[u.herraje] += u.puntos.length; }); return n; };
+const herrajesTotales = res => { const n = { barril: 0, excentrica: 0, tubillones: 0 }; (res || R).uniones.forEach(u => { if (u.tipo === 'herraje') { n[u.herraje] += u.puntos.length; n.tubillones += (u.tubillones || []).length; } }); return n; };
 function datosHerraje(tipo, e) {
   if (tipo === 'excentrica') { const dB = e >= 15 ? 34 : 24; return { dB, rC: 7.5, profC: Math.min(14, Math.max(8, e - 4.5)), rP: 2.5, profP: 11, rCanto: 4, profCanto: dB + 2 }; }
-  const L = [40, 50, 60, 70, 80].find(l => l - e - 5 >= 20) || 80, dB = L - e - 5;
-  return { L, dB, rC: 5, rP: 3.5, rCanto: 3.5, profCanto: dB + 8 };
+  const L = [40, 50, 60, 70, 80].find(l => l - e - 5 >= 20) || 80, dB = L - e - 5, lb = e >= 18 ? 15 : 12;
+  const ciego = planoP().barrilCiego !== false && lb + 1 <= e - 2;   // la tuerca de barril, en taladro ciego si cabe dejando 2 mm
+  return { L, dB, rC: 5, rP: 3.5, rCanto: 3.5, profCanto: dB + 8, lb, ciego, profC: ciego ? lb + 1 : 0 };
 }
+// tubillones de Ø 8 × 30 junto a los herrajes: centran las piezas y aguantan el esfuerzo cortante
+const datosTubillon = e => ({ r: 4, prof: Math.min(12, Math.max(8, e - 5)), largo: 30 });
+// lado de la pieza que mira hacia dentro del mueble (+1 o −1 en su eje normal), con la caja de todas las piezas
+function haciaDentro(res, Pt) {
+  const n = PLANOS[Pt.plano].n, v = [];
+  res.costillas.forEach(c => { if (!c.ok || c.cuna) return; const pl = PLANOS[c.plano]; if (pl.n === n) v.push(c.x); else { const j = pl.a === n ? 0 : pl.b === n ? 1 : -1; if (j >= 0) v.push(c.caja[j ? 'y0' : 'x0'], c.caja[j ? 'y1' : 'x1']); } });
+  return (Math.min(...v) + Math.max(...v)) / 2 >= Pt.x ? 1 : -1;
+}
+let R0 = null;   // el resultado que se está calculando (para mirar las demás piezas)
 function ponerHerraje(u, Pt, Pc, ej, ejC, sT, e) {
   const D = datosHerraje(u.herraje, e), L = u.hi - u.lo, m = Math.min(50, L / 4);
   const n = L < 140 ? 1 : clamp(1 + Math.floor((L - 2 * m) / 300), 2, 5);
@@ -2680,12 +2691,26 @@ function ponerHerraje(u, Pt, Pc, ej, ejC, sT, e) {
   const P2 = (eje, x, l) => eje === 'v' ? [x, l] : [l, x], borde = Pc.x - sT * e / 2;
   Pt.cantos = Pt.cantos || [];
   u.puntos = ls; u.datos = D;
+  // caras de los taladros ciegos: en Pt, la que no se ve (debajo en tapas y baldas, la de dentro en las demás); en Pc, la que toca a Pt
+  const caraT = Pt.plano === 'horizontal' ? -1 : haciaDentro(R0, Pt), caraC = -sT;
   ls.forEach(l => {
     const qB = P2(ej, borde - sT * D.dB, l);
-    if (u.herraje === 'excentrica') { Pt.taladros.push([...qB, D.rC, 'ciego', D.profC]); Pc.taladros.push([...P2(ejC, Pt.x, l), D.rP, 'ciego', D.profP]); }
-    else { Pt.taladros.push([...qB, D.rC, 'pasante']); Pc.taladros.push([...P2(ejC, Pt.x, l), D.rP, 'pasante']); }
+    if (u.herraje === 'excentrica') { Pt.taladros.push([...qB, D.rC, 'ciego', D.profC, caraT]); Pc.taladros.push([...P2(ejC, Pt.x, l), D.rP, 'ciego', D.profP, caraC]); }
+    else { Pt.taladros.push(D.ciego ? [...qB, D.rC, 'ciego', D.profC, caraT] : [...qB, D.rC, 'pasante']); Pc.taladros.push([...P2(ejC, Pt.x, l), D.rP, 'pasante']); }
     Pt.cantos.push({ a: P2(ej, borde, l), b: P2(ej, borde - sT * D.profCanto, l), r: D.rCanto });
   });
+  // tubillones: a 32 mm de cada herraje, hacia el centro de la unión (a los dos lados si hay uno solo)
+  u.tubillones = [];
+  if (planoP().tubillones !== false) {
+    const T = datosTubillon(e), lim = 14, cand = [];
+    ls.forEach(l => { const hacia = l <= (u.lo + u.hi) / 2 ? 1 : -1; if (n === 1) cand.push(l - 32, l + 32); else cand.push(l + hacia * 32); });
+    cand.filter(l => l >= u.lo + lim && l <= u.hi - lim).forEach(l => {
+      if ([...ls, ...u.tubillones].some(o => Math.abs(o - l) < 20)) return;
+      u.tubillones.push(l);
+      Pc.taladros.push([...P2(ejC, Pt.x, l), T.r, 'ciego', T.prof, caraC]);
+      Pt.cantos.push({ a: P2(ej, borde, l), b: P2(ej, borde - sT * (T.largo - T.prof + 2), l), r: T.r });
+    });
+  }
 }
 // recorta los dientes: en los tramos k con k % 2 === quita, el canto se retira hasta la cara de dentro de la otra pieza
 function aplicarDientes(p, w, hol) {
@@ -3508,7 +3533,7 @@ PLANTILLAS.mesilla_dentada = {
 };
 PLANTILLAS.estanteria_kit = {
   nombre: 'Estantería de kit', grupo: 'plano',
-  desc: 'Laterales, tapa, base, baldas, zócalo y travesaño trasero unidos a tope con excéntricas (o perno y tuerca de barril): se monta y se desmonta con un destornillador.',
+  desc: 'Laterales, tapa, base, baldas, zócalo y travesaño trasero unidos a tope con excéntricas y tubillones: se monta y se desmonta con un destornillador. El herraje (excéntrica o perno y tuerca de barril) se elige en «Piezas planas: uniones → Cantos a tope».',
   params: [
     { id: 'ancho', nombre: 'Ancho', min: 300, max: 1200, paso: 5, valor: 800 },
     { id: 'fondo', nombre: 'Fondo', min: 150, max: 600, paso: 5, valor: 300 },
@@ -3916,7 +3941,8 @@ function dibujarPerfilPlano(ctx, V) {
     const b = cajaDe(u.zonas[0].poly), [lx, ly] = V.aPantalla(b.x0 + b.w / 2, b.y1);
     ctx.fillStyle = '#5f6b78'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center'; ctx.fillText(`${otra.etq} (solape)`, lx, ly - 4); ctx.textAlign = 'left';
   });
-  (c.taladros || []).forEach(t => { const [x, y] = V.aPantalla(t[0], t[1]); ctx.strokeStyle = '#5f6b78'; ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(x, y, Math.max(3, t[2] * V.sc), 0, PI2); ctx.fill(); ctx.stroke(); });
+  (c.taladros || []).forEach(t => { const [x, y] = V.aPantalla(t[0], t[1]), ci = t[3] === 'ciego'; ctx.strokeStyle = '#5f6b78'; ctx.fillStyle = ci ? 'rgba(95,107,120,.18)' : 'rgba(255,255,255,.8)'; ctx.lineWidth = 1.4; ctx.setLineDash(ci ? [3, 2] : []); ctx.beginPath(); ctx.arc(x, y, Math.max(3, t[2] * V.sc), 0, PI2); ctx.fill(); ctx.stroke(); ctx.setLineDash([]); });
+  (c.cantos || []).forEach(m => { const a = V.aPantalla(m.a[0], m.a[1]), b = V.aPantalla(m.b[0], m.b[1]); ctx.strokeStyle = '#b5532f'; ctx.lineWidth = Math.max(1.5, 2 * m.r * V.sc); ctx.globalAlpha = 0.45; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); ctx.globalAlpha = 1; });
   // la pieza como se corta (con ranuras y cajas)
   if (c.ok) {
     ctx.fillStyle = conAlfa(acento, .12); ctx.beginPath();
@@ -4906,6 +4932,8 @@ function iniciarPanel() {
   enlazar('#plHolgura', () => { planoP().holgura = clamp(+$('#plHolgura').value || 0, 0, 3); cambio('Holgura de las uniones ' + fmt(planoP().holgura, 2) + ' mm'); });
   enlazar('#plAsiento', () => { planoP().asiento = $('#plAsiento').checked; cambio(planoP().asiento ? 'Comprobaciones de asiento' : 'Sin comprobaciones de asiento'); });
   enlazar('#plHerraje', () => { planoP().herraje = $('#plHerraje').value; cambio($('#plHerraje').value === 'no' ? 'Cantos con uniones dentadas' : 'Cantos a tope con ' + NOMBRE_HERRAJE[$('#plHerraje').value]); });
+  enlazar('#plTubillon', () => { planoP().tubillones = $('#plTubillon').checked; cambio(planoP().tubillones ? 'Con tubillones' : 'Sin tubillones'); });
+  enlazar('#plBarrilCiego', () => { planoP().barrilCiego = $('#plBarrilCiego').checked; cambio(planoP().barrilCiego ? 'Tuerca de barril en taladro ciego' : 'Tuerca de barril en taladro pasante'); });
   enlazar('#plFlexion', () => { planoP().flexion = $('#plFlexion').checked; cambio(planoP().flexion ? 'Comprobación de flexión' : 'Sin comprobación de flexión'); });
   enlazar('#plPersona', () => { planoP().persona = clamp(+$('#plPersona').value || 100, 20, 200); cambio('Persona de ' + fmt(planoP().persona) + ' kg'); });
   enlazar('#plCarga', () => { planoP().cargaBalda = clamp(+$('#plCarga').value || 0, 0, 500); cambio('Carga de las baldas ' + fmt(planoP().cargaBalda) + ' kg/m²'); });
@@ -5204,7 +5232,7 @@ function ponerControles() {
   const Pl = P.planta; $('#plForma').value = Pl.forma; $('#plRadio').value = Pl.radio; $('#plSentido').value = String(Pl.sentido === -1 ? -1 : 1); $('#plAmp').value = Pl.amplitud; $('#plOndas').value = Pl.ondas;
   const Ra = P.radial; $('#raNum').value = P.costillas.numero; $('#raTubo').value = Ra.tubo; $('#raHolTubo').value = Ra.holguraTubo; $('#raDiscos').value = Ra.discos; $('#raRDisco').value = Ra.rDisco; $('#raHolgura').value = Ra.holgura;
   ponerPartir();
-  $('#plHolgura').value = planoP().holgura; $('#plCunas').checked = !!planoP().cunas; $('#plAsiento').checked = planoP().asiento !== false; $('#plFlexion').checked = planoP().flexion !== false; $('#plHerraje').value = planoP().herraje || 'no'; $('#plPersona').value = planoP().persona; $('#plCarga').value = planoP().cargaBalda; $('#plSolTipo').value = solapeP().tipo; $('#plSolDiam').value = solapeP().diam; $('#plSolN').value = solapeP().n; $('#pzRejilla').value = $('#kRejilla').value;
+  $('#plHolgura').value = planoP().holgura; $('#plCunas').checked = !!planoP().cunas; $('#plAsiento').checked = planoP().asiento !== false; $('#plFlexion').checked = planoP().flexion !== false; $('#plHerraje').value = planoP().herraje || 'no'; $('#plTubillon').checked = planoP().tubillones !== false; $('#plBarrilCiego').checked = planoP().barrilCiego !== false; $('#plTubillon').disabled = $('#plHerraje').value === 'no'; $('#plBarrilCiego').disabled = $('#plHerraje').value !== 'barril'; $('#plPersona').value = planoP().persona; $('#plCarga').value = planoP().cargaBalda; $('#plSolTipo').value = solapeP().tipo; $('#plSolDiam').value = solapeP().diam; $('#plSolN').value = solapeP().n; $('#pzRejilla').value = $('#kRejilla').value;
   const Pa = P.pared; $('#paNum').value = Pa.rastreles; $('#paAlto').value = Pa.alto; $('#paGrueso').value = Pa.grueso; $('#paMargen').value = Pa.margen; $('#paHolgura').value = Pa.holgura; $('#paVer').checked = Pa.verPared;
   $('#cClaves3d').checked = P.vista.claves !== false;
   const Fg = P.figura; $('#fgAlto').value = Fg.alto; $('#fgEje').value = Fg.eje; $('#fgGiro').value = String(Fg.giro || 0); $('#fgMin').value = Fg.minArea; $('#fgUnir').checked = Fg.unir !== false;
@@ -5482,13 +5510,21 @@ function geoFab(c) {
   if (c.generarInt) { int = c.generarInt(wF); if (conHueso()) int = int.map(h => huesoDePerro(h, h, fresaFab() / 2 / k).poly); }
   if (c.conHuecos && c.ranuras && c.ranuras.length && !c.modulo) { const q = parteFab(c, base); base = q.poly; int = q.int || []; }
   else if (c.conHuecos && !c.generar) base = c.poly;
-  const poly = base.map(p => [p[0] * k, p[1] * k]), interiores = int.map(hh => hh.map(p => [p[0] * k, p[1] * k]));
+  // taladros ciegos: la máquina taladra por la cara de arriba, que es la que se ve en el dibujo de la pieza (caraVista).
+  // Si casi todos van por la otra cara, la pieza sale en espejo (volteada); los que queden por la otra cara van a otra capa.
+  const caraVista = esPlano() && c.plano && !c.giro ? basePieza(c).ez[PLANOS[c.plano].n] : 1;
+  const ciegos = (c.taladros || []).filter(t => t[3] === 'ciego' && t[5]);
+  const volteada = ciegos.filter(t => t[5] !== caraVista).length > ciegos.filter(t => t[5] === caraVista).length, sx = volteada ? -1 : 1;
+  const caraArriba = volteada ? -caraVista : caraVista;
+  const poly = base.map(p => [sx * p[0] * k, p[1] * k]), interiores = int.map(hh => hh.map(p => [sx * p[0] * k, p[1] * k]));
+  if (volteada) { poly.reverse(); interiores.forEach(h => h.reverse()); }
   return {
+    volteada,
     c, poly, interiores, caja: cajaDe(poly), r: radioFab(), area: Math.abs(c.area) * k * k, huesosMal, nHuesos, nEsq: esq.length,
     // agujeros [x, y, radio]: los de las varillas y los propios de la pieza (el tubo en los discos)
-    agujeros: c.agujeros.map(j => [P.varillas.lista[j][0] * k, P.varillas.lista[j][1] * k, radioFab()]).concat((c.huecos || []).map(h => [h.x * k, h.y * k, h.r * k])).concat((c.taladros || []).map(t => [t[0] * k, t[1] * k, t[2] * k, t[3] === 'ciego' && t[4] ? t[4] * k : 0])),
-    cantos: (c.cantos || []).map(q => ({ a: [q.a[0] * k, q.a[1] * k], b: [q.b[0] * k, q.b[1] * k], r: q.r * k })),
-    etiqueta: puntoEtiqueta(c).map(v => v * k),
+    agujeros: c.agujeros.map(j => [sx * P.varillas.lista[j][0] * k, P.varillas.lista[j][1] * k, radioFab()]).concat((c.huecos || []).map(h => [sx * h.x * k, h.y * k, h.r * k])).concat((c.taladros || []).map(t => [sx * t[0] * k, t[1] * k, t[2] * k, t[3] === 'ciego' && t[4] ? t[4] * k : 0, t[3] === 'ciego' && t[5] && t[5] !== caraArriba])),
+    cantos: (c.cantos || []).map(q => ({ a: [sx * q.a[0] * k, q.a[1] * k], b: [sx * q.b[0] * k, q.b[1] * k], r: q.r * k })),
+    etiqueta: puntoEtiqueta(c).map((v, i) => (i ? 1 : sx) * v * k),
   };
 }
 function fabDefecto(maq) {
@@ -5706,7 +5742,8 @@ function dxf() {
   const n = v => (Math.round(v * 1000) / 1000).toString();
   g(0, 'SECTION'); g(2, 'HEADER'); g(9, '$ACADVER'); g(1, 'AC1009'); g(9, '$INSUNITS'); g(70, 4); g(9, '$MEASUREMENT'); g(70, 1); g(0, 'ENDSEC');
   const capaCiego = p => 'CIEGO_' + String(Math.round(p * 10) / 10).replace('.', '_') + 'MM';
-  const ciegos = [...new Set(col.tableros.flatMap(t => t.piezas.flatMap(pz => pz.g.agujeros.filter(a => a[3]).map(a => capaCiego(a[3])))))], hayCanto = col.tableros.some(t => t.piezas.some(pz => (pz.g.cantos || []).length));
+  const capaA = a => (a[4] ? 'OTRA_CARA_' : '') + capaCiego(a[3]);
+  const ciegos = [...new Set(col.tableros.flatMap(t => t.piezas.flatMap(pz => pz.g.agujeros.filter(a => a[3]).map(capaA))))], hayCanto = col.tableros.some(t => t.piezas.some(pz => (pz.g.cantos || []).length));
   g(0, 'SECTION'); g(2, 'TABLES'); g(0, 'TABLE'); g(2, 'LAYER'); g(70, 4 + ciegos.length + (hayCanto ? 1 : 0));
   [['CORTE', 7], ['TALADROS', 1], ['GRABADO', 5], ['TABLERO', 8], ...ciegos.map(c => [c, 3]), ...(hayCanto ? [['CANTO', 6]] : [])].forEach(([nom, c]) => { g(0, 'LAYER'); g(2, nom); g(70, 0); g(62, c); g(6, 'CONTINUOUS'); });
   g(0, 'ENDTAB'); g(0, 'ENDSEC');
@@ -5728,7 +5765,7 @@ function dxf() {
       (pz.g.interiores || []).forEach(hh => { const ci = contornoCNC(hh); poli('CORTE', ci.pts.map(p => { const q = aTablero(pz, p); return [ox + q[0], q[1]]; }), ci.b); });
       poli('CORTE', cc.pts.map(p => { const q = aTablero(pz, p); return [ox + q[0], q[1]]; }), cc.b);
       (pz.g.cantos || []).forEach(m => { const a = aTablero(pz, m.a), b = aTablero(pz, m.b); g(0, 'LINE'); g(8, 'CANTO'); g(10, n(ox + a[0])); g(20, n(a[1])); g(30, 0); g(11, n(ox + b[0])); g(21, n(b[1])); g(31, 0); });
-      pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); g(0, 'CIRCLE'); g(8, a[3] ? capaCiego(a[3]) : 'TALADROS'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(a[2])); });
+      pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); g(0, 'CIRCLE'); g(8, a[3] ? capaA(a) : 'TALADROS'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(a[2])); });
       if (f.numeros) {
         const q = aTablero(pz, pz.g.etiqueta), h = altoTexto(pz.g);
         g(0, 'TEXT'); g(8, 'GRABADO'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(h)); g(1, pz.c.etq); g(72, 1); g(11, n(ox + q[0])); g(21, n(q[1] - h / 2)); g(31, 0);
@@ -5815,7 +5852,8 @@ function listaCompra() {
     if (nF && So.tipo === 'tornillos') L.push([`Tornillos para madera Ø ${fmt(So.diam, 1)} mm, de unos ${fmt(Math.round(grosorFab() * 1.7))} mm (cabeza avellanada)`, String(nF)]);
     else if (nF) { L.push([`Tacos de madera Ø ${fmt(So.diam, 1)} × ${fmt(lt.largo)} mm (taladros ciegos de ${fmt(lt.prof)} mm)`, String(nF)]); L.push(['Cola blanca', 'para los tacos y los solapes']); }
     const nh = herrajesTotales(), Dh = datosHerraje(planoP().herraje, grosorFab());
-    if (nh.barril) L.push([`Perno M6 × ${fmt(Dh.L)} mm (cabeza Allen plana) y tuerca de barril M6 Ø 10`, `${nh.barril} juegos`]);
+    if (nh.barril) L.push([`Perno M6 × ${fmt(Dh.L)} mm (cabeza Allen plana) y tuerca de barril M6 Ø 10 × ${fmt(Dh.lb)} mm`, `${nh.barril} juegos`]);
+    if (nh.tubillones) L.push([`Tubillón (espiga de madera estriada) Ø 8 × ${datosTubillon(grosorFab()).largo} mm`, `${nh.tubillones}`]);
     if (nh.excentrica) L.push(['Excéntrica Ø 15 (tipo minifix) con su perno', `${nh.excentrica} juegos`]);
     if (R.costillas.some(c => c.cuna)) L.push(['Cuñas', `${R.costillas.filter(c => c.cuna).length}, del mismo tablero (van en el corte)`]);
     if (!nh.barril && !nh.excentrica) L.push(['Herrajes', nF && So.tipo === 'tornillos' ? 'solo los tornillos de los solapes' : 'ninguno (cola en las uniones, si se quiere fijo)']);
@@ -6141,7 +6179,7 @@ function planoPDF(F = null) {   // F: opciones de la ficha de práctica (enuncia
       (c.int || []).forEach(hh => D.relleno([255, 255, 255]).trazo(madera).grosor(0.35).poli(hh.map(p => [PX(p[0]), PY(p[1])]), true, 'b'));
       D.relleno([255, 255, 255]).trazo(rojo).grosor(0.25);
       c.agujeros.forEach(j2 => D.circulo(PX(V.lista[j2][0]), PY(V.lista[j2][1]), Math.max(0.6, radioAgujero() * s3), 'b'));
-      (c.taladros || []).forEach(t => D.circulo(PX(t[0]), PY(t[1]), Math.max(0.5, t[2] * s3), 'b'));
+      (c.taladros || []).forEach(t => D.circulo(PX(t[0]), PY(t[1]), Math.max(0.5, t[2] * s3), t[3] === 'ciego' ? 's' : 'b'));
       (c.cantos || []).forEach(m => D.linea(PX(m.a[0]), PY(m.a[1]), PX(m.b[0]), PY(m.b[1])));
       D.relleno([0, 0, 0]).trazo();
       const et = puntoEtiqueta(c);
@@ -6494,14 +6532,17 @@ function pasosPlano(k, maq) {
   // uniones a tope con herraje desmontable
   const hj = R.uniones.filter(u => u.tipo === 'herraje');
   if (hj.length) {
-    const D = hj[0].datos, ex = hj[0].herraje === 'excentrica';
-    pasos.splice(2, 0, ex
-      ? `Taladros de las excéntricas (en el DXF salen los de las caras): Ø 15 a ${fmt(D.profC, 1)} mm de profundidad en las piezas que llegan a tope, a ${fmt(D.dB)} mm del canto, y Ø 5 a ${fmt(D.profP)} mm para los pernos en la otra pieza. Después, a mano y con una guía, el taladro de Ø 8 en el canto hasta la excéntrica (raya de la capa CANTO).`
-      : `Taladros de los pernos (en el DXF salen los de las caras): Ø 7 pasante en la pieza que recibe y Ø 10 pasante para la tuerca de barril a ${fmt(D.dB)} mm del canto en la que llega a tope. Después, a mano y con una guía, el taladro de Ø 7 en el canto, de ${fmt(D.profCanto)} mm, hasta el de la tuerca (raya de la capa CANTO).`);
+    const D = hj[0].datos, ex = hj[0].herraje === 'excentrica', Tb = datosTubillon(grosor()), nTub = hj.reduce((s, u) => s + (u.tubillones || []).length, 0);
+    const volt = R.costillas.filter(c => c.ok && !c.cuna && geoFab(c).volteada).map(c => c.etq);
+    const tub = nTub ? ` Los ${nTub} tubillones de Ø 8 × ${Tb.largo} mm llevan un taladro ciego de ${fmt(Tb.prof)} mm en la cara (en el DXF) y otro de ${fmt(Tb.largo - Tb.prof + 2)} mm en el canto (a mano).` : '';
+    const caras = ` Los taladros ciegos van por la cara que no se ve (debajo de tapas y baldas, por dentro en las demás); ${volt.length ? `por eso las piezas ${lista2(volt)} salen en espejo en el DXF: se cortan con esa cara hacia arriba.` : 'en el DXF ya salen hacia arriba.'}`;
+    pasos.splice(2, 0, (ex
+      ? `Taladros de las excéntricas: ciego de Ø 15 y ${fmt(D.profC, 1)} mm en las piezas que llegan a tope, a ${fmt(D.dB)} mm del canto, y ciego de Ø 5 y ${fmt(D.profP)} mm para los pernos en la otra pieza. Después, a mano y con una guía, el taladro de Ø 8 en el canto hasta la excéntrica (raya de la capa CANTO).`
+      : `Taladros de los pernos: Ø 7 pasante en la pieza que recibe y ${D.ciego ? `ciego de Ø 10 y ${fmt(D.profC)} mm` : 'pasante de Ø 10'} para la tuerca de barril a ${fmt(D.dB)} mm del canto en la que llega a tope. Después, a mano y con una guía, el taladro de Ø 7 en el canto, de ${fmt(D.profCanto)} mm, hasta el de la tuerca (raya de la capa CANTO).`) + tub + caras);
     const porP = {}; hj.forEach(u => { (porP[u.en] = porP[u.en] || []).push(u); });
     Object.entries(porP).forEach(([en, us]) => pasos.push(ex
-      ? `${nom(+en)}: rosca sus ${us.reduce((s, u) => s + u.puntos.length, 0)} pernos en los taladros de Ø 5. Presenta ${lista2([...new Set(us.map(u => nom(u.pasa)))])} a tope (los pernos entran por el canto), mete las excéntricas con la flecha hacia el canto y gíralas con el destornillador hasta que aprieten.`
-      : `Une ${lista2([...new Set(us.map(u => nom(u.pasa)))])} a ${nom(+en)}: mete las tuercas de barril en sus taladros (con la ranura hacia el canto), pasa los pernos M6 de ${fmt(D.L)} mm desde fuera de ${R.costillas[+en].etq} y rosca con la llave Allen, sin apretar del todo hasta tener todas puestas.`));
+      ? `${nom(+en)}: rosca sus ${us.reduce((s, u) => s + u.puntos.length, 0)} pernos en los taladros de Ø 5${nTub ? ' y encola los tubillones en sus taladros' : ''}. Presenta ${lista2([...new Set(us.map(u => nom(u.pasa)))])} a tope (los pernos entran por el canto), mete las excéntricas con la flecha hacia el canto y gíralas con el destornillador hasta que aprieten.`
+      : `Une ${lista2([...new Set(us.map(u => nom(u.pasa)))])} a ${nom(+en)}${nTub ? ' (con los tubillones encolados en ' + R.costillas[+en].etq + ')' : ''}: mete las tuercas de barril en sus taladros (con la ranura hacia el canto), pasa los pernos M6 de ${fmt(D.L)} mm desde fuera de ${R.costillas[+en].etq} y rosca con la llave Allen, sin apretar del todo hasta tener todas puestas.`));
   }
   // cuñas de las espigas que asoman
   const cun = R.costillas.filter(c => c.cuna);
@@ -7303,6 +7344,7 @@ function calcularPresupuesto() {
     const nh = herrajesTotales();
     if (nh.barril) filas.push(['Pernos con tuerca de barril', nh.barril, B.barril]);
     if (nh.excentrica) filas.push(['Excéntricas con perno', nh.excentrica, B.excentrica]);
+    if (nh.tubillones) filas.push(['Tubillones de Ø 8', nh.tubillones, B.tubillon]);
   }
   if (!maq && B.cola) filas.push(['Cola, lija y varios', 1, B.cola]);
   const m2 = cm.area / 1e6 * 2 * 1.1;   // las dos caras y un poco de canto
@@ -7348,14 +7390,14 @@ function dialogoPresupuesto() {
         ${P.tipo === 'costillas' ? n('psVar', 'Varilla o tubo (€/m)', B.varilla, 0.5) + n('psSep', 'Separador (€/m)', B.separador, 0.5) + n('psTue', 'Tuerca y arandela (cada)', B.tuerca, 0.05) : ''}
         ${P.tipo === 'radial' ? n('psVar', 'Tubo central (€/m)', B.varilla, 0.5) : ''}
         ${P.tipo === 'pared' ? n('psRas', 'Rastrel (€/m)', B.rastrel, 0.5) : ''}
-        ${esPlano() ? n('psTac', 'Taco de madera (cada)', B.taco, 0.01) + n('psTor', 'Tornillo (cada)', B.tornillo, 0.01) + n('psBar', 'Perno y tuerca de barril (juego)', B.barril, 0.05) + n('psExc', 'Excéntrica con perno (juego)', B.excentrica, 0.05) : ''}
+        ${esPlano() ? n('psTac', 'Taco de madera (cada)', B.taco, 0.01) + n('psTor', 'Tornillo (cada)', B.tornillo, 0.01) + n('psBar', 'Perno y tuerca de barril (juego)', B.barril, 0.05) + n('psExc', 'Excéntrica con perno (juego)', B.excentrica, 0.05) + n('psTub', 'Tubillón (cada)', B.tubillon, 0.01) : ''}
         ${n('psCola', 'Cola, lija y varios (total)', B.cola, 1)}
         ${n('psAcab', 'Acabado (€/m²)', B.acabado, 1, 'Aceite, barniz o laca, por m² de superficie')}
         ${n('psMarg', 'Margen (%)', B.margen, 5)}
       </div>
       <div><div id="psRes" style="font-size:13px"></div></div>
     </div>`, [['Precios por defecto', () => { P.presupuesto = proyectoBase().presupuesto; guardado(); dialogoPresupuesto(); }], ['⬇ CSV', () => exportarCSVPresupuesto()]], true);
-  const mapa = { psAv: 'avance', psPas: 'pasada', psBaj: 'bajada', psEnt: 'entrada', psTab: 'minTablero', psExtra: 'extra', psHora: 'hora', psVar: 'varilla', psSep: 'separador', psTue: 'tuerca', psRas: 'rastrel', psTac: 'taco', psTor: 'tornillo', psBar: 'barril', psExc: 'excentrica', psCola: 'cola', psAcab: 'acabado', psMarg: 'margen' };
+  const mapa = { psAv: 'avance', psPas: 'pasada', psBaj: 'bajada', psEnt: 'entrada', psTab: 'minTablero', psExtra: 'extra', psHora: 'hora', psVar: 'varilla', psSep: 'separador', psTue: 'tuerca', psRas: 'rastrel', psTac: 'taco', psTor: 'tornillo', psBar: 'barril', psExc: 'excentrica', psTub: 'tubillon', psCola: 'cola', psAcab: 'acabado', psMarg: 'margen' };
   const pintar = () => {
     const r = calcularPresupuesto(), filas = filasPresupuesto(r);
     $('#psRes').innerHTML = '<table class="tabla">' + filas.map(f => f.titulo ? `<tr><th colspan="2">${esc(f.titulo)}</th></tr>` : `<tr><td>${esc(f[0])}</td><td style="text-align:right"><b>${esc(f[1])}</b></td></tr>`).join('') + '</table>'
@@ -7793,7 +7835,7 @@ function iniciar() {
   requestAnimationFrame(() => { ajustar3D(); VP.ajustar(); VC.ajustar(); cargarProyecto(P, true); });
 }
 // para las pruebas automáticas
-window.MadeRebanadas = { get P() { return P; }, get R() { return R; }, calcular: () => { const t = performance.now(); R = calcular(); return performance.now() - t; }, autoVar: () => autoVarillas(P.varillas.autoN), construir3D: () => { const t = performance.now(); construir3D(); return performance.now() - t; }, cargar: o => cargarProyecto(validarProyecto(o)), dxf: () => dxf(), svg: () => svg(), plano: () => planoPDF(), malla3D: o => piezasMalla3D(o || {}), pieza: i => piezaCalcador([...R.costillas, ...R.otras][i]), geo: i => geoFab([...R.costillas, ...R.otras][i]), camara: t => camara(t), selCostilla: i => selCostilla(i), slugEjemplo: n => slugEjemplo(n), formasTexto: h => formasTexto(h), leerSVG: t => leerSVG(t), leerMalla: (b, n) => leerMalla(b, n), polyVista: i => { const c = [...R.costillas, ...R.otras][i]; return { poly: c.poly, vista: polyVista(c.poly), esq: c.poly.esq || [] }; }, presupuesto: () => calcularPresupuesto(), ficha: () => fichaPDF(), flexion: () => analisisFlexion(R).map(c => ({ pieza: c.H.nombre, asiento: !!c.asiento, L: c.L, vuelo: c.vuelo, flecha: c.flecha, lim: c.lim, seg: c.seg })), prueba: o => { const g = geoPrueba(o); return { g, dxf: dxfPrueba(g), svg: svgPrueba(g) }; }, ordenMontaje: () => ordenMontaje(), montaje: () => montajeAnimado(), cerradas: o => piezasCerradas(o || { zArriba: true, escala: 1, herrajes: true }),
+window.MadeRebanadas = { get P() { return P; }, get R() { return R; }, calcular: () => { const t = performance.now(); R = calcular(); return performance.now() - t; }, autoVar: () => autoVarillas(P.varillas.autoN), construir3D: () => { const t = performance.now(); construir3D(); return performance.now() - t; }, cargar: o => cargarProyecto(validarProyecto(o)), dxf: () => dxf(), svg: () => svg(), plano: () => planoPDF(), malla3D: o => piezasMalla3D(o || {}), pieza: i => piezaCalcador([...R.costillas, ...R.otras][i]), geo: i => geoFab([...R.costillas, ...R.otras][i]), camara: t => camara(t), selCostilla: i => selCostilla(i), slugEjemplo: n => slugEjemplo(n), formasTexto: h => formasTexto(h), leerSVG: t => leerSVG(t), leerMalla: (b, n) => leerMalla(b, n), polyVista: i => { const c = [...R.costillas, ...R.otras][i]; return { poly: c.poly, vista: polyVista(c.poly), esq: c.poly.esq || [] }; }, presupuesto: () => calcularPresupuesto(), geoFab: i => geoFab(R.costillas[i]), ficha: () => fichaPDF(), flexion: () => analisisFlexion(R).map(c => ({ pieza: c.H.nombre, asiento: !!c.asiento, L: c.L, vuelo: c.vuelo, flecha: c.flecha, lim: c.lim, seg: c.seg })), prueba: o => { const g = geoPrueba(o); return { g, dxf: dxfPrueba(g), svg: svgPrueba(g) }; }, ordenMontaje: () => ordenMontaje(), montaje: () => montajeAnimado(), cerradas: o => piezasCerradas(o || { zArriba: true, escala: 1, herrajes: true }),
   leerDXF: t => leerDXF(t), colocar: () => colocarEnTableros(fabActual()), compra: () => listaCompra(), despiece: () => filasDespiece(), csvCortes: () => { let out; const d0 = descargar; descargar = (n, c) => { out = c; }; try { exportarCSVCortes(); } finally { descargar = d0; } return out; }, vetaDe: c => vetaDe(c), ponVeta: (c, v) => ponVeta(c, v),
   pantallaPunto: i => { const k = claveActual().pts[i], r = $('#cPerfil').getBoundingClientRect(), q = VP.aPantalla(k[0], k[1]); return [r.left + q[0], r.top + q[1]]; },
   pantallaVarilla: i => { const k = P.varillas.lista[i], r = $('#cPerfil').getBoundingClientRect(), q = VP.aPantalla(k[0], k[1]); return [r.left + q[0], r.top + q[1]]; } };

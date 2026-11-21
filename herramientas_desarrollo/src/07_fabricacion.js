@@ -47,13 +47,21 @@ function geoFab(c) {
   if (c.generarInt) { int = c.generarInt(wF); if (conHueso()) int = int.map(h => huesoDePerro(h, h, fresaFab() / 2 / k).poly); }
   if (c.conHuecos && c.ranuras && c.ranuras.length && !c.modulo) { const q = parteFab(c, base); base = q.poly; int = q.int || []; }
   else if (c.conHuecos && !c.generar) base = c.poly;
-  const poly = base.map(p => [p[0] * k, p[1] * k]), interiores = int.map(hh => hh.map(p => [p[0] * k, p[1] * k]));
+  // taladros ciegos: la máquina taladra por la cara de arriba, que es la que se ve en el dibujo de la pieza (caraVista).
+  // Si casi todos van por la otra cara, la pieza sale en espejo (volteada); los que queden por la otra cara van a otra capa.
+  const caraVista = esPlano() && c.plano && !c.giro ? basePieza(c).ez[PLANOS[c.plano].n] : 1;
+  const ciegos = (c.taladros || []).filter(t => t[3] === 'ciego' && t[5]);
+  const volteada = ciegos.filter(t => t[5] !== caraVista).length > ciegos.filter(t => t[5] === caraVista).length, sx = volteada ? -1 : 1;
+  const caraArriba = volteada ? -caraVista : caraVista;
+  const poly = base.map(p => [sx * p[0] * k, p[1] * k]), interiores = int.map(hh => hh.map(p => [sx * p[0] * k, p[1] * k]));
+  if (volteada) { poly.reverse(); interiores.forEach(h => h.reverse()); }
   return {
+    volteada,
     c, poly, interiores, caja: cajaDe(poly), r: radioFab(), area: Math.abs(c.area) * k * k, huesosMal, nHuesos, nEsq: esq.length,
     // agujeros [x, y, radio]: los de las varillas y los propios de la pieza (el tubo en los discos)
-    agujeros: c.agujeros.map(j => [P.varillas.lista[j][0] * k, P.varillas.lista[j][1] * k, radioFab()]).concat((c.huecos || []).map(h => [h.x * k, h.y * k, h.r * k])).concat((c.taladros || []).map(t => [t[0] * k, t[1] * k, t[2] * k, t[3] === 'ciego' && t[4] ? t[4] * k : 0])),
-    cantos: (c.cantos || []).map(q => ({ a: [q.a[0] * k, q.a[1] * k], b: [q.b[0] * k, q.b[1] * k], r: q.r * k })),
-    etiqueta: puntoEtiqueta(c).map(v => v * k),
+    agujeros: c.agujeros.map(j => [sx * P.varillas.lista[j][0] * k, P.varillas.lista[j][1] * k, radioFab()]).concat((c.huecos || []).map(h => [sx * h.x * k, h.y * k, h.r * k])).concat((c.taladros || []).map(t => [sx * t[0] * k, t[1] * k, t[2] * k, t[3] === 'ciego' && t[4] ? t[4] * k : 0, t[3] === 'ciego' && t[5] && t[5] !== caraArriba])),
+    cantos: (c.cantos || []).map(q => ({ a: [sx * q.a[0] * k, q.a[1] * k], b: [sx * q.b[0] * k, q.b[1] * k], r: q.r * k })),
+    etiqueta: puntoEtiqueta(c).map((v, i) => (i ? 1 : sx) * v * k),
   };
 }
 function fabDefecto(maq) {
@@ -271,7 +279,8 @@ function dxf() {
   const n = v => (Math.round(v * 1000) / 1000).toString();
   g(0, 'SECTION'); g(2, 'HEADER'); g(9, '$ACADVER'); g(1, 'AC1009'); g(9, '$INSUNITS'); g(70, 4); g(9, '$MEASUREMENT'); g(70, 1); g(0, 'ENDSEC');
   const capaCiego = p => 'CIEGO_' + String(Math.round(p * 10) / 10).replace('.', '_') + 'MM';
-  const ciegos = [...new Set(col.tableros.flatMap(t => t.piezas.flatMap(pz => pz.g.agujeros.filter(a => a[3]).map(a => capaCiego(a[3])))))], hayCanto = col.tableros.some(t => t.piezas.some(pz => (pz.g.cantos || []).length));
+  const capaA = a => (a[4] ? 'OTRA_CARA_' : '') + capaCiego(a[3]);
+  const ciegos = [...new Set(col.tableros.flatMap(t => t.piezas.flatMap(pz => pz.g.agujeros.filter(a => a[3]).map(capaA))))], hayCanto = col.tableros.some(t => t.piezas.some(pz => (pz.g.cantos || []).length));
   g(0, 'SECTION'); g(2, 'TABLES'); g(0, 'TABLE'); g(2, 'LAYER'); g(70, 4 + ciegos.length + (hayCanto ? 1 : 0));
   [['CORTE', 7], ['TALADROS', 1], ['GRABADO', 5], ['TABLERO', 8], ...ciegos.map(c => [c, 3]), ...(hayCanto ? [['CANTO', 6]] : [])].forEach(([nom, c]) => { g(0, 'LAYER'); g(2, nom); g(70, 0); g(62, c); g(6, 'CONTINUOUS'); });
   g(0, 'ENDTAB'); g(0, 'ENDSEC');
@@ -293,7 +302,7 @@ function dxf() {
       (pz.g.interiores || []).forEach(hh => { const ci = contornoCNC(hh); poli('CORTE', ci.pts.map(p => { const q = aTablero(pz, p); return [ox + q[0], q[1]]; }), ci.b); });
       poli('CORTE', cc.pts.map(p => { const q = aTablero(pz, p); return [ox + q[0], q[1]]; }), cc.b);
       (pz.g.cantos || []).forEach(m => { const a = aTablero(pz, m.a), b = aTablero(pz, m.b); g(0, 'LINE'); g(8, 'CANTO'); g(10, n(ox + a[0])); g(20, n(a[1])); g(30, 0); g(11, n(ox + b[0])); g(21, n(b[1])); g(31, 0); });
-      pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); g(0, 'CIRCLE'); g(8, a[3] ? capaCiego(a[3]) : 'TALADROS'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(a[2])); });
+      pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); g(0, 'CIRCLE'); g(8, a[3] ? capaA(a) : 'TALADROS'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(a[2])); });
       if (f.numeros) {
         const q = aTablero(pz, pz.g.etiqueta), h = altoTexto(pz.g);
         g(0, 'TEXT'); g(8, 'GRABADO'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(h)); g(1, pz.c.etq); g(72, 1); g(11, n(ox + q[0])); g(21, n(q[1] - h / 2)); g(31, 0);
@@ -380,7 +389,8 @@ function listaCompra() {
     if (nF && So.tipo === 'tornillos') L.push([`Tornillos para madera Ø ${fmt(So.diam, 1)} mm, de unos ${fmt(Math.round(grosorFab() * 1.7))} mm (cabeza avellanada)`, String(nF)]);
     else if (nF) { L.push([`Tacos de madera Ø ${fmt(So.diam, 1)} × ${fmt(lt.largo)} mm (taladros ciegos de ${fmt(lt.prof)} mm)`, String(nF)]); L.push(['Cola blanca', 'para los tacos y los solapes']); }
     const nh = herrajesTotales(), Dh = datosHerraje(planoP().herraje, grosorFab());
-    if (nh.barril) L.push([`Perno M6 × ${fmt(Dh.L)} mm (cabeza Allen plana) y tuerca de barril M6 Ø 10`, `${nh.barril} juegos`]);
+    if (nh.barril) L.push([`Perno M6 × ${fmt(Dh.L)} mm (cabeza Allen plana) y tuerca de barril M6 Ø 10 × ${fmt(Dh.lb)} mm`, `${nh.barril} juegos`]);
+    if (nh.tubillones) L.push([`Tubillón (espiga de madera estriada) Ø 8 × ${datosTubillon(grosorFab()).largo} mm`, `${nh.tubillones}`]);
     if (nh.excentrica) L.push(['Excéntrica Ø 15 (tipo minifix) con su perno', `${nh.excentrica} juegos`]);
     if (R.costillas.some(c => c.cuna)) L.push(['Cuñas', `${R.costillas.filter(c => c.cuna).length}, del mismo tablero (van en el corte)`]);
     if (!nh.barril && !nh.excentrica) L.push(['Herrajes', nF && So.tipo === 'tornillos' ? 'solo los tornillos de los solapes' : 'ninguno (cola en las uniones, si se quiere fijo)']);
