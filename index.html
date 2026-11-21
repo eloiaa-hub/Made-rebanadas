@@ -45,6 +45,8 @@ h3{font-size:20px;margin-bottom:16px}
 .paso small{display:block;margin-top:6px;font-size:12.5px;color:var(--acento);font-weight:600}
 .descarga{background:var(--panel);border:1px solid var(--borde);border-radius:12px;padding:22px 24px;display:flex;gap:24px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:46px}
 .descarga p{color:var(--suave);max-width:640px}
+.volver{display:inline-flex;align-items:center;gap:6px;margin-bottom:18px;font-size:14px;font-weight:600;text-decoration:none;color:var(--acento2);border:1px solid var(--borde);background:var(--panel);border-radius:20px;padding:4px 14px}
+.volver:hover{border-color:var(--acento2)}
 footer{border-top:1px solid var(--borde);padding:22px 0 40px;font-size:14px;color:var(--suave)}
 footer .envoltura{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 @media (max-width:860px){.programas{grid-template-columns:1fr}.pasos{grid-template-columns:repeat(2,minmax(0,1fr))}header{padding:36px 0 24px}}
@@ -58,6 +60,7 @@ footer .envoltura{display:flex;justify-content:space-between;gap:16px;flex-wrap:
 <body>
 <header>
   <div class="envoltura">
+    <a class="volver" href="https://fusteriapps.es/" title="Volver al portal FusterIApps">← FusterIApps · todos los programas</a>
     <div class="firma">Por Eloi A.A. · Carpintería y mueble</div>
     <h1>Muebles <span>orgánicos</span><br>cortados en <span>rebanadas</span></h1>
     <p class="entrada">Diseña bancos, tumbonas, poufs, mesas, estanterías, lámparas y paneles de pared de formas curvas hechos con rebanadas de tablero. Se abre con doble clic, sin instalar nada y sin conexión a internet.</p>
@@ -138,7 +141,7 @@ footer .envoltura{display:flex;justify-content:space-between;gap:16px;flex-wrap:
 <footer>
   <div class="envoltura">
     <span>Programa: EUPL-1.2 · Manual: CC BY-SA 4.0 · Three.js: MIT</span>
-    <span><a href="https://github.com/eloiaa-hub/Made-rebanadas">Código en GitHub</a> · <a href="https://github.com/eloiaa-hub/Made-rebanadas/blob/main/NOVEDADES.md" target="_blank" rel="noopener">Novedades</a></span>
+    <span>Parte de <a href="https://fusteriapps.es/">FusterIApps</a> · <a href="https://github.com/eloiaa-hub/Made-rebanadas">Código en GitHub</a> · <a href="https://github.com/eloiaa-hub/Made-rebanadas/blob/main/NOVEDADES.md" target="_blank" rel="noopener">Novedades</a></span>
   </div>
 </footer>
 </body>
