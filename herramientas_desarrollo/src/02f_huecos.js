@@ -11,7 +11,7 @@
    Las restas se hacen con Clipper (assets/js/clipper.js). Una lama o costilla puede quedar en varias
    piezas (Lama 12a, 12b…) y con agujeros por dentro. */
 const ESC_CL = 1000;
-const usaHuecos = () => ['pared', 'costillas', 'reticula'].includes(P.tipo) && ((P.huecos || []).some(h => h.activo !== false) || partirActivo()) && !!window.ClipperLib;
+const usaHuecos = () => ['pared', 'costillas', 'reticula', 'apilado'].includes(P.tipo) && ((P.huecos || []).some(h => h.activo !== false) || partirActivo()) && !!window.ClipperLib;
 
 /* ---- partir las lamas de un panel de pared (paredes altas o para aprovechar el tablero) ----
    Cada junta es una franja (0,1 mm a tope, o la sombra) que se resta de la lama, como un hueco: los trozos
@@ -290,6 +290,8 @@ function recortesDe(p, poly) {
       const [x0, x1] = tramoX(h);
       ts.forEach(([a, b]) => out.push([[x0, a], [x1, a], [x1, b], [x0, b]]));
     } else {
+      // figura apilada: la llave solo atraviesa las capas seguidas en las que cabe (con su holgura)
+      if (P.tipo === 'apilado' && h.llave) { const r = LLAVE_RANGO.get(h.id); if (!r || p.x < r[0] || p.x > r[1]) return; out.push(engordar(forma, Math.max(0, +apiladoP().holgura || 0))); return; }
       // costilla: el túnel la atraviesa si su grosor cae entre desde y hasta
       const [x0, x1] = tramoX(h);
       if (p.x + e / 2 <= x0 || p.x - e / 2 >= x1) return;

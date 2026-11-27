@@ -139,6 +139,13 @@
   <div>
     <div class="caja">
       <h2>Tablero</h2>
+      <div class="fila" title="Medidas de tableros y planchas que se compran: al elegir una, se ponen el largo y el ancho (y el grosor típico)"><label>Medida típica</label>
+        <select id="tTipico"><option value="">— elegir —</option>
+          <optgroup label="Tableros"><option value="2440x1220">2440 × 1220 (estándar)</option><option value="2500x1250">2500 × 1250</option><option value="2850x2070">2850 × 2070 (aglomerado / MDF)</option><option value="1525x1525">1525 × 1525 (abedul báltico)</option><option value="1220x610">1220 × 610 (cuarto de tablero)</option></optgroup>
+          <optgroup label="Láser"><option value="600x400x3">600 × 400 (DM de 3 mm)</option><option value="900x600x3">900 × 600 (DM de 3 mm)</option><option value="1000x600x3">1000 × 600</option></optgroup>
+          <optgroup label="Porex (EPS) — hilo caliente"><option value="1000x500x30">1000 × 500 (plancha)</option><option value="1200x600x30">1200 × 600 (plancha)</option><option value="2000x1000x50">2000 × 1000 (bloque cortado)</option></optgroup>
+          <optgroup label="Poliestireno extruido (XPS)"><option value="1250x600x30">1250 × 600</option><option value="2500x600x30">2500 × 600</option></optgroup>
+        </select></div>
       <div class="fila" title="Medida del tablero en X (a lo largo de la veta, si la tiene)"><label>Largo <small>(X, mm)</small></label><input class="num" inputmode="decimal" id="tL" value="1000"></div>
       <div class="fila" title="Medida del tablero en Y"><label>Ancho <small>(Y, mm)</small></label><input class="num" inputmode="decimal" id="tA" value="600"></div>
       <div class="fila" title="Grueso del tablero. La profundidad de corte del proyecto será el grosor más lo que pase al martiriño"><label>Grosor <small>(mm)</small></label><input class="num" inputmode="decimal" id="tG" value="16"></div>
@@ -156,7 +163,7 @@
       <div class="fila" title="Fresadora CNC: separa las piezas el diámetro de la fresa. Cortadora láser: el corte es muy fino, las piezas van casi juntas y se saca el G-code del láser o un SVG para su programa (LightBurn, RDWorks…)"><label>Máquina</label><select id="mMaq"><option value="fresa">Fresadora CNC</option><option value="laser">Cortadora láser</option></select></div>
       <div class="fila soloFresa" title="Fresa de la base de herramientas compartida (la misma del Calcador y los Simuladores). Su diámetro decide la separación entre piezas"><label>Fresa</label><select id="hSel"></select></div>
       <div class="fila soloFresa" title="Diámetro de la fresa que corta las piezas"><label>Diámetro <small>(mm)</small></label><input class="num" inputmode="decimal" id="hD" value="6"></div>
-      <div class="fila soloLaser" title="Ancho del corte del láser (lo que se quema): en contrachapado o DM de 3 mm, de 0,1 a 0,2 mm"><label>Ancho del corte <small>(mm)</small></label><input class="num" inputmode="decimal" id="lK" value="0.15"></div>
+      <div class="fila soloLaser" title="Ancho del corte del láser (lo que se quema): en contrachapado o DM de 3 mm, de 0,1 a 0,2 mm. Con hilo caliente en porex o XPS, de 0,5 a 1,5 mm"><label>Ancho del corte <small>(mm)</small></label><input class="num" inputmode="decimal" id="lK" value="0.15"></div>
       <div class="fila" title="Madera que queda entre el corte de una pieza y el de la siguiente (además del ancho de la fresa)"><label>Holgura entre cortes <small>(mm)</small></label><input class="num" inputmode="decimal" id="hH" value="4"></div>
       <p class="nota" id="notaSep"></p>
     </div>
@@ -243,6 +250,7 @@
   <p>Elige la fresa de la base de herramientas (o escribe su diámetro). Entre pieza y pieza se deja el diámetro de la fresa más la holgura, para que los dos cortes no se toquen.</p>
   <h4>Cortadora láser</h4>
   <p>En <b>Máquina</b> elige <b>Cortadora láser</b> (ideal para maquetas en DM o contrachapado de 3 mm). Entre pieza y pieza se deja el <b>ancho del corte</b> (0,1 a 0,2 mm) más la holgura, así que las piezas van casi juntas. En la caja <b>Láser</b> pones la potencia, la velocidad y las pasadas, y si se <b>compensa el ancho del corte</b> (el láser pasa medio corte por fuera de cada pieza y por dentro de sus agujeros, para que las medidas, y las ranuras, queden exactas).</p>
+  <p><b>Porex (EPS) y poliestireno extruido (XPS) con hilo caliente.</b> En <b>Medida típica</b> están las planchas que se venden (porex de 1000 × 500 o 1200 × 600 mm, XPS de 1250 × 600 o 2500 × 600 mm). Para una cortadora de hilo caliente de dos ejes, elige <b>Cortadora láser</b> (también corta con un hilo fino, sin fresa) y pon en <b>Ancho del corte</b> lo que funde el hilo: de 0,5 a 1,5 mm según el hilo y la temperatura. Deja unos milímetros de holgura entre piezas: el hilo entra y sale por el borde de la plancha.</p>
   <p>Para cada tablero: <b>⬇ G-code láser</b> (GRBL en modo láser, $32=1, con M4: el láser se apaga solo en los movimientos rápidos) o <b>⬇ SVG para láser</b> para LightBurn, RDWorks, LaserGRBL o Inkscape: <b style="color:#d00">rojo</b> = cortar el contorno, <b style="color:#00d">azul</b> = cortar los interiores y negro = grabar (los nombres de las piezas). En los dos, primero se graba, luego se cortan los interiores y al final el contorno de cada pieza, para que no se mueva antes de tiempo. Las cajeras no se pueden hacer con láser. Prueba siempre la potencia y la velocidad en un retal.</p>
   <h4>3. Las piezas</h4>
   <ul>
@@ -1179,6 +1187,7 @@ function cargar() {
   if (d.costes && Array.isArray(d.costes.tipos) && d.costes.tipos.length) costes = { ...costes, ...d.costes };
 }
 ['tL', 'tA', 'tG', 'tP', 'tM', 'hD', 'hH', 'lK'].forEach(id => $(id).addEventListener('input', todo));
+$('tTipico').addEventListener('change', () => { const v = $('tTipico').value.split('x').map(Number); if (v.length < 2 || !v[0]) return; $('tL').value = v[0]; $('tA').value = v[1]; if (v[2]) $('tG').value = v[2]; $('tTipico').value = ''; todo(); });
 ['lPot', 'lF', 'lPas', 'lPotG', 'lS'].forEach(id => $(id).addEventListener('input', guardar));
 ['lComp', 'lNom'].forEach(id => $(id).addEventListener('change', guardar));
 $('mMaq').addEventListener('change', () => { if (esLaser() && num($('hH').value) > 3) $('hH').value = 2; todo(); });   // con láser, las piezas casi juntas

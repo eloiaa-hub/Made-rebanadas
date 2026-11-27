@@ -57,7 +57,7 @@ class Vista2D {
     ctx.strokeStyle = cssVar('--ejes'); ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.moveTo(0, ys); ctx.lineTo(this.w, ys); ctx.stroke();
     ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(xs, 0); ctx.lineTo(xs, this.h); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = cssVar('--suave'); ctx.font = '11px system-ui'; ctx.fillText('suelo', 6, ys - 4);
+    ctx.fillStyle = cssVar('--suave'); ctx.font = '11px system-ui'; if (!(typeof P !== 'undefined' && P && P.tipo === 'apilado' && this.c.id !== 'cPerfil')) ctx.fillText('suelo', 6, ys - 4);   // en planta no hay suelo
     ctx.textAlign = 'right'; ctx.fillText('rejilla ' + menor + ' / ' + mayor + ' mm', this.w - 8, this.h - 8); ctx.textAlign = 'left';
   }
   cota(ctx, a, b, off, texto, vertical) { // cota sencilla entre a y b (mundo), desplazada off px
@@ -109,6 +109,7 @@ function dibujarPerfil(ctx, V) {
   if (!P || !R) return;
   if (relieveActivo()) { dibujarPerfilRelieve(ctx, V); return; }
   if (esPlano()) { dibujarPerfilPlano(ctx, V); return; }
+  if (esApilado()) { dibujarPerfilApilado(ctx, V); return; }
   const C = clavesOrdenadas(), k = claveActual(), acento = cssVar('--acento');
   // todas las costillas, muy suaves (la «envolvente»)
   ctx.lineWidth = 1; ctx.strokeStyle = colorCostilla(.16);
@@ -265,6 +266,11 @@ function iniciarEditor() {
       return;
     }
     if (ev.button === 1) { ED.arr = { tipo: 'pan', x: mx, y: my, ox: VP.ox, oy: VP.oy }; return; }
+    if (esApilado() && R && ev.button === 0) {   // clic en una capa del alzado: se elige
+      const [u, v] = VP.aMundo(mx, my), k = Math.floor(v / grosor()), cs = R.costillas.filter(q => q.capa === k);
+      const q = cs.find(o => u >= o.caja.x0 && u <= o.caja.x1) || cs[0]; if (q) selCostilla(q.i, false);
+      ED.arr = { tipo: 'pan', x: mx, y: my, ox: VP.ox, oy: VP.oy }; return;
+    }
     const ip = puntoCerca(mx, my);
     if (ip >= 0) {
       UI.punto = ip; UI.varilla = -1;
@@ -374,6 +380,26 @@ function dibujarPerfilPlano(ctx, V) {
   ctx.fillStyle = cssVar('--suave'); ctx.font = '11.5px system-ui';
   ctx.fillText(`${c.nombre} (${c.etq}) · ${pl.nombre.toLowerCase()}, en ${pl.normal} = ${fmt(c.x)} mm${c.giro ? `, inclinada ${fmt(c.giro, 1)}°` : ''} · horizontal: ${pl.ejes[0]} · vertical: ${pl.ejes[1]}` + (k.pieza && k.pieza !== planoP().piezas[UI.costilla] ? ` · igual que «${k.pieza.nombre}»` : ''), 8, 72);
 }
+// figura apilada: alzado de las capas (de frente), cada una como una franja de su ancho; las llaves, en rojo
+function dibujarPerfilApilado(ctx, V) {
+  const e = grosor(), sel = piezaSel(), acento = cssVar('--acento');
+  if (!R.costillas.length) { ctx.fillStyle = acento; ctx.font = '600 12.5px system-ui'; ctx.textAlign = 'center'; ctx.fillText('Carga un modelo 3D en «Figura (modelo 3D)»', V.w / 2, V.h / 2); ctx.textAlign = 'left'; return; }
+  R.costillas.forEach(c => {
+    if (!c.ok) return;
+    const y0 = c.capa * e, [x0, yA] = V.aPantalla(c.caja.x0, y0 + e), [x1, yB] = V.aPantalla(c.caja.x1, y0), es = sel && c.i === sel.i;
+    ctx.fillStyle = es ? conAlfa(acento, .45) : colorCostilla(sel && c.capa === sel.capa ? .5 : .28); ctx.fillRect(x0, yA, x1 - x0, Math.max(1, yB - yA));
+    ctx.strokeStyle = es ? acento : colorCostilla(.75); ctx.lineWidth = es ? 1.6 : .6; ctx.strokeRect(x0, yA, x1 - x0, Math.max(1, yB - yA));
+  });
+  (R.llaves || []).forEach(l => {
+    if (l.k0 < 0) return; const cb = cajaDe(l.forma), [x0, yA] = V.aPantalla(cb.x0, (l.k1 + 1) * e), [x1, yB] = V.aPantalla(cb.x0 + cb.w, l.k0 * e);
+    ctx.fillStyle = 'rgba(208,69,58,.35)'; ctx.fillRect(x0, yA, x1 - x0, yB - yA); ctx.strokeStyle = '#d0453a'; ctx.lineWidth = 1.2; ctx.strokeRect(x0, yA, x1 - x0, yB - yA);
+    ctx.fillStyle = '#d0453a'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center'; ctx.fillText('L' + l.n, (x0 + x1) / 2, yA - 4); ctx.textAlign = 'left';
+  });
+  const bb = R.bbox; V.cota(ctx, [bb[0][1], 0], [bb[0][1], R.capas * e], 26, fmt(R.capas * e) + ' mm', true);
+  V.cota(ctx, [bb[0][0], 0], [bb[0][1], 0], 22, fmt(bb[0][1] - bb[0][0]) + ' mm', false);
+  ctx.fillStyle = cssVar('--suave'); ctx.font = '11.5px system-ui';
+  ctx.fillText(`Alzado de las ${R.capas} capas (de ${fmt(e, 1)} mm) · clic: elegir capa · las llaves, en rojo · se editan en la vista ▦ Huecos`, 8, 72);
+}
 // casillas con la posición del punto seleccionado (se pueden escribir)
 function refrescarPuntoCoord() {
   const caja = $('#ptCoord'); if (!caja) return;
@@ -397,12 +423,14 @@ function dibujarPerfilRelieve(ctx, V) {
   ctx.textAlign = 'left';
 }
 function ayudaPerfil() {
+  if (P && esApilado() && !UI.vistaHuecos) return '<span><kbd>Clic</kbd> elegir la capa</span><span><kbd>Rueda</kbd> acercar</span><span>Las llaves se mueven en <b>▦ Huecos</b></span>';
   if (UI.vistaHuecos) return '<span><kbd>Arrastrar</kbd> mover el hueco · asas: estirar</span><span><kbd>Doble clic</kbd> vértice nuevo (libre)</span><span><kbd>↻</kbd> girar</span><span><kbd>Clic dcho.</kbd> quitar vértice</span><span><kbd>Supr</kbd> borrar el hueco</span><span><kbd>Mayús</kbd> sin rejilla</span>';
   return '<span><kbd>Doble clic</kbd> línea: punto nuevo · punto: esquina</span><span><kbd>Clic dcho.</kbd> borrar</span><span><kbd>Mayús</kbd> sin rejilla</span>';
 }
 function encuadrarPerfil() {
   if (!R) return;
   if (esPlano()) { const k = ctrlEdit(), c = piezaSel(); if (!k) { VP.pintar(); return; } const b = cajaDe(curvaCerrada(k.pts, k.esq)); if (c && c.ok) { const d = c.caja; b.x0 = Math.min(b.x0, d.x0); b.y0 = Math.min(b.y0, d.y0); b.w = Math.max(b.x0 + b.w, d.x1) - b.x0; b.h = Math.max(b.y0 + b.h, d.y1) - b.y0; } VP.encuadrar(b, 50); return; }
+  if (esApilado()) { if (R.costillas.length) VP.encuadrar({ x0: R.bbox[0][0], y0: 0, w: R.bbox[0][1] - R.bbox[0][0], h: R.capas * grosor() }, 50); else VP.pintar(); return; }
   if (formaCalculada()) { const cs = R.costillas.filter(c => c.ok); if (cs.length) VP.encuadrar({ x0: 0, y0: 0, w: Math.max(...cs.map(c => c.caja.x1)), h: Math.max(...cs.map(c => c.caja.y1)) }, 50); return; }
   let x0 = Infinity, y0 = 0, x1 = -Infinity, y1 = -Infinity;
   P.claves.forEach(c => c.pts.forEach(p => { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }));
@@ -420,6 +448,7 @@ function dibujarCostilla(ctx, V) {
   ctx.fill('evenodd'); ctx.stroke();
   // los otros trozos de la misma lama o costilla, en claro
   const pad = c.padre || c; (pad.partes || []).forEach(q => { if (q === c || !q.ok) return; ctx.save(); ctx.globalAlpha = .35; ctx.setLineDash([4, 3]); V.camino(ctx, q.poly); ctx.stroke(); ctx.restore(); });
+  if (c.marcas && c.marcas.length) { ctx.save(); ctx.strokeStyle = '#2f6fd0'; ctx.lineWidth = 1.1; ctx.setLineDash([4, 3]); c.marcas.forEach(l => { ctx.beginPath(); l.forEach((p, i) => { const [x, y] = V.aPantalla(p[0], p[1]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke(); }); ctx.restore(); }
   const r = radioAgujero();
   (c.taladros || []).forEach(t => { const [x, y] = V.aPantalla(t[0], t[1]); ctx.fillStyle = cssVar('--vista'); ctx.beginPath(); ctx.arc(x, y, Math.max(2, t[2] * V.sc), 0, PI2); ctx.fill(); ctx.stroke(); });
   c.agujeros.forEach(k => {
@@ -461,9 +490,9 @@ const piezaSel = () => R ? (UI.costilla < R.n ? R.costillas[UI.costilla] : R.otr
 function encuadrarCostilla() { const c = piezaSel(); if (c && c.ok) VC.encuadrar(c.caja, 40); else VC.pintar(); }
 function refrescarCostilla() {
   const c = piezaSel(); if (!c) return;
-  $('#tipoPieza').textContent = esPlano() ? 'Pieza' : c.disco ? 'Disco' : c.z ? 'Larguero' : P.tipo === 'pared' ? 'Lama' : 'Costilla';
+  $('#tipoPieza').textContent = esPlano() ? 'Pieza' : esApilado() ? 'Capa' : c.disco ? 'Disco' : c.z ? 'Larguero' : P.tipo === 'pared' ? 'Lama' : 'Costilla';
   $('#numCost').textContent = c.etq;
-  $('#infoCost').textContent = esPlano() ? `${c.nombre} · ${PLANOS[c.plano].nombre.toLowerCase()} en ${PLANOS[c.plano].normal} = ${fmt(c.x)} mm · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm · ${textoUnionesPieza(c)}` : c.disco ? `a ${fmt(c.v)} mm de altura · Ø ${fmt(2 * c.rD)} mm · ${R.n} ranuras`
+  $('#infoCost').textContent = esApilado() ? `de ${R.capas} · de ${fmt(c.capa * grosor())} a ${fmt((c.capa + 1) * grosor())} mm de altura · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm` + ((c.int || []).length ? ` · ${c.int.length} hueco${c.int.length > 1 ? 's' : ''}` : '') : esPlano() ? `${c.nombre} · ${PLANOS[c.plano].nombre.toLowerCase()} en ${PLANOS[c.plano].normal} = ${fmt(c.x)} mm · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm · ${textoUnionesPieza(c)}` : c.disco ? `a ${fmt(c.v)} mm de altura · Ø ${fmt(2 * c.rD)} mm · ${R.n} ranuras`
     : c.z ? `z = ${fmt(c.u)} mm · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm · ${c.ranuras.length} ranuras`
     : `de ${R.n} · ${P.tipo === 'radial' ? 'ángulo' : 'x'} = ${textoPos(c.x)} · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm` + (c.ranuras.length ? ` · ${c.ranuras.length} ${P.tipo === 'reticula' ? 'ranuras' : 'muescas'}` : '');
   $$('#listaCost li').forEach((li, i) => li.classList.toggle('sel', i === UI.costilla));

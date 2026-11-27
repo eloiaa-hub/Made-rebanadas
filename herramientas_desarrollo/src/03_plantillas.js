@@ -529,6 +529,21 @@ PLANTILLAS.estanteria_kit = {
     return Object.assign({}, CLAVE_PLANO, { piezas, asiento: false, herraje: 'excentrica' });
   },
 };
+// ---- figuras apiladas (planos seriados): la forma sale de un modelo 3D; la plantilla pone el material, el grosor y el modelo de ejemplo ----
+PLANTILLAS.apilado_laser = {
+  nombre: 'Figura apilada pequeña (láser)', grupo: 'apilado', modelo: 'conejo',
+  desc: 'Figura de capas de MDF de 3 mm (también 4 o 5) cortadas con láser y pegadas unas sobre otras, alineadas con una llave cuadrada y otra triangular. Cada capa lleva grabado el contorno de la de encima. Empieza con un conejo: carga tu modelo en «Figura (modelo 3D)».',
+  params: [{ id: 'alto', nombre: 'Alto de la figura', min: 40, max: 800, paso: 5, valor: 200 }],
+  ajustes: { grosor: 3, material: 'mdf', corte: 'centro', minArea: 6, holgura: 0.15, lado: 6, margen: 1.5, grabar: true, hilo: false, fab: { ancho: 600, alto: 400, borde: 5, sep: 2 } },
+  generar(p) { return Object.assign({}, CLAVE_PLANO, { largo: p.alto, apilado: true }); },
+};
+PLANTILLAS.apilado_porex = {
+  nombre: 'Figura apilada grande (porex, hilo caliente)', grupo: 'apilado', modelo: 'moai',
+  desc: 'Figura grande de planchas de porex (EPS) o poliestireno extruido (XPS) de 30 mm cortadas con hilo caliente, pegadas y lijadas. Las capas salen por fuera (sobra un poco para lijar) y los huecos de las llaves llevan la entrada del hilo. Empieza con una cabeza de moái.',
+  params: [{ id: 'alto', nombre: 'Alto de la figura', min: 200, max: 3000, paso: 10, valor: 1000 }],
+  ajustes: { grosor: 30, material: 'porex', corte: 'fuera', minArea: 400, holgura: 0.5, lado: 30, margen: 8, grabar: false, hilo: true, anchoHilo: 1, fab: { ancho: 1200, alto: 600, borde: 10, sep: 4 } },
+  generar(p) { return Object.assign({}, CLAVE_PLANO, { largo: p.alto, apilado: true }); },
+};
 PLANTILLAS.plano_vacio = {
   nombre: 'Vacío: piezas planas', grupo: 'plano',
   desc: 'Un tablero de frente y otro de lado que se cruzan, para construir el mueble pieza a pieza o traer los contornos de un DXF o SVG.',
@@ -545,7 +560,7 @@ PLANTILLAS.plano_vacio = {
   },
 };
 const grupoDe = id => PLANTILLAS[id].grupo || 'lineal';
-const grupoTipo = t => t === 'radial' ? 'radial' : t === 'pared' ? 'pared' : t === 'plano' ? 'plano' : 'lineal';
+const grupoTipo = t => t === 'radial' ? 'radial' : t === 'pared' ? 'pared' : t === 'plano' ? 'plano' : t === 'apilado' ? 'apilado' : 'lineal';
 
 function paramsDefecto(id) { const o = {}; PLANTILLAS[id].params.forEach(q => o[q.id] = q.valor); return o; }
 // genera la forma desde la plantilla; si solo cambia el largo y hay retoques a mano, escala las claves
@@ -559,6 +574,7 @@ function aplicarPlantilla(soloLargo) {
   }
   const g = pl.generar(P.params, grosor());
   P.largo = g.largo; P.esquinas = g.esquinas; P.claves = g.claves; P.editado = false;
+  if (g.apilado) P.figura.alto = P.params.alto;
   if (g.piezas && g.herraje && planoP().herraje == null) planoP().herraje = g.herraje;
   if (g.piezas) { planoP().asiento = g.asiento !== false; planoP().piezas = g.piezas; UI.costilla = Math.min(UI.costilla || 0, g.piezas.length - 1); }
   UI.clave = Math.min(UI.clave, P.claves.length - 1); UI.punto = -1;

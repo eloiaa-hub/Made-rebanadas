@@ -1,5 +1,14 @@
 # Novedades de Made-rebanadas
 
+## v1.6
+
+- **Figuras apiladas (planos seriados)**, un tipo de mueble nuevo: la figura se corta de un modelo 3D (STL, OBJ, GLB o PLY) en capas horizontales del grosor del tablero o de la plancha, que se pegan unas sobre otras desde el suelo, sin separación. Capas por el centro, por fuera (para lijar) o por dentro; los cortes con varios trozos salen en piezas 12a, 12b…; avisos de las piezas que quedan en el aire.
+- **Llaves de alineación** en lugar de varillas: listones cuadrados y triangulares que atraviesan las capas por un hueco de su forma. Son huecos con la casilla «Llave de alineación»: se mueven, giran, estiran y retocan en la vista ▦ Huecos; cada una llega sola de la primera a la última capa seguida en la que cabe, con su holgura y un margen de material. Se colocan solas al cargar el modelo (✨ Colocar las llaves solas).
+- Dos plantillas: **figura pequeña para láser** (DM de 3 a 5 mm, con el contorno de la capa de encima grabado) y **figura grande de porex o XPS para hilo caliente** (capas por fuera y entrada del hilo hasta los huecos de las llaves). Modelos de ejemplo nuevos: **conejo sentado** y **cabeza de moái**; ejemplos **Moái de sobremesa (láser)**, **Conejo grande en XPS** y **Busto en porex**.
+- Materiales **porex (EPS)** y **poliestireno extruido (XPS)**, grosores de 3 a 100 mm, y medidas de **planchas de porex y XPS** en Fabricar y en el **Anidador** («Medida típica»).
+- Plano en PDF con la hoja de **capas y llaves** (alzado numerado, planta y tabla de llaves), las capas con el contorno de encima y el montaje de abajo arriba; lista de compra con los listones, la cola sin disolventes para el porex y el acabado.
+- Las tablas del plano ajustan el alto de cada fila a la columna más larga.
+
 ## v1.5
 
 - **Ficha de práctica para alumnos** (botón 🎓 Ficha): un PDF con el enunciado (datos del alumno, objetivos, tareas, qué se entrega y registro de mediciones), el plano completo con las vistas acotadas, las piezas, el corte y el montaje, y una rúbrica de evaluación con cuatro niveles y pesos. Los textos salen solos del mueble y se pueden cambiar; se guardan con el proyecto.

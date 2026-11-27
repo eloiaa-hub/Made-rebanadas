@@ -4,6 +4,7 @@ let tRecalc = 0;
 // recalcula costillas y lo dibuja todo
 function recalcular() {
   R = calcular();
+  if (llavesTrasCalcular()) { R = calcular(); refrescarHuecos(); }
   UI.costilla = clamp(UI.costilla, 0, nPiezas() - 1);
   if (UI.varilla >= P.varillas.lista.length) UI.varilla = -1;
   construir3D();
@@ -63,6 +64,7 @@ function iniciarPanel() {
     if (P.editado && !confirm('Se perderán los retoques hechos a mano en los perfiles. ¿Cambiar de plantilla?')) { sp.value = P.plantilla; return; }
     P.plantilla = sp.value; P.params = paramsDefecto(sp.value); P.nombre = PLANTILLAS[sp.value].nombre;
     aplicarPlantilla(); UI.clave = 0;
+    if (P.tipo === 'apilado') { ajustesApilado(sp.value); ponerControles(); }
     if (P.tipo === 'costillas') { R = calcular(); autoVarillas(P.varillas.autoN); }
     construirParams(); cambio('Plantilla: ' + PLANTILLAS[sp.value].nombre);
     encuadrarSiHaceFalta(); camara('tres4');
@@ -75,7 +77,7 @@ function iniciarPanel() {
     const v = $('#cGrosor').value; $('#filaGrosorOtro').classList.toggle('oculto', v !== 'otro');
     P.costillas.grosor = v === 'otro' ? +$('#cGrosorOtro').value : +v; if (esPlano() && !P.editado) aplicarPlantilla(); cambio('Grosor ' + P.costillas.grosor + ' mm');
   });
-  enlazar('#cGrosorOtro', () => { P.costillas.grosor = clamp(+$('#cGrosorOtro').value || 18, 3, 80); if (esPlano() && !P.editado) aplicarPlantilla(); cambio('Grosor ' + P.costillas.grosor + ' mm'); });
+  enlazar('#cGrosorOtro', () => { P.costillas.grosor = clamp(+$('#cGrosorOtro').value || 18, 1, 200); if (esPlano() && !P.editado) aplicarPlantilla(); cambio('Grosor ' + P.costillas.grosor + ' mm'); });
   enlazar('#cModo', () => {
     P.costillas.modo = $('#cModo').value;
     // conserva el reparto actual al cambiar de modo
@@ -145,7 +147,10 @@ function iniciarPanel() {
     if (P.tipo === 'costillas' && !P.varillas.lista.length) autoVarillas(P.varillas.autoN);
     UI.costilla = 0; ponerControles();
     if (P.tipo === 'plano' && !planoP().piezas.length) aplicarPlantilla();
-    cambio({ costillas: 'Costillas con varillas', reticula: 'Retícula entrelazada', radial: 'Rebanadas radiales', pared: 'Panel de pared', plano: 'Piezas planas' }[P.tipo]);
+    UI.fab = null;
+    if (P.tipo === 'apilado') { ajustesApilado(P.plantilla); R = calcular(); ponerControles(); }
+    cambio({ costillas: 'Costillas con varillas', reticula: 'Retícula entrelazada', radial: 'Rebanadas radiales', pared: 'Panel de pared', plano: 'Piezas planas', apilado: 'Figura apilada' }[P.tipo]);
+    if (P.tipo === 'apilado') verHuecos(true);
     encuadrarSiHaceFalta(); camara('tres4');
   });
   // relieve: texto o modelo 3D
@@ -196,7 +201,7 @@ function iniciarPanel() {
   // figura desde un modelo 3D (costillas y retícula)
   const Fg = () => P.figura;
   const reFigura = (txt) => { R = calcular(); if (P.tipo === 'costillas') autoVarillas(P.varillas.autoN); ponerControles(); cambio(txt); encuadrarSiHaceFalta(); encuadrarPerfil(); camara('tres4'); };
-  enlazar('#fgAlto', () => { Fg().alto = clamp(+$('#fgAlto').value || 800, 100, 5000); reFigura('Alto de la figura'); });
+  enlazar('#fgAlto', () => { Fg().alto = clamp(+$('#fgAlto').value || 800, esApilado() ? 20 : 100, 5000); if (esApilado() && P.params) { P.params.alto = Fg().alto; construirParams(); } reFigura('Alto de la figura'); });
   enlazar('#fgEje', () => { Fg().eje = $('#fgEje').value; reFigura(Fg().eje === 'z' ? 'Cortes de delante a atrás' : 'Cortes de lado a lado'); });
   enlazar('#fgUnir', () => { Fg().unir = $('#fgUnir').checked; CACHE_SEC.clave = ''; reFigura(Fg().unir ? 'Unir trozos sueltos' : 'Solo el trozo mayor'); });
   enlazar('#fgMin', () => { Fg().minArea = clamp(+$('#fgMin').value || 0, 0, 60); reFigura('Costillas pequeñas'); });
@@ -214,6 +219,24 @@ function iniciarPanel() {
   };
   $('#bFigEjemplo').onclick = () => dialogoModelos(true);
   $('#bConvertirPerfiles').onclick = dialogoConvertir;
+  // figura apilada: capas y llaves
+  const Ap = () => apiladoP();
+  enlazar('#apCorte', () => { Ap().corte = $('#apCorte').value; cambio('Capas cortadas ' + NOMBRE_CORTE[Ap().corte]); });
+  enlazar('#apMin', () => { Ap().minArea = Math.max(0, +$('#apMin').value || 0); cambio('Trozos de menos de ' + fmt(Ap().minArea) + ' mm² fuera'); });
+  enlazar('#apLado', () => { Ap().lado = clamp(+$('#apLado').value || 8, 2, 500); });
+  enlazar('#apHolgura', () => { Ap().holgura = clamp(+$('#apHolgura').value || 0, 0, 5); cambio('Holgura de las llaves ' + fmt(Ap().holgura, 2) + ' mm'); });
+  enlazar('#apMargen', () => { Ap().margen = clamp(+$('#apMargen').value || 0, 0, 200); cambio('Material alrededor de las llaves ' + fmt(Ap().margen, 1) + ' mm'); });
+  enlazar('#apGrabar', () => { Ap().grabar = $('#apGrabar').checked; cambio(Ap().grabar ? 'Con el contorno de la capa de encima grabado' : 'Sin grabar el contorno de encima'); });
+  enlazar('#apHilo', () => { Ap().hilo = $('#apHilo').checked; cambio(Ap().hilo ? 'Con entrada del hilo a los huecos' : 'Sin entrada del hilo'); });
+  enlazar('#apAnchoHilo', () => { Ap().anchoHilo = clamp(+$('#apAnchoHilo').value || 1, 0.2, 5); cambio('Corte del hilo de ' + fmt(Ap().anchoHilo, 1) + ' mm'); });
+  const llave = f => { if (!window.ClipperLib) { aviso('⚠ Falta assets/js/clipper.js'); return; } P.huecos = P.huecos || []; P.huecos.push(llaveNueva(f)); UI.hueco = P.huecos.length - 1; cambio(f === 'tri' ? 'Llave triangular' : 'Llave cuadrada'); verHuecos(true); };
+  $('#bLlaveCuad').onclick = () => llave('cuad'); $('#bLlaveTri').onclick = () => llave('tri');
+  $('#bLlavesAuto').onclick = () => {
+    const n = colocarLlavesAuto();
+    if (!n) { aviso('No hay sitio común para las llaves: baja su lado o el material alrededor.', 5000); return; }
+    UI.hueco = P.huecos.length - 1; cambio(n === 1 ? 'Solo cabe una llave' : 'Llaves colocadas'); verHuecos(true);
+    if (n === 1) aviso('Solo cabe una llave: la zona común a las capas es pequeña.');
+  };
   $('#bSimplificar').onclick = dialogoSimplificar;
   $('#bPerfilDXF').onclick = dialogoPerfilDXF;
   $$('.bLetra').forEach(bt => bt.onclick = () => {
@@ -343,36 +366,38 @@ function llenarPlantillas() {
 }
 // enseña los apartados de cada tipo de mueble
 function mostrarSecciones(forzarFigura) {
-  const t = P.tipo;
+  const t = P.tipo, ap = t === 'apilado';
   $('#secVarillas').classList.toggle('oculto', t !== 'costillas');
   $('#secReticula').classList.toggle('oculto', t !== 'reticula');
   $('#secPlanta').classList.toggle('oculto', t !== 'costillas');
+  $('#secApilado').classList.toggle('oculto', !ap); $('#secMaqueta').classList.toggle('oculto', ap);
+  ['#filaFgEje', '#filaFgMin', '#filaFgUnir'].forEach(s => $(s).classList.toggle('oculto', ap));
   $('#secRadial').classList.toggle('oculto', t !== 'radial');
   $('#secPared').classList.toggle('oculto', t !== 'pared');
   const pl = t === 'plano';
   $('#secPlano').classList.toggle('oculto', !pl); $('#secPiezas').classList.toggle('oculto', !pl);
   $('#bMontaje').classList.toggle('oculto', !pl);
-  ['#cVarillas3d', '#cClaves3d', '#cFantasma'].forEach(s => $(s).closest('label').classList.toggle('oculto', pl));
-  $('#titCostillas').textContent = pl ? 'Tablero' : t === 'pared' ? 'Lamas' : 'Costillas';
-  $('#titLista').textContent = pl ? 'Piezas' : t === 'pared' ? 'Lamas' : 'Costillas';
-  ['#cBase', '#cTope'].forEach(s => $(s).closest('label').classList.toggle('oculto', pl)); $('#resCost').classList.toggle('oculto', pl);
+  ['#cVarillas3d', '#cClaves3d', '#cFantasma'].forEach(s => $(s).closest('label').classList.toggle('oculto', pl || (ap && s !== '#cFantasma')));
+  $('#titCostillas').textContent = pl ? 'Tablero' : ap ? 'Tablero o plancha' : t === 'pared' ? 'Lamas' : 'Costillas';
+  $('#titLista').textContent = pl ? 'Piezas' : ap ? 'Capas' : t === 'pared' ? 'Lamas' : 'Costillas';
+  ['#cBase', '#cTope'].forEach(s => $(s).closest('label').classList.toggle('oculto', pl || ap)); $('#resCost').classList.toggle('oculto', pl || ap);
   $$('.filaArco').forEach(f => f.classList.toggle('oculto', P.planta.forma !== 'arco'));
   $$('.filaS').forEach(f => f.classList.toggle('oculto', P.planta.forma !== 's'));
   const rad = t === 'radial';
-  $('#cModo').closest('label').classList.toggle('oculto', rad || pl);
-  $('#filaSep').classList.toggle('oculto', rad || pl || P.costillas.modo !== 'separacion');
-  $('#filaNum').classList.toggle('oculto', rad || pl || P.costillas.modo !== 'numero');
-  if (pl) $('#filaTope').classList.add('oculto');
+  $('#cModo').closest('label').classList.toggle('oculto', rad || pl || ap);
+  $('#filaSep').classList.toggle('oculto', rad || pl || ap || P.costillas.modo !== 'separacion');
+  $('#filaNum').classList.toggle('oculto', rad || pl || ap || P.costillas.modo !== 'numero');
+  if (pl || ap) $('#filaTope').classList.add('oculto');
   $('#kPosTit').textContent = rad ? 'Posición (°)' : 'Posición (mm)';
   // relieve (paneles de pared)
-  const rel = relieveActivo(), fig = figuraActiva() || (!!forzarFigura && t !== 'pared' && t !== 'radial'), calc = !!(rel || fig), Rl = P.relieve;
-  $('#filaOrigen').classList.toggle('oculto', t === 'radial' || pl);
+  const rel = relieveActivo(), fig = figuraActiva() || ap || (!!forzarFigura && t !== 'pared' && t !== 'radial'), calc = !!(rel || (fig && !ap)), Rl = P.relieve;
+  $('#filaOrigen').classList.toggle('oculto', t === 'radial' || pl || ap);
   [...$('#sOrigen').options].forEach(o => { o.hidden = t === 'pared' ? o.value === 'figura' : !['plantilla', 'figura'].includes(o.value); });
   $('#filaPlantilla').classList.toggle('oculto', calc); $('#bPlantillaFotos').classList.toggle('oculto', calc); $('#params').classList.toggle('oculto', calc); $('#descPlantilla').classList.toggle('oculto', calc);
   $('#secRelieve').classList.toggle('oculto', !rel); $('#secFigura').classList.toggle('oculto', !fig); $('#bConvertirPerfiles').classList.toggle('oculto', !(rel || figuraActiva()));
   $('#relTexto').classList.toggle('oculto', Rl.fuente !== 'texto'); $('#relModelo').classList.toggle('oculto', Rl.fuente !== 'modelo'); $('#relImagen').classList.toggle('oculto', Rl.fuente !== 'imagen');
-  $('#secClaves').classList.toggle('oculto', calc || pl);
-  $('#sClave').classList.toggle('oculto', calc || pl); $('#bEsquina').classList.toggle('oculto', calc); $('#infoClave').classList.toggle('oculto', calc || pl);
+  $('#secClaves').classList.toggle('oculto', calc || pl || ap);
+  $('#sClave').classList.toggle('oculto', calc || pl || ap); $('#bEsquina').classList.toggle('oculto', calc || ap); $('#infoClave').classList.toggle('oculto', calc || pl || ap);
 }
 // campos de «Partir las lamas» (se enseñan los que hacen falta)
 function ponerPartir() {
@@ -418,6 +443,11 @@ function ponerControles() {
   const Fg = P.figura; $('#fgAlto').value = Fg.alto; $('#fgEje').value = Fg.eje; $('#fgGiro').value = String(Fg.giro || 0); $('#fgMin').value = Fg.minArea; $('#fgUnir').checked = Fg.unir !== false;
   $('#fgInfo').textContent = Fg.malla ? `Modelo: ${Fg.malla.nombre} (${Fg.malla.nt.toLocaleString('es-ES')} triángulos${Fg.malla.original > Fg.malla.nt ? ', reducido de ' + Fg.malla.original.toLocaleString('es-ES') : ''}).` + (figuraActiva() ? ` La figura mide ${fmt(mallaFigura().largo)} × ${fmt(mallaFigura().ancho)} × ${fmt(mallaFigura().alto)} mm.` : '') : 'Sin modelo. Carga un STL u OBJ: cada costilla será un corte de verdad del modelo.';
   const Rl = P.relieve; $('#sOrigen').value = P.tipo === 'pared' ? Rl.fuente : (figuraActiva() ? 'figura' : 'plantilla'); $('#paOrient').value = Rl.orient || 'v';
+  { const A = apiladoP(); $('#apCorte').value = A.corte; $('#apMin').value = A.minArea; $('#apLado').value = A.lado; $('#apHolgura').value = A.holgura; $('#apMargen').value = A.margen;
+    $('#apGrabar').checked = !!A.grabar; $('#apHilo').checked = !!A.hilo; $('#apAnchoHilo').value = A.anchoHilo; $('#filaApHilo').classList.toggle('oculto', !A.hilo);
+    if (esApilado()) { const m = apiladoActivo() ? mallaFigura() : null, nL = (R && R.llaves || []).filter(l => l.k0 >= 0).length;
+      $('#apInfo').innerHTML = m ? `<b>${R ? R.capas : 0}</b> capas de <b>${fmt(grosor(), 1)}</b> mm · <b>${R ? R.n : 0}</b> piezas · figura de ${fmt(m.ancho)} × ${fmt(m.fondo)} × ${fmt(m.alto)} mm · <b>${nL}</b> llave${nL === 1 ? '' : 's'}` : 'Sin modelo: carga uno en «Figura (modelo 3D)».';
+      if (m) $('#fgInfo').textContent = `Modelo: ${P.figura.malla.nombre} (${P.figura.malla.nt.toLocaleString('es-ES')} triángulos). La figura mide ${fmt(m.ancho)} × ${fmt(m.fondo)} × ${fmt(m.alto)} mm (ancho × fondo × alto).`; } }
   $('#rlTexto').value = Rl.texto; $('#rlLetra').value = Rl.letra; $('#rlNegrita').checked = Rl.negrita; $('#rlTam').value = Rl.tamLetra; $('#rlInter').value = Rl.interlinea;
   $('#rlVista').value = Rl.vista; $('#rlGiro').value = String(Rl.giro || 0); $('#rlBase').value = Rl.base;
   $('#rlAncho').value = Rl.ancho; $('#rlAlto').value = Rl.alto; $('#rlFondo').value = Rl.fondo; $('#rlRelieve').value = Rl.relieve; $('#rlSuave').value = Rl.suavizado; $('#rlInvertir').checked = Rl.invertir; $('#rlOnda').value = Rl.ondaAmp; $('#rlOndas').value = Rl.ondas;
@@ -492,10 +522,11 @@ function refrescarListas() {
   const cm = calcularCompra(), largoV = cm.varillas.reduce((a, v) => a + v.largo, 0);
   $('#resumen').innerHTML = `<table>
     <tr><td>Medidas totales</td><td>${(G.dims || [0, 0, 0]).map(v => fmt(v)).join(' × ')} mm</td></tr>
-    <tr><td>${esPlano() ? 'Piezas' : P.tipo === 'pared' ? 'Lamas' : 'Costillas'}</td><td>${R.n} de ${fmt(grosor(), 1)} mm</td></tr>
+    <tr><td>${esPlano() ? 'Piezas' : esApilado() ? 'Capas' : P.tipo === 'pared' ? 'Lamas' : 'Costillas'}</td><td>${esApilado() ? `${R.capas} de ${fmt(grosor(), 1)} mm (${R.n} piezas)` : `${R.n} de ${fmt(grosor(), 1)} mm`}</td></tr>
     <tr><td>Superficie de tablero</td><td>${fmt(cm.area / 1e6, 2)} m²</td></tr>
     <tr><td>Tableros ${fmt(cm.tablero[0])}×${fmt(cm.tablero[1])}</td><td>${cm.nTableros}</td></tr>
     ${esPlano() ? `<tr><td>Uniones a media madera</td><td>${R.uniones.filter(u => u.tipo === 'media').length}</td></tr><tr><td>Espigas en caja pasante</td><td>${R.uniones.filter(u => u.tipo === 'caja').length}</td></tr><tr><td>Ancho de ranuras y cajas</td><td>${fmt(grosor() + planoP().holgura, 2)} mm</td></tr>`
+    : esApilado() ? (R.llaves || []).filter(l => l.k0 >= 0).map(l => `<tr><td>Llave L${l.n} (${nombreLlave(l.h)})</td><td>${listonLlave(l)} × ${fmt(l.largo)} mm</td></tr>`).join('') + `<tr><td>Material</td><td>${esc(MATERIALES[P.costillas.material].nombre)}</td></tr>`
     : P.tipo === 'radial' ? `<tr><td>Tubo central</td><td>Ø ${fmt(P.radial.tubo)} mm</td></tr><tr><td>Discos de unión</td><td>${R.discos.length}</td></tr>`
     : P.tipo === 'pared' ? `<tr><td>Rastreles ${fmt(P.pared.alto)} × ${fmt(P.pared.grueso)}</td><td>${R.rastreles.length} de ${fmt(P.largo)} mm</td></tr>`
     : ret ? `<tr><td>Largueros</td><td>${R.largueros.length} de ${fmt(grosor(), 1)} mm</td></tr>

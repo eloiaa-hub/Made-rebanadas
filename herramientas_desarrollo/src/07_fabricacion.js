@@ -8,6 +8,13 @@ const TABLEROS = [
   { n: '2850 × 2070 (aglomerado / MDF)', a: 2850, h: 2070 },
   { n: '1220 × 1220 (medio tablero)', a: 1220, h: 1220 },
   { n: '1220 × 610 (cuarto de tablero)', a: 1220, h: 610 },
+  { n: '600 × 400 (láser)', a: 600, h: 400 },
+  { n: '900 × 600 (láser)', a: 900, h: 600 },
+  { n: '1000 × 500 (plancha de porex, EPS)', a: 1000, h: 500 },
+  { n: '1200 × 600 (plancha de porex, EPS)', a: 1200, h: 600 },
+  { n: '2000 × 1000 (bloque de porex, EPS)', a: 2000, h: 1000 },
+  { n: '1250 × 600 (poliestireno extruido, XPS)', a: 1250, h: 600 },
+  { n: '2500 × 600 (poliestireno extruido, XPS)', a: 2500, h: 600 },
 ];
 const TABLEROS_MAQ = [
   { n: '600 × 400 (láser)', a: 600, h: 400 },
@@ -61,10 +68,14 @@ function geoFab(c) {
     // agujeros [x, y, radio]: los de las varillas y los propios de la pieza (el tubo en los discos)
     agujeros: c.agujeros.map(j => [sx * P.varillas.lista[j][0] * k, P.varillas.lista[j][1] * k, radioFab()]).concat((c.huecos || []).map(h => [sx * h.x * k, h.y * k, h.r * k])).concat((c.taladros || []).map(t => [sx * t[0] * k, t[1] * k, t[2] * k, t[3] === 'ciego' && t[4] ? t[4] * k : 0, t[3] === 'ciego' && t[5] && t[5] !== caraArriba])),
     cantos: (c.cantos || []).map(q => ({ a: [sx * q.a[0] * k, q.a[1] * k], b: [sx * q.b[0] * k, q.b[1] * k], r: q.r * k })),
+    marcas: (c.marcas || []).map(l => l.map(p => [sx * p[0] * k, p[1] * k])),   // figura apilada: contorno de la capa de encima (a grabar)
     etiqueta: puntoEtiqueta(c).map((v, i) => (i ? 1 : sx) * v * k),
   };
 }
 function fabDefecto(maq) {
+  // figuras apiladas: la plancha de su plantilla (láser o porex)
+  const ap = !maq && P && P.tipo === 'apilado' && PLANTILLAS[P.plantilla] && PLANTILLAS[P.plantilla].ajustes;
+  if (ap && ap.fab) return Object.assign({ girar: true, modo: 'tableros', numeros: true }, ap.fab);
   return maq ? { ancho: 600, alto: 400, borde: 5, sep: 4, girar: true, modo: 'tableros', numeros: true }
              : { ancho: 2440, alto: 1220, borde: 10, sep: 12, girar: true, modo: 'tableros', numeros: true };
 }
@@ -143,7 +154,7 @@ function abrirFabricar() {
   const f = fabActual(), lista = enMaqueta() ? TABLEROS_MAQ : TABLEROS;
   const ops = lista.map(t => `<option value="${t.a}x${t.h}" ${t.a === f.ancho && t.h === f.alto ? 'selected' : ''}>${t.n}</option>`).join('');
   const maq = enMaqueta() ? `<div class="aviso-maq">Maqueta <b>1:${P.maqueta.escala}</b>: ${esPlano() ? 'piezas' : 'costillas'} a escala, tablero de ${fmt(P.maqueta.grosor, 1)} mm y ${P.tipo === 'costillas' ? `agujeros de Ø ${fmt(P.maqueta.diam + P.maqueta.holgura, 2)} mm` : `ranuras de ${fmt(P.maqueta.grosor + P.maqueta.holgura, 2)} mm`}. Para el mueble real, quita «Fabricar como maqueta» en el panel izquierdo.</div>` : '';
-  modal('🪚 Fabricar: ' + (esPlano() ? 'piezas' : P.tipo === 'pared' ? 'lamas' : 'costillas') + ' en tableros' + (enMaqueta() ? ' · maqueta 1:' + P.maqueta.escala : ''), `${maq}
+  modal('🪚 Fabricar: ' + (esPlano() ? 'piezas' : esApilado() ? 'capas' : P.tipo === 'pared' ? 'lamas' : 'costillas') + ((MATERIALES[P.costillas.material] || {}).espuma ? ' en planchas' : ' en tableros') + (enMaqueta() ? ' · maqueta 1:' + P.maqueta.escala : ''), `${maq}
     <div class="fab">
       <div class="opc">
         <label class="fila">Colocación <select id="fModo"><option value="tableros">En tableros</option><option value="fila">En fila (sin tablero)</option></select></label>
@@ -161,7 +172,7 @@ function abrirFabricar() {
         <label class="fila chk" title="El contorno sale en rectas y arcos (G01, G02, G03) en vez de muchos tramos rectos"><input type="checkbox" id="fArcos" ${P.cnc.arcos ? 'checked' : ''}> Contornos con arcos</label>
         <label class="fila" title="Lo que se puede separar el arco de la curva original">Tolerancia de los arcos (mm) <input type="number" id="fTol" value="${P.cnc.tolArco}" min="0.005" max="1" step="0.01"></label>
         <div class="info" id="fInfo"></div>
-        <p class="nota" style="margin-top:10px">El DXF lleva las capas <b>CORTE</b> (contornos, con las ranuras), <b>TALADROS</b> (agujeros de las varillas), <b>GRABADO</b> (números) y <b>TABLERO</b> (borde del tablero); los taladros ciegos van en capas <b>CIEGO_…MM</b> con su profundidad y los taladros de canto de los herrajes, como una raya en la capa <b>CANTO</b> (se hacen a mano).</p>
+        <p class="nota" style="margin-top:10px">El DXF lleva las capas <b>CORTE</b> (contornos, con las ranuras), <b>TALADROS</b> (agujeros de las varillas), <b>GRABADO</b> (números${esApilado() ? ' y el contorno de la capa de encima' : ''}) y <b>TABLERO</b> (borde del tablero); los taladros ciegos van en capas <b>CIEGO_…MM</b> con su profundidad y los taladros de canto de los herrajes, como una raya en la capa <b>CANTO</b> (se hacen a mano).</p>
         <p class="nota">Esta colocación usa el rectángulo de cada costilla. Para encajarlas por su forma real, usa <b>🧩 Anidador</b>.</p>
       </div>
       <div><canvas id="fPrev" width="900" height="520"></canvas></div>
@@ -268,7 +279,7 @@ function previsualizarFab() {
     if (fr && (P.tipo === 'reticula' || esPlano()) && fr > anchoR - 0.2) info.push(`<span style="color:var(--peligro)">La fresa de Ø ${fmt(fr, 1)} mm no cabe en las ranuras de ${fmt(anchoR, 2)} mm.</span>`);
   }
   if (P.cnc.arcos && ps.length) { const p0 = ps[0], cc = contornoCNC(p0.g.poly); info.push(`Contornos con arcos: la ${esc(p0.c.nombre.toLowerCase())} pasa de ${p0.g.poly.length} puntos a ${cc.pts.length} tramos (${cc.b.filter(v => v).length} arcos).`); }
-  info.push(P.tipo === 'reticula' || esPlano() ? `Ranuras${esPlano() ? ' y cajas' : ''} de ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm · grosor del tablero ${fmt(grosorFab(), 1)} mm.` : `Agujeros: Ø ${fmt(2 * radioFab(), 2)} mm · grosor del tablero ${fmt(grosorFab(), 1)} mm.`);
+  info.push(esApilado() ? `${R.capas} capas de ${fmt(grosorFab(), 1)} mm · huecos de las llaves con ${fmt(apiladoP().holgura, 2)} mm de holgura${apiladoP().hilo ? ' · con entrada del hilo' : ''}${apiladoP().grabar ? ' · el contorno de la capa de encima, en GRABADO' : ''}.` : P.tipo === 'reticula' || esPlano() ? `Ranuras${esPlano() ? ' y cajas' : ''} de ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm · grosor del tablero ${fmt(grosorFab(), 1)} mm.` : `Agujeros: Ø ${fmt(2 * radioFab(), 2)} mm · grosor del tablero ${fmt(grosorFab(), 1)} mm.`);
   $('#fInfo').innerHTML = info.join('<br>');
 }
 
@@ -303,6 +314,7 @@ function dxf() {
       poli('CORTE', cc.pts.map(p => { const q = aTablero(pz, p); return [ox + q[0], q[1]]; }), cc.b);
       (pz.g.cantos || []).forEach(m => { const a = aTablero(pz, m.a), b = aTablero(pz, m.b); g(0, 'LINE'); g(8, 'CANTO'); g(10, n(ox + a[0])); g(20, n(a[1])); g(30, 0); g(11, n(ox + b[0])); g(21, n(b[1])); g(31, 0); });
       pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); g(0, 'CIRCLE'); g(8, a[3] ? capaA(a) : 'TALADROS'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(a[2])); });
+      (pz.g.marcas || []).forEach(l => { g(0, 'POLYLINE'); g(8, 'GRABADO'); g(66, 1); g(10, 0); g(20, 0); g(30, 0); g(70, 0); l.forEach(p => { const q = aTablero(pz, p); g(0, 'VERTEX'); g(8, 'GRABADO'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); }); g(0, 'SEQEND'); g(8, 'GRABADO'); });
       if (f.numeros) {
         const q = aTablero(pz, pz.g.etiqueta), h = altoTexto(pz.g);
         g(0, 'TEXT'); g(8, 'GRABADO'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(h)); g(1, pz.c.etq); g(72, 1); g(11, n(ox + q[0])); g(21, n(q[1] - h / 2)); g(31, 0);
@@ -313,7 +325,7 @@ function dxf() {
   return out.join('\r\n') + '\r\n';
 }
 const sufijoFab = () => enMaqueta() ? '_maqueta_1-' + P.maqueta.escala : '';
-function exportarDXF() { descargar(nombreArchivo(P.nombre) + '_costillas' + sufijoFab() + '.dxf', dxf(), 'application/dxf'); aviso('DXF guardado'); }
+function exportarDXF() { descargar(nombreArchivo(P.nombre) + (esApilado() ? '_capas' : '_costillas') + sufijoFab() + '.dxf', dxf(), 'application/dxf'); aviso('DXF guardado'); }
 
 function svg() {
   const f = fabActual(), col = colocarEnTableros(f);
@@ -340,6 +352,7 @@ function svg() {
         d += ' Z';
       });
       partes.push(`<path d="${d}" fill="none" stroke="#000" stroke-width="0.2"/>`);
+      (pz.g.marcas || []).forEach(l => partes.push(`<polyline points="${l.map(p => { const q = aTablero(pz, p); return n(ox + q[0]) + ',' + n(Y(q[1])); }).join(' ')}" fill="none" stroke="#00f" stroke-width="0.2"/>`));
       pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); partes.push(`<circle cx="${n(ox + q[0])}" cy="${n(Y(q[1]))}" r="${n(a[2])}" fill="none" stroke="#d00" stroke-width="0.2"/>`); });
       if (f.numeros) { const q = aTablero(pz, pz.g.etiqueta); partes.push(`<text x="${n(ox + q[0])}" y="${n(Y(q[1]))}" font-family="Arial" font-size="${n(altoTexto(pz.g))}" text-anchor="middle" dominant-baseline="middle" fill="#00f">${pz.c.etq}</text>`); }
     });
@@ -380,7 +393,15 @@ function listaCompra() {
         `${nT} tablero${nT === 1 ? '' : 's'} de ${fmt(cm.tablero[0])} × ${fmt(cm.tablero[1])} mm`]);
     });
     L.push(['Superficie de las piezas', `${fmt(cm.area / 1e6, 2)} m² en total`]);
-  } else L.push([tablero, `${cm.nTableros} tablero${cm.nTableros === 1 ? '' : 's'} de ${fmt(cm.tablero[0])} × ${fmt(cm.tablero[1])} mm (${maq ? fmt(cm.area / 100, 0) + ' cm²' : fmt(cm.area / 1e6, 2) + ' m²'} de piezas)`]);
+  } else L.push([tablero, `${cm.nTableros} ${(MATERIALES[P.costillas.material] || {}).espuma ? 'plancha' : 'tablero'}${cm.nTableros === 1 ? '' : 's'} de ${fmt(cm.tablero[0])} × ${fmt(cm.tablero[1])} mm (${maq ? fmt(cm.area / 100, 0) + ' cm²' : fmt(cm.area / 1e6, 2) + ' m²'} de piezas)`]);
+  if (esApilado()) {
+    const A = apiladoP(), esp = !!(MATERIALES[P.costillas.material] || {}).espuma;
+    L.push(['Piezas', `${R.n} en ${R.capas} capas de ${fmt(grosorFab(), 1)} mm (numeradas desde abajo)`]);
+    (R.llaves || []).filter(l => l.k0 >= 0).forEach(l => L.push([`Llave L${l.n}: listón ${listonLlave(l)}`, `${fmt(l.largo)} mm${esp ? ', del mismo porex' : ', de pino o haya'}`]));
+    L.push(esp ? ['Cola sin disolventes (cola blanca o para poliestireno)', 'los disolventes deshacen el porex'] : ['Cola blanca', 'capa fina; peso encima al secar']);
+    L.push(esp ? ['Lija gruesa o escofina, masilla, imprimación y pintura al agua', 'para el acabado'] : ['Lija fina', 'o deja los escalones a la vista']);
+    return L;
+  }
   if (esPlano()) {
     const nSo = R.uniones.filter(u => u.tipo === 'solape').length;
     L.push(['Piezas', `${R.costillas.filter(c => c.ok).length}, con ${R.uniones.filter(u => u.tipo === 'media').length} uniones a media madera, ${R.uniones.filter(u => u.tipo === 'caja').length} espigas en caja pasante` + (nSo ? `, ${nSo} solapes` : '') + (R.uniones.some(u => u.tipo === 'dentada') ? ` y ${R.uniones.filter(u => u.tipo === 'dentada').length} uniones dentadas` : '')]);

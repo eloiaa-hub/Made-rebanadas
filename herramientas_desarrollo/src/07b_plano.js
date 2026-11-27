@@ -127,8 +127,8 @@ function planoPDF(F = null) {   // F: opciones de la ficha de práctica (enuncia
     filas.forEach((f, i) => {
       if (f.titulo) { D.texto(x, y + alto * 0.75, f.titulo, { pt: 9.5, b: true, col: azul }); y += alto + 0.6; return; }
       const yy = D.parrafo(x, y + alto * 0.72, c1 - 2, f[0], { pt: 8.5 });
-      D.parrafo(x + c1, y + alto * 0.72, ancho - c1, f[1], { pt: 8.5, b: true });
-      const h = Math.max(alto, yy - y - alto * 0.72 + alto);
+      const yy2 = D.parrafo(x + c1, y + alto * 0.72, ancho - c1, f[1], { pt: 8.5, b: true });
+      const h = Math.max(alto, Math.max(yy, yy2) - y - alto * 0.72 + alto);   // la fila crece con la columna más larga
       D.trazo([225, 225, 225]).grosor(0.2).linea(x, y + h, x + ancho, y + h).trazo();
       y += h;
     });
@@ -154,6 +154,14 @@ function planoPDF(F = null) {   // F: opciones de la ficha de práctica (enuncia
     ...(R.uniones.some(u => u.tipo === 'herraje') ? [['Uniones con herraje', `${R.uniones.filter(u => u.tipo === 'herraje').length} a tope, ${R.uniones.reduce((s, u) => s + (u.tipo === 'herraje' ? u.puntos.length : 0), 0)} × ${NOMBRE_HERRAJE[planoP().herraje] || 'herraje'}`]] : []),
     ['Ancho de ranuras y cajas', `${fmt(grosorFab() + holguraRanuraFab(), 2)} mm`],
     ...(planoP().flexion !== false ? analisisFlexion(R).slice(0, 4).map(c => [`Flexión: ${c.lamas ? 'lamas del asiento' : c.asiento ? 'asiento' : c.H.nombre.toLowerCase()}`, `${fmt(c.flecha, 1)} mm (máx. ${fmt(c.lim, 1)}) con ${c.carga.replace('²', '2')}`]) : []),
+  ]) : esApilado() ? tabla(x2, M + 18, a2, [
+    { titulo: 'Datos' },
+    ['Medidas (ancho × fondo × alto)', `${fmt((G.dims || [0])[0])} × ${fmt(fondo)} × ${fmt(alto)} mm`],
+    ['Capas', `${R.capas} de ${fmt(e, 1)} mm, en ${R.n} piezas`],
+    ['Corte de las capas', NOMBRE_CORTE[apiladoP().corte] || ''],
+    ['Material', MATERIALES[P.costillas.material].nombre],
+    ['Modelo 3D', P.figura.malla ? P.figura.malla.nombre : '—'],
+    ['Llaves de alineación', `${(R.llaves || []).filter(l => l.k0 >= 0).length} (hoja 2), huecos con ${fmt(apiladoP().holgura, 2)} mm de holgura`],
   ]) : tabla(x2, M + 18, a2, [
     { titulo: 'Datos' },
     ['Medidas (largo × fondo × alto)', `${fmt(P.largo * k)} × ${fmt(fondo * k)} × ${fmt(alto * k)} mm`],
@@ -177,6 +185,7 @@ function planoPDF(F = null) {   // F: opciones de la ficha de práctica (enuncia
   else if (ret) hojaReticula(D, cabecera, tabla, oH);
   else if (P.tipo === 'radial') hojaRadial(D, cabecera, tabla, oH);
   else if (P.tipo === 'pared') hojaPared(D, cabecera, tabla, oH);
+  else if (esApilado()) hojaApilado(D, cabecera, tabla, oH);
   else if (disposicion() === 'curva') hojaCurva(D, cabecera, tabla, oH);
   else {
   // ---- hoja 2: vista lateral (orden de montaje) y perfil con las varillas ----
@@ -236,7 +245,7 @@ function planoPDF(F = null) {   // F: opciones de la ficha de práctica (enuncia
   const mw = Math.max(...csP.map(c => c.caja.w)), mh = Math.max(...csP.map(c => c.caja.h));
   const s3 = Math.min((cw - 10) / mw, (ch - 16) / mh);
   for (let h0 = 0; h0 < csP.length; h0 += porHoja) {
-    cabecera(`3. ${esPlano() ? 'Piezas' : P.tipo === 'pared' ? 'Lamas' : 'Costillas'} ${csP[h0].etq} a ${csP[Math.min(csP.length, h0 + porHoja) - 1].etq} (todas a la misma escala, 1:${fmt(k / s3, 0)} aprox.)`);
+    cabecera(`3. ${esPlano() ? 'Piezas' : esApilado() ? 'Capas' : P.tipo === 'pared' ? 'Lamas' : 'Costillas'} ${csP[h0].etq} a ${csP[Math.min(csP.length, h0 + porHoja) - 1].etq} (todas a la misma escala, 1:${fmt(k / s3, 0)} aprox.)${esApilado() && apiladoP().grabar ? ' · en azul, el contorno de la capa de encima (se graba)' : ''}`);
     csP.slice(h0, h0 + porHoja).forEach((c, j) => {
       const g = geoFab(c), cx = M + (j % cols) * cw, cy = M + 18 + Math.floor(j / cols) * ch;
       D.trazo([225, 225, 225]).grosor(0.2).rect(cx + 1, cy + 1, cw - 2, ch - 2);
@@ -248,12 +257,14 @@ function planoPDF(F = null) {   // F: opciones de la ficha de práctica (enuncia
       c.agujeros.forEach(j2 => D.circulo(PX(V.lista[j2][0]), PY(V.lista[j2][1]), Math.max(0.6, radioAgujero() * s3), 'b'));
       (c.taladros || []).forEach(t => D.circulo(PX(t[0]), PY(t[1]), Math.max(0.5, t[2] * s3), t[3] === 'ciego' ? 's' : 'b'));
       (c.cantos || []).forEach(m => D.linea(PX(m.a[0]), PY(m.a[1]), PX(m.b[0]), PY(m.b[1])));
+      if (c.marcas) { D.trazo(azul).grosor(0.15); c.marcas.forEach(l => D.poli(l.map(p => [PX(p[0]), PY(p[1])]), false, 's')); }
       D.relleno([0, 0, 0]).trazo();
       const et = puntoEtiqueta(c);
       D.texto(PX(et[0]), PY(et[1]) + 2.2, c.etq, { pt: 14, b: true, al: 'c', col: azul });
       D.texto(cx + 3, cy + 6, c.nombre, { pt: 9, b: true });
       D.texto(cx + cw - 3, cy + 6, `${fmt(g.caja.w, maq ? 1 : 0)} × ${fmt(g.caja.h, maq ? 1 : 0)} mm`, { pt: 8.5, al: 'r', col: gris });
       if (esPlano()) D.texto(cx + 3, cy + ch - 3.5, `${PLANOS[c.plano].normal} = ${fmt(c.x * k)} mm · ${textoUnionesPieza(c)}`, { pt: 6.5, col: gris });
+      else if (esApilado()) D.texto(cx + 3, cy + ch - 3.5, `altura ${fmt(c.capa * e)}–${fmt((c.capa + 1) * e)} mm${(c.int || []).length ? ` · ${c.int.length} hueco${c.int.length > 1 ? 's' : ''}` : ''}`, { pt: 7, col: gris });
       else D.texto(cx + 3, cy + ch - 3.5, (P.tipo === 'radial' ? `a ${fmt(c.x, 1)}° · ` : `x = ${fmt(c.x * k)} mm · `) + (ret ? `${c.ranuras.length} ranuras` : P.tipo === 'radial' || P.tipo === 'pared' ? `${c.ranuras.length} muescas` : `${c.agujeros.length} agujeros`), { pt: 7.5, col: gris });
     });
   }
@@ -320,7 +331,7 @@ function planoPDF(F = null) {   // F: opciones de la ficha de práctica (enuncia
   cabecera('5. Montaje paso a paso');
   const wR = fmt(grosorFab() + holguraRanuraFab(), 2), nZ = (R.largueros || []).length, ultZ = nZ ? R.largueros[nZ - 1].etq : '';
   const tabla2 = maq ? `tablero de ${fmt(P.maqueta.grosor, 1)} mm` : `${MATERIALES[P.costillas.material].nombre.toLowerCase()} de ${fmt(grosor(), 1)} mm`;
-  const pasos = esPlano() ? pasosPlano(k, maq) : P.tipo === 'radial' ? [
+  const pasos = esPlano() ? pasosPlano(k, maq) : esApilado() ? pasosApilado() : P.tipo === 'radial' ? [
     `Corta las ${R.n} costillas y los ${R.discos.length} discos en ${tabla2}. Las muescas y ranuras son de ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm: prueba antes una en un retal.`,
     `Corta el tubo central de Ø ${fmt(P.radial.tubo * k, 1)} mm a ${fmt(cm.tubo)} mm.` + (maq ? '' : ' Si es una lámpara, pasa antes el cable por dentro.'),
     'Mete los discos en el tubo a su altura (hoja 2) y fíjalos con una gota de cola, con las ranuras de los dos discos alineadas.',
@@ -375,7 +386,7 @@ function planoPDF(F = null) {   // F: opciones de la ficha de práctica (enuncia
     D.texto(M + 4, yp + 0.1, String(i + 1), { pt: 9, b: true, al: 'c', col: [255, 255, 255] });
     yp = D.parrafo(M + 11, yp, 170, t, { pt: 10 }) + 3;
   });
-  D.texto(M, H - M - 4, 'Herramientas: ' + (esPlano() ? (maq ? 'cortadora láser, lija fina; cola si se quiere fijo.' : 'CNC (o sierra de calar y escoplo), lija, maza de goma; cola si se quiere fijo.') : P.tipo === 'radial' ? (maq ? 'cortadora láser o cúter, cola.' : 'CNC o láser, sierra para el tubo, cola, lija.') : P.tipo === 'pared' ? 'CNC o sierra de calar, taladro, tacos y tornillos, nivel, taco separador.' : ret ? (maq ? 'cortadora láser o cúter, lija fina.' : 'CNC (fresa menor que la ranura), formón o lima, mazo de goma, lija.') : maq ? 'cortadora láser o cúter, cola blanca.' : `CNC o sierra de calar, broca de Ø ${fmt(2 * radioFab(), 1)}, lija, llaves para las tuercas M${V.diam}.`), { pt: 9, col: gris });
+  D.texto(M, H - M - 4, 'Herramientas: ' + (esApilado() ? ((MATERIALES[P.costillas.material] || {}).espuma ? 'cortadora de hilo caliente (o sierra de calar), lija o escofina, cola sin disolventes, palillos.' : 'cortadora láser (o CNC), lija fina, cola blanca, pinzas o peso.') : esPlano() ? (maq ? 'cortadora láser, lija fina; cola si se quiere fijo.' : 'CNC (o sierra de calar y escoplo), lija, maza de goma; cola si se quiere fijo.') : P.tipo === 'radial' ? (maq ? 'cortadora láser o cúter, cola.' : 'CNC o láser, sierra para el tubo, cola, lija.') : P.tipo === 'pared' ? 'CNC o sierra de calar, taladro, tacos y tornillos, nivel, taco separador.' : ret ? (maq ? 'cortadora láser o cúter, lija fina.' : 'CNC (fresa menor que la ranura), formón o lima, mazo de goma, lija.') : maq ? 'cortadora láser o cúter, cola blanca.' : `CNC o sierra de calar, broca de Ø ${fmt(2 * radioFab(), 1)}, lija, llaves para las tuercas M${V.diam}.`), { pt: 9, col: gris });
 
   // ---- última hoja: tiempo de mecanizado y presupuesto (o, en la ficha, la rúbrica) ----
   if (F) hojaRubrica(D, cabecera, { M, W, H, gris, azul, madera, F });
@@ -744,4 +755,51 @@ function hojaVistas(D, cabecera, o) {
   if (aEjes && cadX.length > 2 && cadX.length <= 10) D.texto(xA + ancho + 4, yP + fondo + 8, 'a ejes de las piezas', { pt: 6.5, col: gris });
   // cuadro de datos
   D.texto(W - M, H - M - 6, `${P.nombre} · ${fmt(lx)} × ${fmt(lz)} × ${fmt(ly)} mm (ancho × fondo × alto)`, { pt: 8, al: 'r', col: azul });
+}
+
+// ---- figura apilada: montaje de abajo arriba con las llaves ----
+function pasosApilado() {
+  const A = apiladoP(), esp = !!(MATERIALES[P.costillas.material] || {}).espuma, ll = (R.llaves || []).filter(l => l.k0 >= 0), e = grosor();
+  const tabla2 = `${MATERIALES[P.costillas.material].nombre.toLowerCase()} de ${fmt(e, 1)} mm`;
+  return [
+    `Corta las ${R.n} piezas de las ${R.capas} capas en ${tabla2} (DXF o SVG en «Fabricar»)${esp ? ' con el hilo caliente: el corte fino que va del borde a cada hueco es la entrada del hilo y se cierra al pegar' : ''}. ${A.grabar && !esp ? 'El láser graba en cada pieza su número y la línea donde va la capa de encima.' : 'Escribe el número de cada pieza en su cara de abajo.'}`,
+    ll.length ? `Prepara las llaves: ${ll.map(l => `L${l.n}, listón ${listonLlave(l)} de ${fmt(l.largo)} mm`).join('; ')}. Lija un poco sus puntas para que entren fácil; los huecos tienen ${fmt(A.holgura, 2)} mm de holgura por cada lado.` : 'No hay llaves: alinea cada capa con la línea grabada o con marcas a lápiz.',
+    ll.length ? `Pon la capa 1 en la mesa y clava en ella las llaves, bien verticales (con una escuadra). ${esp ? 'Una gota de cola en el hueco las deja fijas.' : ''}` : 'Pon la capa 1 en la mesa, sobre un papel por si cae cola.',
+    `Ve subiendo capa a capa (2, 3, 4…): cola fina en la cara de arriba de la de abajo${esp ? ' (sin disolventes)' : ''}, ensártala en las llaves${A.grabar && !esp ? ' y ajústala a la línea grabada' : ''} y aprieta un poco. Las capas con varios trozos (12a, 12b…) van a la vez.`,
+    ll.length && ll.some(l => l.k1 < R.capas - 1) ? `Las llaves terminan en la capa ${Math.max(...ll.map(l => l.k1 + 1))}: las de encima se alinean con ${A.grabar && !esp ? 'la línea grabada' : 'cuidado, mirando la figura de lado'}.` : 'Termina con la última capa.',
+    esp ? 'Deja secar con peso encima (unos libros) y lija los escalones con lija gruesa o escofina hasta la forma. Después, masilla, imprimación acrílica y pintura al agua.' : 'Deja secar con peso encima. Los escalones se pueden dejar a la vista o lijar; acabado con aceite, cera o barniz.',
+  ];
+}
+
+// ---- figura apilada: alzado de las capas con su número y planta con las llaves ----
+function hojaApilado(D, cabecera, tabla, o) {
+  const { M, W, H, e, gris, azul, madera, rojo } = o, cs = R.costillas.filter(c => c.ok); if (!cs.length) return;
+  cabecera('2. Capas y llaves de alineación');
+  const bb = R.bbox, altoT = R.capas * e, anchoT = bb[0][1] - bb[0][0];
+  // alzado (de frente): cada capa, una franja de su ancho
+  const zA = { x: M + 4, y: M + 24, w: 120, h: H - M - 24 - (M + 14) }, sA = Math.min(zA.w / anchoT, zA.h / altoT);
+  const AX = x => zA.x + (zA.w - anchoT * sA) / 2 + (x - bb[0][0]) * sA, AY = y => zA.y + zA.h - y * sA;
+  D.texto(zA.x, M + 20, 'Alzado: capas numeradas desde abajo', { pt: 8.5, b: true, col: gris });
+  cs.forEach(c => { D.relleno([240, 228, 208]).trazo(madera).grosor(0.12).rect(AX(c.caja.x0), AY((c.capa + 1) * e), c.caja.w * sA, e * sA, 'b'); });
+  const paso = R.capas > 60 ? 10 : R.capas > 25 ? 5 : R.capas > 12 ? 2 : 1;
+  for (let k = 0; k < R.capas; k += paso) D.texto(AX(bb[0][0]) - 2, AY((k + 0.5) * e) + 1, String(k + 1), { pt: 6.5, al: 'r', col: gris });
+  (R.llaves || []).filter(l => l.k0 >= 0).forEach(l => {
+    const cb = cajaDe(l.forma);
+    D.relleno([246, 200, 196]).trazo(rojo).grosor(0.25).rect(AX(cb.x0), AY((l.k1 + 1) * e), cb.w * sA, (l.k1 - l.k0 + 1) * e * sA, 'b');
+    D.texto(AX(cb.x0 + cb.w / 2), AY((l.k1 + 1) * e) - 1.5, 'L' + l.n, { pt: 7.5, b: true, al: 'c', col: rojo });
+  });
+  D.relleno([0, 0, 0]).trazo([0, 0, 0]);
+  // planta de la capa más grande con las llaves
+  const mayor = cs.reduce((m, c) => c.area > m.area ? c : m, cs[0]), zP = { x: M + 140, y: M + 24, w: 120, h: 95 };
+  const cbM = cajaDe([mayor.poly, ...(R.llaves || []).map(l => l.forma)].flat()), sP = Math.min(zP.w / cbM.w, zP.h / cbM.h);
+  const PX = u => zP.x + (zP.w - cbM.w * sP) / 2 + (u - cbM.x0) * sP, PY = v => zP.y + zP.h - (zP.h - cbM.h * sP) / 2 - (v - cbM.y0) * sP;
+  D.texto(zP.x, M + 20, `Planta (vista desde arriba, el frente abajo): capa ${mayor.etq}`, { pt: 8.5, b: true, col: gris });
+  D.relleno([240, 228, 208]).trazo(madera).grosor(0.3).poli(mayor.poly.map(p => [PX(p[0]), PY(p[1])]), true, 'b');
+  (R.llaves || []).forEach(l => { D.relleno([246, 200, 196]).trazo(rojo).grosor(0.3).poli(l.forma.map(p => [PX(p[0]), PY(p[1])]), true, 'b'); const cb = cajaDe(l.forma); D.texto(PX(cb.x0 + cb.w / 2), PY(cb.y0 + cb.h) - 1.5, 'L' + l.n, { pt: 7.5, b: true, al: 'c', col: rojo }); });
+  D.relleno([0, 0, 0]).trazo([0, 0, 0]);
+  const A = apiladoP(), filas = [{ titulo: 'Llaves' }, ...(R.llaves || []).map(l => [`L${l.n} · ${nombreLlave(l.h)}`, l.k0 >= 0 ? `listón ${listonLlave(l)} × ${fmt(l.largo)} mm · capas ${l.k0 + 1} a ${l.k1 + 1}` : 'no cabe en ninguna capa']),
+    ['Holgura de los huecos', `${fmt(A.holgura, 2)} mm por cada lado`], ['Material alrededor', `${fmt(A.margen, 1)} mm como mínimo`]];
+  if (!(R.llaves || []).length) filas.splice(1, 0, ['Sin llaves', 'las capas se alinean a ojo (o con la línea grabada)']);
+  let y = tabla(zP.x, zP.y + zP.h + 8, W - M - zP.x, filas);
+  D.parrafo(zP.x, y + 4, W - M - zP.x, `Las capas se pegan de abajo arriba, sin separación. Cada llave atraviesa las capas seguidas en las que cabe con su holgura y ${fmt(A.margen, 1)} mm de material alrededor; en las de encima, las capas se alinean ${A.grabar ? 'con el contorno grabado' : 'a ojo'}.${A.hilo ? ' Con hilo caliente, el corte fino desde el borde hasta cada hueco es la entrada del hilo.' : ''}`, { pt: 8.5, col: gris });
 }

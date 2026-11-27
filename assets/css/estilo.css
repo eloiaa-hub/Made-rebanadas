@@ -21,8 +21,8 @@ select,input[type=text],input[type=number]{background:var(--panel);border:1px so
 input[type=range]{accent-color:var(--acento)}
 .oculto{display:none!important}
 .oculto2{display:none!important}
-.botonesHueco{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:6px 0}
-.botonesHueco button{padding:5px 4px;font-size:12px}
+.botonesHueco{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin:6px 0}
+.botonesHueco button{padding:5px 4px;font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #listaHuecos li{display:flex;align-items:center;justify-content:space-between;gap:6px}
 #listaHuecos .quitarHueco{padding:1px 6px;font-size:12px;border:none;background:none;cursor:pointer;opacity:.6}
 #listaHuecos .quitarHueco:hover{opacity:1}

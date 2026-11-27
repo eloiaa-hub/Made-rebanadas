@@ -7,7 +7,7 @@
    - eje 'x': cortes de lado a lado (cada costilla es un perfil); eje 'z': de delante a atrás.
    - En cada corte se queda el contorno mayor; los trozos sueltos (orejas, brazos…) y los huecos se avisan. */
 const figuraActiva = () => (P.tipo === 'costillas' || P.tipo === 'reticula') && P.figura && P.figura.activa && !!(P.figura.malla && P.figura.malla.v64);
-const formaCalculada = () => relieveActivo() || figuraActiva();
+const formaCalculada = () => relieveActivo() || figuraActiva() || P.tipo === 'apilado';
 
 // ---- guardar y leer la malla ----
 function b64DeBuffer(buf) { const u = new Uint8Array(buf); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); }
@@ -43,7 +43,7 @@ function guardarMallaFigura(tri, nombre, ejemplo) {
 // ---- malla colocada: girada, a escala (alto pedido), apoyada en y = 0 ----
 const CACHE_FIG = { clave: '', m: null };
 function mallaFigura() {
-  const Fg = P.figura, M = Fg.malla, clave = [M.id, Fg.alto, Fg.eje, Fg.giro].join('|');
+  const Fg = P.figura, M = Fg.malla, eje = P.tipo === 'apilado' ? 'y' : Fg.eje, clave = [M.id, Fg.alto, eje, Fg.giro].join('|');
   if (CACHE_FIG.clave === clave) return CACHE_FIG.m;
   const v16 = new Int16Array(bufferDeB64(M.v64)), F = new Uint32Array(bufferDeB64(M.f64)), n = v16.length / 3;
   const g = (Fg.giro || 0) * Math.PI / 180, cg = Math.cos(g), sg = Math.sin(g);
@@ -59,14 +59,15 @@ function mallaFigura() {
   const C = new Float64Array(n), U = new Float64Array(n), Vv = new Float64Array(n);
   for (let i = 0; i < n; i++) {
     const xx = (X[i] - x0) * s, yy = (Y[i] - y0) * s, zz = (Z[i] - z0) * s;
-    if (Fg.eje === 'z') { C[i] = (z1 - z0) * s - zz; U[i] = xx; } else { C[i] = xx; U[i] = (z1 - z0) * s - zz; }   // la cara, hacia u = 0 (el frente)
+    if (eje === 'y') { C[i] = yy; U[i] = xx - (x1 - x0) * s / 2; Vv[i] = (z1 - z0) * s / 2 - zz; continue; }   // figura apilada: capas horizontales, en planta vista desde arriba
+    if (eje === 'z') { C[i] = (z1 - z0) * s - zz; U[i] = xx; } else { C[i] = xx; U[i] = (z1 - z0) * s - zz; }   // la cara, hacia u = 0 (el frente)
     Vv[i] = yy;
   }
-  const largo = Fg.eje === 'z' ? (z1 - z0) * s : (x1 - x0) * s;
+  const largo = eje === 'y' ? (y1 - y0) * s : eje === 'z' ? (z1 - z0) * s : (x1 - x0) * s;
   // por triángulo, el tramo en c (para descartar rápido)
   const nt = F.length / 3, cmin = new Float64Array(nt), cmax = new Float64Array(nt);
   for (let t = 0; t < nt; t++) { const a = C[F[3 * t]], b = C[F[3 * t + 1]], c = C[F[3 * t + 2]]; cmin[t] = Math.min(a, b, c); cmax[t] = Math.max(a, b, c); }
-  const m = { C, U, V: Vv, F, nt, cmin, cmax, largo, ancho: (Fg.eje === 'z' ? (x1 - x0) : (z1 - z0)) * s, alto: (y1 - y0) * s };
+  const m = { C, U, V: Vv, F, nt, cmin, cmax, largo, ancho: (eje === 'z' || eje === 'y' ? (x1 - x0) : (z1 - z0)) * s, fondo: (z1 - z0) * s, alto: (y1 - y0) * s, eje };
   CACHE_FIG.clave = clave; CACHE_FIG.m = m; CACHE_SEC.clave = '';
   return m;
 }
@@ -248,7 +249,8 @@ function convertirFiguraEnPerfiles(maxClaves = 60) {
 // ---- cargar ----
 function cargarFiguraTriangulos(tri, nombre, ejemplo) {
   if (!tri.length) throw new Error('No se han encontrado triángulos en «' + nombre + '»');
-  const m = guardarMallaFigura(tri, nombre, ejemplo); P.figura.activa = true;
+  const m = guardarMallaFigura(tri, nombre, ejemplo); P.figura.activa = P.tipo !== 'apilado';
+  if (P.tipo === 'apilado') { apiladoP().llavesAuto = true; P.huecos = (P.huecos || []).filter(h => !h.llave); }
   return m;
 }
 

@@ -1,4 +1,4 @@
-MADE-REBANADAS — Por Eloi A.A.   (versión 1.5)
+MADE-REBANADAS — Por Eloi A.A.   (versión 1.6)
 
 Muebles orgánicos hechos con rebanadas: costillas de tablero separadas, unidas con varillas.
 
@@ -10,6 +10,7 @@ Importa: DXF y SVG (huecos y perfiles); STL, OBJ, GLB y PLY (relieves y figuras)
 Tipos de mueble: costillas con varillas, retícula, radial, panel de pared y piezas planas (sillas, taburetes…)
 Plano de montaje en PDF con vistas acotadas; tiempo de mecanizado y presupuesto (botón 🛠 Fabricar)
 Ficha de práctica para alumnos con rúbrica (botón 🎓 Ficha); muebles de kit con herrajes; flexión de baldas
+Figuras apiladas (planos seriados): capas de un modelo 3D con llaves de alineación, láser o porex
 
 Copia siempre la carpeta completa:
   assets/js        programa (app.js) y Three.js empaquetado sin módulos

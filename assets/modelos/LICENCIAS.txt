@@ -4,6 +4,9 @@ Modelos 3D de ejemplo de Made-rebanadas
 labios.stl, ondas.stl, burbuja.stl
   Generados por programa (herramientas_desarrollo/modelos.py). Sin restricciones.
 
+conejo.stl, moai.stl
+  Generados por programa (herramientas_desarrollo/modelos_figuras.py). Sin restricciones.
+
 cara.stl («Busto de mujer»)
   Escultura «HeadSculptFem_001» (archivo .blend aportado por el autor del programa),
   reducida a unos 44 000 triángulos y orientada para Made-rebanadas.

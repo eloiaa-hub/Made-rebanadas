@@ -83,4 +83,10 @@ window.MADE_EJEMPLOS = [
     params: {}, costillas: { grosor: 18, material: 'roble' } },
   { nombre: 'Estantería de kit en blanco', plantilla: 'estanteria_kit', desc: 'Piezas planas a tope con perno y tuerca de barril: se monta y se desmonta con una llave Allen. 1,8 m de alto y 4 baldas.',
     params: { ancho: 560, fondo: 320, alto: 1800, baldas: 4 }, costillas: { grosor: 19, material: 'lacado', color: '#f2efe8' }, plano: { herraje: 'barril' } },
+  { nombre: 'Moái de sobremesa (láser)', plantilla: 'apilado_laser', figuraEjemplo: 'moai', desc: 'Figura apilada de 60 capas de DM de 3 mm cortadas con láser, con el contorno de la capa de encima grabado y dos llaves.',
+    params: { alto: 180 }, costillas: { grosor: 3, material: 'mdf' } },
+  { nombre: 'Conejo grande en XPS', plantilla: 'apilado_porex', figuraEjemplo: 'conejo', desc: 'Conejo de 90 cm en planchas de poliestireno extruido de 40 mm, cortadas con hilo caliente por fuera para lijarlo después.',
+    params: { alto: 900 }, costillas: { grosor: 40, material: 'xps' } },
+  { nombre: 'Busto en porex', plantilla: 'apilado_porex', figuraEjemplo: 'cara', desc: 'El busto de mujer en capas de porex de 20 mm: más capas para que se noten menos los escalones al lijar.',
+    params: { alto: 700 }, costillas: { grosor: 20, material: 'porex' }, apilado: { lado: 25, margen: 6 } },
 ];

@@ -161,6 +161,7 @@ function radioAgujero() { return (P.varillas.diam + P.varillas.holgura) / 2; }
 
 function calcular() {
   if (P.tipo === 'plano') return calcularPlano();
+  if (P.tipo === 'apilado') return calcularApilado();
   if (relieveActivo()) P.largo = P.relieve.orient === 'h' ? P.relieve.alto : P.relieve.ancho;
   else if (figuraActiva()) P.largo = Math.max(50, Math.round(mallaFigura().largo * 10) / 10);
   const e = grosor(), rep = reparto(), V = P.varillas;

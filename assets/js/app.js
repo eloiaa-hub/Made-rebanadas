@@ -8,7 +8,7 @@
 'use strict';
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
-const VERSION = '1.5';
+const VERSION = '1.6';
 const T = window.THREE;
 
 /* ===================== UTILIDADES ===================== */
@@ -63,6 +63,8 @@ const MATERIALES = {
   pino:     { nombre: 'Tablero alistonado de pino', cara: 'pino', canto: 'pino', hex: '#ddb77f' },
   mdf:      { nombre: 'MDF crudo', cara: 'alma_mdf', canto: 'alma_mdf', hex: '#a9845c', mm: 200 },
   lacado:   { nombre: 'MDF lacado (color a elegir)', color: true, hex: '#f2efe8' },
+  porex:    { nombre: 'Porex (poliestireno expandido, EPS)', solido: '#ecebe4', hex: '#ecebe4', espuma: true },
+  xps:      { nombre: 'Poliestireno extruido (XPS)', solido: '#9cc7e8', hex: '#9cc7e8', espuma: true },
 };
 const VARILLA_TIPOS = {
   roscada: { nombre: 'Varilla roscada', sep: 'Tubo separador', hex: '#b8bcc0', metal: true },
@@ -111,6 +113,7 @@ function proyectoBase() {
       capa: { activa: false, texto: 'Hola', letra: 'Arial Black', negrita: true, tamLetra: 160, relieve: 30, x: 50, y: 15, modo: 'sale' } },
     huecos: [],
     figura: { activa: false, malla: null, alto: 800, eje: 'x', giro: 0, minArea: 2, unir: true },
+    apilado: Object.assign({}, APILADO_DEF),
     plano: { holgura: 0.3, piezas: [], solape: { tipo: 'tacos', diam: 8, n: 0 }, cunas: false, flexion: true, persona: 100, cargaBalda: 150 },
   };
 }
@@ -277,6 +280,7 @@ function radioAgujero() { return (P.varillas.diam + P.varillas.holgura) / 2; }
 
 function calcular() {
   if (P.tipo === 'plano') return calcularPlano();
+  if (P.tipo === 'apilado') return calcularApilado();
   if (relieveActivo()) P.largo = P.relieve.orient === 'h' ? P.relieve.alto : P.relieve.ancho;
   else if (figuraActiva()) P.largo = Math.max(50, Math.round(mallaFigura().largo * 10) / 10);
   const e = grosor(), rep = reparto(), V = P.varillas;
@@ -1274,7 +1278,7 @@ function reproyectarModelo() {
    - eje 'x': cortes de lado a lado (cada costilla es un perfil); eje 'z': de delante a atrás.
    - En cada corte se queda el contorno mayor; los trozos sueltos (orejas, brazos…) y los huecos se avisan. */
 const figuraActiva = () => (P.tipo === 'costillas' || P.tipo === 'reticula') && P.figura && P.figura.activa && !!(P.figura.malla && P.figura.malla.v64);
-const formaCalculada = () => relieveActivo() || figuraActiva();
+const formaCalculada = () => relieveActivo() || figuraActiva() || P.tipo === 'apilado';
 
 // ---- guardar y leer la malla ----
 function b64DeBuffer(buf) { const u = new Uint8Array(buf); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); }
@@ -1310,7 +1314,7 @@ function guardarMallaFigura(tri, nombre, ejemplo) {
 // ---- malla colocada: girada, a escala (alto pedido), apoyada en y = 0 ----
 const CACHE_FIG = { clave: '', m: null };
 function mallaFigura() {
-  const Fg = P.figura, M = Fg.malla, clave = [M.id, Fg.alto, Fg.eje, Fg.giro].join('|');
+  const Fg = P.figura, M = Fg.malla, eje = P.tipo === 'apilado' ? 'y' : Fg.eje, clave = [M.id, Fg.alto, eje, Fg.giro].join('|');
   if (CACHE_FIG.clave === clave) return CACHE_FIG.m;
   const v16 = new Int16Array(bufferDeB64(M.v64)), F = new Uint32Array(bufferDeB64(M.f64)), n = v16.length / 3;
   const g = (Fg.giro || 0) * Math.PI / 180, cg = Math.cos(g), sg = Math.sin(g);
@@ -1326,14 +1330,15 @@ function mallaFigura() {
   const C = new Float64Array(n), U = new Float64Array(n), Vv = new Float64Array(n);
   for (let i = 0; i < n; i++) {
     const xx = (X[i] - x0) * s, yy = (Y[i] - y0) * s, zz = (Z[i] - z0) * s;
-    if (Fg.eje === 'z') { C[i] = (z1 - z0) * s - zz; U[i] = xx; } else { C[i] = xx; U[i] = (z1 - z0) * s - zz; }   // la cara, hacia u = 0 (el frente)
+    if (eje === 'y') { C[i] = yy; U[i] = xx - (x1 - x0) * s / 2; Vv[i] = (z1 - z0) * s / 2 - zz; continue; }   // figura apilada: capas horizontales, en planta vista desde arriba
+    if (eje === 'z') { C[i] = (z1 - z0) * s - zz; U[i] = xx; } else { C[i] = xx; U[i] = (z1 - z0) * s - zz; }   // la cara, hacia u = 0 (el frente)
     Vv[i] = yy;
   }
-  const largo = Fg.eje === 'z' ? (z1 - z0) * s : (x1 - x0) * s;
+  const largo = eje === 'y' ? (y1 - y0) * s : eje === 'z' ? (z1 - z0) * s : (x1 - x0) * s;
   // por triángulo, el tramo en c (para descartar rápido)
   const nt = F.length / 3, cmin = new Float64Array(nt), cmax = new Float64Array(nt);
   for (let t = 0; t < nt; t++) { const a = C[F[3 * t]], b = C[F[3 * t + 1]], c = C[F[3 * t + 2]]; cmin[t] = Math.min(a, b, c); cmax[t] = Math.max(a, b, c); }
-  const m = { C, U, V: Vv, F, nt, cmin, cmax, largo, ancho: (Fg.eje === 'z' ? (x1 - x0) : (z1 - z0)) * s, alto: (y1 - y0) * s };
+  const m = { C, U, V: Vv, F, nt, cmin, cmax, largo, ancho: (eje === 'z' || eje === 'y' ? (x1 - x0) : (z1 - z0)) * s, fondo: (z1 - z0) * s, alto: (y1 - y0) * s, eje };
   CACHE_FIG.clave = clave; CACHE_FIG.m = m; CACHE_SEC.clave = '';
   return m;
 }
@@ -1515,7 +1520,8 @@ function convertirFiguraEnPerfiles(maxClaves = 60) {
 // ---- cargar ----
 function cargarFiguraTriangulos(tri, nombre, ejemplo) {
   if (!tri.length) throw new Error('No se han encontrado triángulos en «' + nombre + '»');
-  const m = guardarMallaFigura(tri, nombre, ejemplo); P.figura.activa = true;
+  const m = guardarMallaFigura(tri, nombre, ejemplo); P.figura.activa = P.tipo !== 'apilado';
+  if (P.tipo === 'apilado') { apiladoP().llavesAuto = true; P.huecos = (P.huecos || []).filter(h => !h.llave); }
   return m;
 }
 
@@ -1557,7 +1563,7 @@ function simplificarPerfiles(n) {
    Las restas se hacen con Clipper (assets/js/clipper.js). Una lama o costilla puede quedar en varias
    piezas (Lama 12a, 12b…) y con agujeros por dentro. */
 const ESC_CL = 1000;
-const usaHuecos = () => ['pared', 'costillas', 'reticula'].includes(P.tipo) && ((P.huecos || []).some(h => h.activo !== false) || partirActivo()) && !!window.ClipperLib;
+const usaHuecos = () => ['pared', 'costillas', 'reticula', 'apilado'].includes(P.tipo) && ((P.huecos || []).some(h => h.activo !== false) || partirActivo()) && !!window.ClipperLib;
 
 /* ---- partir las lamas de un panel de pared (paredes altas o para aprovechar el tablero) ----
    Cada junta es una franja (0,1 mm a tope, o la sombra) que se resta de la lama, como un hueco: los trozos
@@ -1836,6 +1842,8 @@ function recortesDe(p, poly) {
       const [x0, x1] = tramoX(h);
       ts.forEach(([a, b]) => out.push([[x0, a], [x1, a], [x1, b], [x0, b]]));
     } else {
+      // figura apilada: la llave solo atraviesa las capas seguidas en las que cabe (con su holgura)
+      if (P.tipo === 'apilado' && h.llave) { const r = LLAVE_RANGO.get(h.id); if (!r || p.x < r[0] || p.x > r[1]) return; out.push(engordar(forma, Math.max(0, +apiladoP().holgura || 0))); return; }
       // costilla: el túnel la atraviesa si su grosor cae entre desde y hasta
       const [x0, x1] = tramoX(h);
       if (p.x + e / 2 <= x0 || p.x - e / 2 >= x1) return;
@@ -3026,6 +3034,274 @@ function cruceGeneral(res, A, B, e, tol) {
   }));
 }
 
+/* ===================== FIGURAS APILADAS (PLANOS SERIADOS) =====================
+   La figura se corta en capas horizontales del grosor del tablero (o de la plancha de porex), de abajo arriba,
+   y las capas se pegan unas sobre otras sin separación. No llevan varillas: para alinearlas, unas «llaves»
+   (listones cuadrados o triangulares) atraviesan las capas por un hueco de su forma. Las llaves son huecos
+   (P.huecos con llave: true) que se mueven, giran y retocan en la vista ▦ Huecos; cada una llega, sola,
+   de la primera a la última capa seguida en la que cabe.
+   - Cada capa es el corte del modelo 3D por el centro de la capa, o la unión de sus cortes de abajo, del
+     centro y de arriba («por fuera»: sobra material y se lija hasta la forma), o su intersección («por dentro»).
+   - Si un corte sale en varios trozos (las orejas, dos patas), cada trozo es una pieza: 12a, 12b…
+   - Las piezas son horizontales: se dibujan en planta, vistas desde arriba (u = x, v hacia atrás). */
+const esApilado = () => !!P && P.tipo === 'apilado';
+const APILADO_DEF = { corte: 'centro', minArea: 20, holgura: 0.2, lado: 8, margen: 2, grabar: true, hilo: false, anchoHilo: 1, llavesAuto: false, plantillaAplicada: null };
+function apiladoP() {
+  if (!P.apilado) P.apilado = {};
+  Object.keys(APILADO_DEF).forEach(k => { if (P.apilado[k] === undefined) P.apilado[k] = APILADO_DEF[k]; });
+  return P.apilado;
+}
+const apiladoActivo = () => esApilado() && !!(P.figura && P.figura.malla && P.figura.malla.v64);
+const LLAVE_RANGO = new Map();   // id de la llave → [altura de abajo, altura de arriba] de las capas que atraviesa
+const NOMBRE_CORTE = { centro: 'por el centro de cada capa', fuera: 'por fuera (sobra un poco: se lija)', dentro: 'por dentro (nunca sobra)' };
+
+// ---- región (con sus huecos) de un juego de lazos cerrados, por la regla par-impar ----
+function regionLazos(lazos) {
+  const C = window.ClipperLib; if (!C || !lazos.length) return [];
+  const c = new C.Clipper(); lazos.forEach(l => { if (l.length >= 3) c.AddPath(aCl(l), C.PolyType.ptSubject, true); });
+  const arbol = new C.PolyTree(); c.Execute(C.ClipType.ctUnion, arbol, C.PolyFillType.pftEvenOdd, C.PolyFillType.pftEvenOdd);
+  return C.JS.PolyTreeToExPolygons(arbol).map(ex => {
+    let poly = deCl(ex.outer); if (areaFirmada(poly) < 0) poly.reverse();
+    const int = ex.holes.map(deCl).filter(hh => Math.abs(areaFirmada(hh)) > 1).map(hh => areaFirmada(hh) < 0 ? hh : hh.slice().reverse());
+    return { poly, int, area: Math.abs(areaFirmada(poly)) - int.reduce((s, hh) => s + Math.abs(areaFirmada(hh)), 0) };
+  }).filter(p => p.poly.length >= 3 && p.area > 1);
+}
+const caminosRegion = reg => reg.flatMap(q => [q.poly, ...q.int]);   // contorno a derechas y huecos a izquierdas (regla «no cero»)
+function regionCapa(k, n, alto, corte) {
+  const sec = y => regionLazos(seccionFigura(y).map(l => l.poly));
+  const yc = (k + 0.5) / n * alto, A = sec(yc);
+  if (corte === 'centro') return A;
+  const B = sec((k + 0.03) / n * alto), Cc = sec((k + 0.97) / n * alto);
+  if (corte === 'fuera') return booleana([...caminosRegion(A), ...caminosRegion(B), ...caminosRegion(Cc)], [], 'union');
+  let r = A; [B, Cc].forEach(o => { r = r.length && o.length ? booleana(caminosRegion(r), caminosRegion(o), 'interseccion') : []; });
+  return r;
+}
+// recorta una polilínea abierta con una región (para grabar el contorno de la capa de encima)
+function recortarAbierta(linea, region) {
+  const C = window.ClipperLib; if (!C || linea.length < 2 || !region.length) return [];
+  const c = new C.Clipper(); c.AddPath(aCl(linea), C.PolyType.ptSubject, false);
+  region.forEach(r => { if (r.length >= 3) c.AddPath(aCl(r), C.PolyType.ptClip, true); });
+  const arbol = new C.PolyTree(); c.Execute(C.ClipType.ctIntersection, arbol, C.PolyFillType.pftNonZero, C.PolyFillType.pftNonZero);
+  return C.Clipper.OpenPathsFromPolyTree(arbol).map(deCl).filter(l => l.length >= 2);
+}
+
+function resultadoVacio() {
+  return { n: 0, sep: 0, hueco: 0, costillas: [], varillas: [], avisos: [], largueros: [], cruces: [], discos: [], rastreles: [], ranurasMal: [], trozos: [], modulos: [],
+    uniones: [], pisan: [], otras: [], llaves: [], uc: 0, apilado: true, capas: 0, bbox: [[0, 1], [0, 1], [0, 1]] };
+}
+function calcularApilado() {
+  const res = resultadoVacio(), A = apiladoP(), add = (tipo, txt, cost) => res.avisos.push({ tipo, txt, cost });
+  LLAVE_RANGO.clear();
+  if (!apiladoActivo()) {
+    cargarModeloPlantillaApilado();
+    add('atencion', 'Figura apilada: carga un modelo 3D (STL, OBJ, GLB o PLY) o elige uno de ejemplo en «Figura (modelo 3D)».');
+    return res;
+  }
+  const e = grosor(), m = mallaFigura(), alto = m.alto, n = Math.max(1, Math.round(alto / e));
+  res.capas = n; P.largo = n * e;
+  const tol = clamp(e * 0.02, 0.05, 0.8), minA = Math.max(1, +A.minArea || 0), letras = 'abcdefghijklmnopqrstuvwxyz';
+  let quitados = 0;
+  const capas = [];
+  for (let k = 0; k < n; k++) {
+    const reg = regionCapa(k, n, alto, A.corte).filter(q => { if (q.area < minA) { quitados++; return false; } return true; }).sort((a, b) => b.area - a.area);
+    capas.push(reg.map(q => ({ poly: simplificaCerrado(q.poly, tol), int: q.int.filter(hh => Math.abs(areaFirmada(hh)) >= minA).map(hh => simplificaCerrado(hh, tol)) })).filter(q => q.poly.length >= 3));
+  }
+  const pieza = (k, q) => {
+    const y = (k + 0.5) * e, poly = areaFirmada(q.poly) < 0 ? q.poly.slice().reverse() : q.poly;
+    return { i: 0, x: y, capa: k, plano: 'horizontal', F: { ex: [1, 0, 0], ey: [0, 0, -1], ez: [0, 1, 0], o: [0, y, 0] }, poly, base: poly, int: q.int, ok: true,
+      caja: cajaDe(poly), area: Math.abs(areaFirmada(poly)) - q.int.reduce((s, hh) => s + Math.abs(areaFirmada(hh)), 0),
+      agujeros: [], nVar: 0, ranuras: [], cajas: [], cajasT: [], dientes: [], uniones: [], taladros: [], huecos: [], etq: '', nombre: '' };
+  };
+  res.costillas = capas.flatMap((cs, k) => cs.map(q => pieza(k, q)));
+  // ---- llaves: el tramo seguido de capas en el que caben (con su holgura y un margen de material alrededor) ----
+  res.llaves = [];
+  const porCapa = k => res.costillas.filter(c => c.capa === k);
+  if (window.ClipperLib) huecosActivos().filter(h => h.llave).forEach(h => {
+    const forma = formaHueco(h), conMargen = engordar(forma, Math.max(0, +A.holgura || 0) + Math.max(0, +A.margen || 0));
+    const [d0, d1] = tramoX(h), cabe = [];
+    for (let k = 0; k < n; k++) {
+      const y = (k + 0.5) * e;
+      cabe.push(y >= d0 && y <= d1 && porCapa(k).some(c => !booleana(conMargen, [c.poly]).length && !c.int.some(hh => booleana(conMargen, [hh], 'interseccion').length)));
+    }
+    let mejor = null;
+    for (let k = 0; k < n;) { if (!cabe[k]) { k++; continue; } let j = k; while (j + 1 < n && cabe[j + 1]) j++; if (!mejor || j - k > mejor[1] - mejor[0]) mejor = [k, j]; k = j + 1; }
+    const nL = P.huecos.indexOf(h) + 1;
+    if (mejor) LLAVE_RANGO.set(h.id, [mejor[0] * e, (mejor[1] + 1) * e]);
+    res.llaves.push({ h, n: nL, k0: mejor ? mejor[0] : -1, k1: mejor ? mejor[1] : -1, largo: mejor ? (mejor[1] - mejor[0] + 1) * e : 0, forma });
+  });
+  // ---- huecos y llaves: se restan a las capas que atraviesan (como los túneles de las costillas) ----
+  res.costillas.forEach((c, i) => { c.i = i; });
+  res.n = res.costillas.length;
+  aplicarHuecos(res);
+  const todas = [];
+  res.costillas.forEach(p => { if (!p.ok) return; (p.partes || [p]).forEach(q => { if (q.ok === false || !q.poly || q.poly.length < 3) return;
+    if (q !== p) Object.assign(q, { capa: p.capa, plano: 'horizontal', F: p.F, cajas: [], cajasT: [], dientes: [], uniones: [], taladros: [], huecos: [] });
+    q.conHuecos = false; q.partes = null; q.padre = null; q.trozo = false; q.int = q.int || []; todas.push(q); }); });
+  res.trozos = []; res.modulos = [];
+  // ---- hilo caliente: los huecos de dentro necesitan una entrada desde el borde (un corte del ancho del hilo) ----
+  if (A.hilo && window.ClipperLib) todas.forEach(c => {
+    let guarda = 0;
+    while (c.int.length && guarda++ < 20) {
+      const hh = c.int[0]; let mej = null;
+      hh.forEach(p => { for (let i = 0; i < c.poly.length; i++) { const a = c.poly[i], b = c.poly[(i + 1) % c.poly.length], dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy;
+        const t = L ? clamp(((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L, 0, 1) : 0, q = [a[0] + t * dx, a[1] + t * dy], d = Math.hypot(q[0] - p[0], q[1] - p[1]);
+        if (!mej || d < mej.d) mej = { d, p, q }; } });
+      if (!mej) break;
+      const w = Math.max(0.3, +A.anchoHilo || 1) / 2, ux = (mej.q[0] - mej.p[0]) / (mej.d || 1), uy = (mej.q[1] - mej.p[1]) / (mej.d || 1), nx = -uy * w, ny = ux * w;
+      const a0 = [mej.p[0] - ux * 0.5, mej.p[1] - uy * 0.5], a1 = [mej.q[0] + ux * 1.5, mej.q[1] + uy * 1.5];
+      const ranura = [[a0[0] + nx, a0[1] + ny], [a1[0] + nx, a1[1] + ny], [a1[0] - nx, a1[1] - ny], [a0[0] - nx, a0[1] - ny]];
+      const r = booleana([c.poly, ...c.int], [ranura]); if (!r.length) break;
+      c.poly = r[0].poly; c.int = r[0].int; c.entradas = (c.entradas || 0) + 1;
+    }
+    c.base = c.poly; c.caja = cajaDe(c.poly);
+  });
+  // ---- números y nombres por capa (desde abajo: 1, 2, 3…; con varios trozos, 12a, 12b…) ----
+  todas.sort((a, b) => a.capa - b.capa || b.area - a.area);
+  todas.forEach((c, i) => { c.i = i; c.caja = cajaDe(c.poly); c.area = Math.abs(areaFirmada(c.poly)) - c.int.reduce((s, hh) => s + Math.abs(areaFirmada(hh)), 0); });
+  const nCapa = {}; todas.forEach(c => { nCapa[c.capa] = (nCapa[c.capa] || 0) + 1; });
+  const vistos = {}; todas.forEach(c => { const j = vistos[c.capa] = (vistos[c.capa] || 0) + 1, multi = nCapa[c.capa] > 1; c.etq = String(c.capa + 1) + (multi ? letras[(j - 1) % 26] : ''); c.nombre = 'Capa ' + c.etq; });
+  res.costillas = todas; res.n = todas.length;
+  // ---- grabado: el contorno de la capa de encima, para pegarla en su sitio ----
+  if (A.grabar && window.ClipperLib) todas.forEach(c => {
+    const arriba = todas.filter(o => o.capa === c.capa + 1), region = [c.poly, ...c.int];
+    c.marcas = arriba.flatMap(o => recortarAbierta([...o.poly, o.poly[0]], region)).filter(l => l.reduce((s, p, i) => i ? s + Math.hypot(p[0] - l[i - 1][0], p[1] - l[i - 1][1]) : 0, 0) > 2);
+  });
+  // ---- caja del conjunto (x, altura, z) ----
+  const bb = [[Infinity, -Infinity], [0, n * e], [Infinity, -Infinity]];
+  todas.forEach(c => { bb[0][0] = Math.min(bb[0][0], c.caja.x0); bb[0][1] = Math.max(bb[0][1], c.caja.x1); bb[2][0] = Math.min(bb[2][0], -c.caja.y1); bb[2][1] = Math.max(bb[2][1], -c.caja.y0); });
+  res.bbox = bb.map(r => isFinite(r[0]) ? r : [0, 0]);
+  avisosApilado(res, add, { n, e, quitados });
+  return res;
+}
+function avisosApilado(res, add, o) {
+  const { n, e, quitados } = o, A = apiladoP(), cs = res.costillas;
+  const multi = new Set(cs.filter(c => /[a-z]$/.test(c.etq)).map(c => c.capa)).size;
+  add('info', `Figura apilada: ${n} capas de ${fmt(e, 1)} mm (${fmt(n * e)} mm de alto, cortadas ${NOMBRE_CORTE[A.corte] || ''}) en ${cs.length} piezas${multi ? `; ${multi} capa${multi > 1 ? 's' : ''} en varios trozos` : ''}.`);
+  if (quitados) add('info', `Se han quitado ${quitados} trozo${quitados > 1 ? 's' : ''} de menos de ${fmt(A.minArea)} mm² (puntas sueltas que no se pueden cortar ni pegar bien).`);
+  // capas que casi no se apoyan en la de abajo
+  if (window.ClipperLib) {
+    const flojas = [];
+    cs.forEach(c => {
+      if (c.capa === 0) return;
+      const abajo = cs.filter(q => q.capa === c.capa - 1); if (!abajo.length) { flojas.push(c); return; }
+      const comun = booleana([c.poly, ...c.int], abajo.flatMap(q => [q.poly, ...q.int]), 'interseccion').reduce((s, q) => s + q.area, 0);
+      if (comun < 0.15 * c.area) flojas.push(c);
+    });
+    if (flojas.length) add('atencion', `${flojas.length === 1 ? 'La pieza' : 'Las piezas'} ${flojas.slice(0, 6).map(c => c.etq).join(', ')}${flojas.length > 6 ? '…' : ''} casi no se ${flojas.length === 1 ? 'apoya' : 'apoyan'} en la capa de abajo: ${flojas.length === 1 ? 'queda' : 'quedan'} en el aire. Pégala${flojas.length === 1 ? '' : 's'} con cuidado (con un soporte mientras seca), gira el modelo o usa el corte «por fuera».`, flojas[0].i);
+  }
+  // llaves
+  const ll = res.llaves || [];
+  if (!ll.length) add('atencion', 'Sin llaves: las capas se alinean a ojo. Pon una llave cuadrada y otra triangular (o pulsa «✨ Colocar las llaves solas» en «Capas»).');
+  ll.forEach(l => {
+    const nom = `Llave L${l.n} (${l.h.forma === 'rect' ? 'cuadrada' : l.h.forma === 'circulo' ? 'redonda' : 'triangular'})`;
+    if (l.k0 < 0) { add('error', `${nom}: no cabe entera en ninguna capa (con ${fmt(A.margen, 1)} mm de material alrededor). Muévela hacia dentro o hazla más pequeña.`); return; }
+    const nc = l.k1 - l.k0 + 1;
+    add(nc < Math.max(2, 0.35 * n) ? 'atencion' : 'info', `${nom}: atraviesa de la capa ${l.k0 + 1} a la ${l.k1 + 1} (${nc} capas, ${fmt(l.largo)} mm)${nc < Math.max(2, 0.35 * n) ? '. Es corta: muévela a la parte más ancha de la figura' : ''}.`);
+  });
+  if (ll.length === 1 && ll[0].h.forma !== 'libre') add('info', 'Con una sola llave las capas aún pueden girar (o, con una cuadrada, ponerse a 90°): añade otra, mejor triangular.');
+  if (A.hilo) { const nE = cs.reduce((s, c) => s + (c.entradas || 0), 0); if (nE) add('info', `Hilo caliente: ${nE} corte${nE > 1 ? 's' : ''} de entrada del hilo hasta los huecos de las llaves (se cierran al pegar).`); }
+}
+
+// ---- colocar las llaves solas: una cuadrada y otra triangular, lo más separadas posible,
+//      en la zona común a las capas de abajo arriba hasta donde quepan las dos ----
+function colocarLlavesAuto() {
+  if (!R || !esApilado() || !window.ClipperLib) return 0;
+  const A = apiladoP(), lado = Math.max(2, +A.lado || 8), r = lado * 0.75 + Math.max(0, +A.holgura || 0) + Math.max(0, +A.margen || 0);
+  // las capas sin los huecos de las llaves que ya hay (se van a quitar)
+  const guardadas = P.huecos || []; P.huecos = guardadas.filter(h => !h.llave);
+  let Rb; try { Rb = calcular(); } finally { P.huecos = guardadas; }
+  const n = Rb.capas || 0;
+  // en cada capa, donde puede ir el centro de una llave (la capa encogida lo que mide media llave más la holgura y el margen)
+  const zonas = Array.from({ length: n }, (_, k) => Rb.costillas.filter(c => c.capa === k).flatMap(c => { const s = engordar(c.poly, -r); if (!s || s.length < 3 || Math.abs(areaFirmada(s)) < 1) return []; return booleana(s, c.int.map(hh => engordar(hh, r))).map(q => q.poly); }));
+  const mayorDe = zs => zs.reduce((m, q) => Math.abs(areaFirmada(q)) > Math.abs(areaFirmada(m)) ? q : m, zs[0]);
+  // el tramo de capas seguidas más largo cuya zona común aún deja separar dos llaves (empezando en las capas de abajo)
+  const tramo = (s, dos) => {
+    let I = null, ult = null, fin = s - 1;
+    for (let k = s; k < n; k++) {
+      if (!zonas[k].length) break;
+      const nuevo = I ? booleana(I, zonas[k], 'interseccion').map(q => q.poly) : zonas[k]; if (!nuevo.length) break;
+      const m = mayorDe(nuevo), cb = cajaDe(m);
+      if (dos && Math.max(cb.w, cb.h) < 2.8 * lado) break;
+      I = nuevo; ult = m; fin = k;
+    }
+    return ult ? { s, fin, largo: fin - s + 1, zona: ult } : null;
+  };
+  let mejor = null;
+  for (let s = 0; s < n && s <= Math.ceil(n * 0.4); s++) {
+    if (mejor && mejor.largo >= n - s) break;   // ya no se puede mejorar
+    const t = tramo(s, true); if (t && (!mejor || t.largo > mejor.largo)) mejor = t;
+  }
+  if (!mejor) mejor = tramo(0, false) || tramo(Math.max(0, zonas.findIndex(z => z.length)), false);
+  if (!mejor) return 0;
+  const ultimo = mejor.zona;
+  // los dos puntos más separados de la zona, un poco hacia dentro
+  let a = ultimo[0], b = ultimo[0], md = -1;
+  for (let i = 0; i < ultimo.length; i++) for (let j = i + 1; j < ultimo.length; j++) { const d = Math.hypot(ultimo[i][0] - ultimo[j][0], ultimo[i][1] - ultimo[j][1]); if (d > md) { md = d; a = ultimo[i]; b = ultimo[j]; } }
+  let cx = 0, cy = 0; ultimo.forEach(p => { cx += p[0]; cy += p[1]; }); cx /= ultimo.length; cy /= ultimo.length;
+  if (!dentro(ultimo, cx, cy)) [cx, cy] = puntoDentro(ultimo, []);   // en una zona con entrantes, el centro de los vértices puede caer fuera
+  const dentroDe = p => { const q = [p[0] + (cx - p[0]) * 0.12, p[1] + (cy - p[1]) * 0.12]; return dentro(ultimo, q[0], q[1]) ? q : p; };
+  P.huecos = (P.huecos || []).filter(h => !h.llave);
+  const r1 = v => Math.round(v * 10) / 10, base = { activo: true, modo: 'pasante', llave: true, giro: 0, radio: 0, prof: 40, holgura: 0, desde: 0, hasta: Math.round(P.largo + grosor()), mueble: { tipo: 'caja', fondo: 0, trasera: false, puerta: 'lisa', holguraPuerta: 3, grosor: 0 } };
+  const cuadrada = c => Object.assign({}, base, { id: 'h' + Date.now().toString(36) + 'c', forma: 'rect', x: r1(c[0] - lado / 2), y: r1(c[1] - lado / 2), ancho: r1(lado), alto: r1(lado), pts: null });
+  const triangular = c => { const s = lado * 1.3, h = s * Math.sqrt(3) / 2, pts = [[c[0] - s / 2, c[1] - h / 3], [c[0] + s / 2, c[1] - h / 3], [c[0], c[1] + 2 * h / 3]].map(p => [r1(p[0]), r1(p[1])]), cb = cajaDe(pts);
+    return Object.assign({}, base, { id: 'h' + Date.now().toString(36) + 't', forma: 'libre', pts, x: cb.x0, y: cb.y0, ancho: cb.w, alto: cb.h }); };
+  if (md < 2.6 * lado) { P.huecos.push(cuadrada([cx, cy])); return 1; }
+  P.huecos.push(cuadrada(dentroDe(a)), triangular(dentroDe(b)));
+  return 2;
+}
+// una llave nueva (cuadrada o triangular) en el centro de la capa seleccionada
+function llaveNueva(forma) {
+  const A = apiladoP(), lado = Math.max(2, +A.lado || 8), c = R && R.costillas[UI.costilla] && R.costillas[UI.costilla].ok ? R.costillas[UI.costilla] : (R && R.costillas[0]);
+  const ctr = c ? puntoDentro(c.poly, c.int) : [0, 0], r1 = v => Math.round(v * 10) / 10;
+  const h = huecoNuevo(forma === 'tri' ? 'libre' : 'rect');
+  Object.assign(h, { llave: true, modo: 'pasante', desde: 0, hasta: Math.round(P.largo + grosor()), giro: 0 });
+  if (forma === 'tri') { const s = lado * 1.3, hh = s * Math.sqrt(3) / 2; h.pts = [[ctr[0] - s / 2, ctr[1] - hh / 3], [ctr[0] + s / 2, ctr[1] - hh / 3], [ctr[0], ctr[1] + 2 * hh / 3]].map(p => [r1(p[0]), r1(p[1])]); const cb = cajaDe(h.pts); Object.assign(h, { x: cb.x0, y: cb.y0, ancho: cb.w, alto: cb.h }); }
+  else Object.assign(h, { x: r1(ctr[0] - lado / 2), y: r1(ctr[1] - lado / 2), ancho: r1(lado), alto: r1(lado), pts: null });
+  return h;
+}
+const nombreLlave = h => h.forma === 'rect' ? (Math.abs(h.ancho - h.alto) < 0.05 ? 'cuadrada' : 'rectangular') : h.forma === 'circulo' ? 'redonda' : (h.pts && h.pts.length === 3 ? 'triangular' : 'de forma libre');
+// medidas del listón de una llave (su sección y su largo), para la lista de compra y el plano
+function listonLlave(l) {
+  const h = l.h, cb = cajaDe(l.forma);
+  if (h.forma === 'rect') return `${fmt(h.ancho, 1)} × ${fmt(h.alto, 1)} mm`;
+  if (h.forma === 'circulo') return `Ø ${fmt(h.ancho, 1)} mm`;
+  if (h.pts && h.pts.length === 3) { const L = h.pts.map((p, i) => { const q = h.pts[(i + 1) % 3]; return Math.hypot(q[0] - p[0], q[1] - p[1]); }); return `triangular de ${fmt(Math.max(...L), 1)} mm de lado`; }
+  return `de ${fmt(cb.w, 1)} × ${fmt(cb.h, 1)} mm (forma libre)`;
+}
+
+// ---- plantillas: ajustes de cada una y su modelo de ejemplo ----
+function ajustesApilado(id, Pp) {
+  Pp = Pp || P;
+  const pl = PLANTILLAS[id]; if (!pl || !pl.ajustes) return;
+  const a = pl.ajustes, A = Pp.apilado = Object.assign({}, APILADO_DEF, Pp.apilado || {});
+  Pp.costillas.grosor = a.grosor; Pp.costillas.material = a.material;
+  ['corte', 'minArea', 'holgura', 'lado', 'margen', 'grabar', 'hilo', 'anchoHilo'].forEach(k => { if (a[k] !== undefined) A[k] = a[k]; });
+  UI.fab = null;   // la plancha de Fabricar sale de la plantilla (fabDefecto)
+  // si el modelo era el de ejemplo de otra plantilla, se cambia por el de esta
+  const otros = Object.values(PLANTILLAS).filter(q => q.modelo && q !== pl).map(q => q.modelo);
+  if (!Pp.figura.malla || (Pp.figura.malla.ejemplo && otros.includes(Pp.figura.malla.ejemplo))) { Pp.figura.malla = null; Pp.huecos = (Pp.huecos || []).filter(h => !h.llave); }
+  Pp.figura.giro = 0; Pp.figura.alto = (Pp.params && Pp.params.alto) || Pp.figura.alto; A.plantillaAplicada = id; A.llavesAuto = true;
+}
+let cargandoApilado = false;
+function cargarModeloPlantillaApilado() {
+  const pl = PLANTILLAS[P.plantilla]; if (cargandoApilado || !pl || !pl.modelo || P.figura.malla) return;
+  cargandoApilado = true;
+  cargarRecurso('modelos').then(() => {
+    cargandoApilado = false;
+    if (!esApilado() || P.figura.malla) return;
+    const r = triangulosEjemplo(pl.modelo); if (!r) return;
+    cargarFiguraTriangulos(r.tri, r.M.nombre, pl.modelo); apiladoP().llavesAuto = true;
+    if (typeof recalcular === 'function' && VP) { recalcular(); ponerControles(); encuadrarSiHaceFalta(); selCostilla(Math.floor(R.n / 3)); if (UI.vistaHuecos) encuadrarHuecos(); if (typeof camara === 'function') camara('tres4'); }
+  }).catch(e => { cargandoApilado = false; if (typeof aviso === 'function') aviso('⚠ ' + esc(e.message), 5000); });
+}
+// después de cargar un modelo o una plantilla: las llaves se colocan solas (una vez)
+function llavesTrasCalcular() {
+  if (!esApilado() || !apiladoActivo() || !apiladoP().llavesAuto || !R || !R.capas) return false;
+  apiladoP().llavesAuto = false;
+  if ((P.huecos || []).some(h => h.llave)) return false;
+  return colocarLlavesAuto() > 0;
+}
+
 /* ===================== PLANTILLAS PARAMÉTRICAS =====================
    Cada plantilla genera el largo, las esquinas y los perfiles clave a partir de sus parámetros.
    Todos los perfiles de un mueble tienen el mismo número de puntos de control. */
@@ -3556,6 +3832,21 @@ PLANTILLAS.estanteria_kit = {
     return Object.assign({}, CLAVE_PLANO, { piezas, asiento: false, herraje: 'excentrica' });
   },
 };
+// ---- figuras apiladas (planos seriados): la forma sale de un modelo 3D; la plantilla pone el material, el grosor y el modelo de ejemplo ----
+PLANTILLAS.apilado_laser = {
+  nombre: 'Figura apilada pequeña (láser)', grupo: 'apilado', modelo: 'conejo',
+  desc: 'Figura de capas de MDF de 3 mm (también 4 o 5) cortadas con láser y pegadas unas sobre otras, alineadas con una llave cuadrada y otra triangular. Cada capa lleva grabado el contorno de la de encima. Empieza con un conejo: carga tu modelo en «Figura (modelo 3D)».',
+  params: [{ id: 'alto', nombre: 'Alto de la figura', min: 40, max: 800, paso: 5, valor: 200 }],
+  ajustes: { grosor: 3, material: 'mdf', corte: 'centro', minArea: 6, holgura: 0.15, lado: 6, margen: 1.5, grabar: true, hilo: false, fab: { ancho: 600, alto: 400, borde: 5, sep: 2 } },
+  generar(p) { return Object.assign({}, CLAVE_PLANO, { largo: p.alto, apilado: true }); },
+};
+PLANTILLAS.apilado_porex = {
+  nombre: 'Figura apilada grande (porex, hilo caliente)', grupo: 'apilado', modelo: 'moai',
+  desc: 'Figura grande de planchas de porex (EPS) o poliestireno extruido (XPS) de 30 mm cortadas con hilo caliente, pegadas y lijadas. Las capas salen por fuera (sobra un poco para lijar) y los huecos de las llaves llevan la entrada del hilo. Empieza con una cabeza de moái.',
+  params: [{ id: 'alto', nombre: 'Alto de la figura', min: 200, max: 3000, paso: 10, valor: 1000 }],
+  ajustes: { grosor: 30, material: 'porex', corte: 'fuera', minArea: 400, holgura: 0.5, lado: 30, margen: 8, grabar: false, hilo: true, anchoHilo: 1, fab: { ancho: 1200, alto: 600, borde: 10, sep: 4 } },
+  generar(p) { return Object.assign({}, CLAVE_PLANO, { largo: p.alto, apilado: true }); },
+};
 PLANTILLAS.plano_vacio = {
   nombre: 'Vacío: piezas planas', grupo: 'plano',
   desc: 'Un tablero de frente y otro de lado que se cruzan, para construir el mueble pieza a pieza o traer los contornos de un DXF o SVG.',
@@ -3572,7 +3863,7 @@ PLANTILLAS.plano_vacio = {
   },
 };
 const grupoDe = id => PLANTILLAS[id].grupo || 'lineal';
-const grupoTipo = t => t === 'radial' ? 'radial' : t === 'pared' ? 'pared' : t === 'plano' ? 'plano' : 'lineal';
+const grupoTipo = t => t === 'radial' ? 'radial' : t === 'pared' ? 'pared' : t === 'plano' ? 'plano' : t === 'apilado' ? 'apilado' : 'lineal';
 
 function paramsDefecto(id) { const o = {}; PLANTILLAS[id].params.forEach(q => o[q.id] = q.valor); return o; }
 // genera la forma desde la plantilla; si solo cambia el largo y hay retoques a mano, escala las claves
@@ -3586,6 +3877,7 @@ function aplicarPlantilla(soloLargo) {
   }
   const g = pl.generar(P.params, grosor());
   P.largo = g.largo; P.esquinas = g.esquinas; P.claves = g.claves; P.editado = false;
+  if (g.apilado) P.figura.alto = P.params.alto;
   if (g.piezas && g.herraje && planoP().herraje == null) planoP().herraje = g.herraje;
   if (g.piezas) { planoP().asiento = g.asiento !== false; planoP().piezas = g.piezas; UI.costilla = Math.min(UI.costilla || 0, g.piezas.length - 1); }
   UI.clave = Math.min(UI.clave, P.claves.length - 1); UI.punto = -1;
@@ -3649,7 +3941,7 @@ class Vista2D {
     ctx.strokeStyle = cssVar('--ejes'); ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.moveTo(0, ys); ctx.lineTo(this.w, ys); ctx.stroke();
     ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(xs, 0); ctx.lineTo(xs, this.h); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = cssVar('--suave'); ctx.font = '11px system-ui'; ctx.fillText('suelo', 6, ys - 4);
+    ctx.fillStyle = cssVar('--suave'); ctx.font = '11px system-ui'; if (!(typeof P !== 'undefined' && P && P.tipo === 'apilado' && this.c.id !== 'cPerfil')) ctx.fillText('suelo', 6, ys - 4);   // en planta no hay suelo
     ctx.textAlign = 'right'; ctx.fillText('rejilla ' + menor + ' / ' + mayor + ' mm', this.w - 8, this.h - 8); ctx.textAlign = 'left';
   }
   cota(ctx, a, b, off, texto, vertical) { // cota sencilla entre a y b (mundo), desplazada off px
@@ -3701,6 +3993,7 @@ function dibujarPerfil(ctx, V) {
   if (!P || !R) return;
   if (relieveActivo()) { dibujarPerfilRelieve(ctx, V); return; }
   if (esPlano()) { dibujarPerfilPlano(ctx, V); return; }
+  if (esApilado()) { dibujarPerfilApilado(ctx, V); return; }
   const C = clavesOrdenadas(), k = claveActual(), acento = cssVar('--acento');
   // todas las costillas, muy suaves (la «envolvente»)
   ctx.lineWidth = 1; ctx.strokeStyle = colorCostilla(.16);
@@ -3857,6 +4150,11 @@ function iniciarEditor() {
       return;
     }
     if (ev.button === 1) { ED.arr = { tipo: 'pan', x: mx, y: my, ox: VP.ox, oy: VP.oy }; return; }
+    if (esApilado() && R && ev.button === 0) {   // clic en una capa del alzado: se elige
+      const [u, v] = VP.aMundo(mx, my), k = Math.floor(v / grosor()), cs = R.costillas.filter(q => q.capa === k);
+      const q = cs.find(o => u >= o.caja.x0 && u <= o.caja.x1) || cs[0]; if (q) selCostilla(q.i, false);
+      ED.arr = { tipo: 'pan', x: mx, y: my, ox: VP.ox, oy: VP.oy }; return;
+    }
     const ip = puntoCerca(mx, my);
     if (ip >= 0) {
       UI.punto = ip; UI.varilla = -1;
@@ -3966,6 +4264,26 @@ function dibujarPerfilPlano(ctx, V) {
   ctx.fillStyle = cssVar('--suave'); ctx.font = '11.5px system-ui';
   ctx.fillText(`${c.nombre} (${c.etq}) · ${pl.nombre.toLowerCase()}, en ${pl.normal} = ${fmt(c.x)} mm${c.giro ? `, inclinada ${fmt(c.giro, 1)}°` : ''} · horizontal: ${pl.ejes[0]} · vertical: ${pl.ejes[1]}` + (k.pieza && k.pieza !== planoP().piezas[UI.costilla] ? ` · igual que «${k.pieza.nombre}»` : ''), 8, 72);
 }
+// figura apilada: alzado de las capas (de frente), cada una como una franja de su ancho; las llaves, en rojo
+function dibujarPerfilApilado(ctx, V) {
+  const e = grosor(), sel = piezaSel(), acento = cssVar('--acento');
+  if (!R.costillas.length) { ctx.fillStyle = acento; ctx.font = '600 12.5px system-ui'; ctx.textAlign = 'center'; ctx.fillText('Carga un modelo 3D en «Figura (modelo 3D)»', V.w / 2, V.h / 2); ctx.textAlign = 'left'; return; }
+  R.costillas.forEach(c => {
+    if (!c.ok) return;
+    const y0 = c.capa * e, [x0, yA] = V.aPantalla(c.caja.x0, y0 + e), [x1, yB] = V.aPantalla(c.caja.x1, y0), es = sel && c.i === sel.i;
+    ctx.fillStyle = es ? conAlfa(acento, .45) : colorCostilla(sel && c.capa === sel.capa ? .5 : .28); ctx.fillRect(x0, yA, x1 - x0, Math.max(1, yB - yA));
+    ctx.strokeStyle = es ? acento : colorCostilla(.75); ctx.lineWidth = es ? 1.6 : .6; ctx.strokeRect(x0, yA, x1 - x0, Math.max(1, yB - yA));
+  });
+  (R.llaves || []).forEach(l => {
+    if (l.k0 < 0) return; const cb = cajaDe(l.forma), [x0, yA] = V.aPantalla(cb.x0, (l.k1 + 1) * e), [x1, yB] = V.aPantalla(cb.x0 + cb.w, l.k0 * e);
+    ctx.fillStyle = 'rgba(208,69,58,.35)'; ctx.fillRect(x0, yA, x1 - x0, yB - yA); ctx.strokeStyle = '#d0453a'; ctx.lineWidth = 1.2; ctx.strokeRect(x0, yA, x1 - x0, yB - yA);
+    ctx.fillStyle = '#d0453a'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center'; ctx.fillText('L' + l.n, (x0 + x1) / 2, yA - 4); ctx.textAlign = 'left';
+  });
+  const bb = R.bbox; V.cota(ctx, [bb[0][1], 0], [bb[0][1], R.capas * e], 26, fmt(R.capas * e) + ' mm', true);
+  V.cota(ctx, [bb[0][0], 0], [bb[0][1], 0], 22, fmt(bb[0][1] - bb[0][0]) + ' mm', false);
+  ctx.fillStyle = cssVar('--suave'); ctx.font = '11.5px system-ui';
+  ctx.fillText(`Alzado de las ${R.capas} capas (de ${fmt(e, 1)} mm) · clic: elegir capa · las llaves, en rojo · se editan en la vista ▦ Huecos`, 8, 72);
+}
 // casillas con la posición del punto seleccionado (se pueden escribir)
 function refrescarPuntoCoord() {
   const caja = $('#ptCoord'); if (!caja) return;
@@ -3989,12 +4307,14 @@ function dibujarPerfilRelieve(ctx, V) {
   ctx.textAlign = 'left';
 }
 function ayudaPerfil() {
+  if (P && esApilado() && !UI.vistaHuecos) return '<span><kbd>Clic</kbd> elegir la capa</span><span><kbd>Rueda</kbd> acercar</span><span>Las llaves se mueven en <b>▦ Huecos</b></span>';
   if (UI.vistaHuecos) return '<span><kbd>Arrastrar</kbd> mover el hueco · asas: estirar</span><span><kbd>Doble clic</kbd> vértice nuevo (libre)</span><span><kbd>↻</kbd> girar</span><span><kbd>Clic dcho.</kbd> quitar vértice</span><span><kbd>Supr</kbd> borrar el hueco</span><span><kbd>Mayús</kbd> sin rejilla</span>';
   return '<span><kbd>Doble clic</kbd> línea: punto nuevo · punto: esquina</span><span><kbd>Clic dcho.</kbd> borrar</span><span><kbd>Mayús</kbd> sin rejilla</span>';
 }
 function encuadrarPerfil() {
   if (!R) return;
   if (esPlano()) { const k = ctrlEdit(), c = piezaSel(); if (!k) { VP.pintar(); return; } const b = cajaDe(curvaCerrada(k.pts, k.esq)); if (c && c.ok) { const d = c.caja; b.x0 = Math.min(b.x0, d.x0); b.y0 = Math.min(b.y0, d.y0); b.w = Math.max(b.x0 + b.w, d.x1) - b.x0; b.h = Math.max(b.y0 + b.h, d.y1) - b.y0; } VP.encuadrar(b, 50); return; }
+  if (esApilado()) { if (R.costillas.length) VP.encuadrar({ x0: R.bbox[0][0], y0: 0, w: R.bbox[0][1] - R.bbox[0][0], h: R.capas * grosor() }, 50); else VP.pintar(); return; }
   if (formaCalculada()) { const cs = R.costillas.filter(c => c.ok); if (cs.length) VP.encuadrar({ x0: 0, y0: 0, w: Math.max(...cs.map(c => c.caja.x1)), h: Math.max(...cs.map(c => c.caja.y1)) }, 50); return; }
   let x0 = Infinity, y0 = 0, x1 = -Infinity, y1 = -Infinity;
   P.claves.forEach(c => c.pts.forEach(p => { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }));
@@ -4012,6 +4332,7 @@ function dibujarCostilla(ctx, V) {
   ctx.fill('evenodd'); ctx.stroke();
   // los otros trozos de la misma lama o costilla, en claro
   const pad = c.padre || c; (pad.partes || []).forEach(q => { if (q === c || !q.ok) return; ctx.save(); ctx.globalAlpha = .35; ctx.setLineDash([4, 3]); V.camino(ctx, q.poly); ctx.stroke(); ctx.restore(); });
+  if (c.marcas && c.marcas.length) { ctx.save(); ctx.strokeStyle = '#2f6fd0'; ctx.lineWidth = 1.1; ctx.setLineDash([4, 3]); c.marcas.forEach(l => { ctx.beginPath(); l.forEach((p, i) => { const [x, y] = V.aPantalla(p[0], p[1]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke(); }); ctx.restore(); }
   const r = radioAgujero();
   (c.taladros || []).forEach(t => { const [x, y] = V.aPantalla(t[0], t[1]); ctx.fillStyle = cssVar('--vista'); ctx.beginPath(); ctx.arc(x, y, Math.max(2, t[2] * V.sc), 0, PI2); ctx.fill(); ctx.stroke(); });
   c.agujeros.forEach(k => {
@@ -4053,9 +4374,9 @@ const piezaSel = () => R ? (UI.costilla < R.n ? R.costillas[UI.costilla] : R.otr
 function encuadrarCostilla() { const c = piezaSel(); if (c && c.ok) VC.encuadrar(c.caja, 40); else VC.pintar(); }
 function refrescarCostilla() {
   const c = piezaSel(); if (!c) return;
-  $('#tipoPieza').textContent = esPlano() ? 'Pieza' : c.disco ? 'Disco' : c.z ? 'Larguero' : P.tipo === 'pared' ? 'Lama' : 'Costilla';
+  $('#tipoPieza').textContent = esPlano() ? 'Pieza' : esApilado() ? 'Capa' : c.disco ? 'Disco' : c.z ? 'Larguero' : P.tipo === 'pared' ? 'Lama' : 'Costilla';
   $('#numCost').textContent = c.etq;
-  $('#infoCost').textContent = esPlano() ? `${c.nombre} · ${PLANOS[c.plano].nombre.toLowerCase()} en ${PLANOS[c.plano].normal} = ${fmt(c.x)} mm · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm · ${textoUnionesPieza(c)}` : c.disco ? `a ${fmt(c.v)} mm de altura · Ø ${fmt(2 * c.rD)} mm · ${R.n} ranuras`
+  $('#infoCost').textContent = esApilado() ? `de ${R.capas} · de ${fmt(c.capa * grosor())} a ${fmt((c.capa + 1) * grosor())} mm de altura · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm` + ((c.int || []).length ? ` · ${c.int.length} hueco${c.int.length > 1 ? 's' : ''}` : '') : esPlano() ? `${c.nombre} · ${PLANOS[c.plano].nombre.toLowerCase()} en ${PLANOS[c.plano].normal} = ${fmt(c.x)} mm · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm · ${textoUnionesPieza(c)}` : c.disco ? `a ${fmt(c.v)} mm de altura · Ø ${fmt(2 * c.rD)} mm · ${R.n} ranuras`
     : c.z ? `z = ${fmt(c.u)} mm · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm · ${c.ranuras.length} ranuras`
     : `de ${R.n} · ${P.tipo === 'radial' ? 'ángulo' : 'x'} = ${textoPos(c.x)} · ${fmt(c.caja.w)} × ${fmt(c.caja.h)} mm` + (c.ranuras.length ? ` · ${c.ranuras.length} ${P.tipo === 'reticula' ? 'ranuras' : 'muescas'}` : '');
   $$('#listaCost li').forEach((li, i) => li.classList.toggle('sel', i === UI.costilla));
@@ -4073,7 +4394,7 @@ const HU = { arr: null };
 const NOMBRE_FORMA = { rect: 'Rectángulo', redondeado: 'Redondeado', arco: 'Arco', circulo: 'Círculo', libre: 'Forma libre', texto: 'Texto' };
 const NOMBRE_MODO = { pasante: 'pasante', rebaje: 'rebaje', saliente: 'sale hacia fuera', hundido: 'hundido' };
 const huecoSel = () => (P.huecos || [])[UI.hueco] || null;
-const snapH = (v, ev) => ev && ev.shiftKey ? Math.round(v * 10) / 10 : Math.round(v / 10) * 10;
+const snapH = (v, ev) => { if (ev && ev.shiftKey) return Math.round(v * 10) / 10; const g = P && P.tipo === 'apilado' ? (grosor() < 10 ? 1 : 5) : 10; return Math.round(v / g) * g; };   // en las figuras apiladas pequeñas, de mm en mm
 
 function dibujarHuecos(ctx, V) {
   V.rejilla(ctx);
@@ -4110,9 +4431,10 @@ function dibujarHuecos(ctx, V) {
       ctx.strokeStyle = 'rgba(80,90,100,.7)'; ctx.strokeRect(a, b, rc[2] * V.sc, rc[3] * V.sc);
     });
   } else {
-    // perfil: todas las costillas en claro
+    // perfil: todas las costillas en claro (en la figura apilada, las capas en planta; la de encima de la elegida, en discontinua)
     ctx.strokeStyle = cssVar('--ejes'); ctx.lineWidth = 1;
     R.costillas.forEach(c => { if (c.ok) { V.camino(ctx, c.poly); ctx.stroke(); } });
+    if (P.tipo === 'apilado' && piezaSel()) { const s = piezaSel(); ctx.save(); ctx.strokeStyle = colorCostilla(.9); ctx.lineWidth = 1.3; ctx.setLineDash([5, 4]); R.costillas.filter(c => c.capa === s.capa + 1).forEach(c => { V.camino(ctx, c.poly); ctx.stroke(); }); ctx.restore(); }
     const cs = piezaSel(); if (cs && cs.ok && !cs.z && !cs.modulo) { ctx.fillStyle = conAlfa(acento, .1); ctx.beginPath(); [cs.poly, ...(cs.int || [])].forEach(pol => { pol.forEach((p, i) => { const [x, y] = V.aPantalla(p[0], p[1]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.closePath(); }); ctx.fill('evenodd'); }
   }
   // los huecos
@@ -4133,7 +4455,7 @@ function dibujarHuecos(ctx, V) {
     const cb = cajaDe(f), [lx, ly] = V.aPantalla(cb.x0 + cb.w / 2, cb.y0 + cb.h / 2);
     if (h.forma !== 'texto') {
     ctx.fillStyle = act ? (sel ? acento : '#d0453a') : cssVar('--suave'); ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('H' + (k + 1), lx, ly); ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+    ctx.fillText((h.llave && P.tipo === 'apilado' ? 'L' : 'H') + (k + 1), lx, ly); ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
     }
     if (sel) {
       // asas
@@ -4150,7 +4472,7 @@ function dibujarHuecos(ctx, V) {
     }
   });
   ctx.fillStyle = acento; ctx.font = '600 12px system-ui';
-  ctx.fillText(fr ? 'Huecos · frente del panel' : 'Huecos · perfil (cada hueco es un túnel de «desde» a «hasta»)', 8, V.h - 26);
+  ctx.fillText(fr ? 'Huecos · frente del panel' : P.tipo === 'apilado' ? `Llaves y huecos · planta vista desde arriba (el frente, abajo) · capa ${(piezaSel() || {}).etq || ''} en color` : 'Huecos · perfil (cada hueco es un túnel de «desde» a «hasta»)', 8, V.h - 26);
 }
 function asasHueco(h) {
   const g = giraHueco(h), c = centroHueco(h), R2 = p => g ? rotarPunto(p, c, g) : p;
@@ -4169,7 +4491,7 @@ function encuadrarHuecos() {
   VH.encuadrar(b, 50);
 }
 function verHuecos(si) {
-  UI.vistaHuecos = !!si && ['pared', 'costillas', 'reticula'].includes(P.tipo);
+  UI.vistaHuecos = !!si && ['pared', 'costillas', 'reticula', 'apilado'].includes(P.tipo);
   $('#cPerfil').classList.toggle('oculto', UI.vistaHuecos); $('#cHuecos').classList.toggle('oculto', !UI.vistaHuecos);
   $('#bVistaHuecos').classList.toggle('activo', UI.vistaHuecos);
   ['#sClave', '#infoClave', '#bEsquina'].forEach(s => $(s).classList.toggle('oculto2', UI.vistaHuecos));
@@ -4243,7 +4565,9 @@ function iniciarHuecos() {
   $('#bVistaHuecos').onclick = () => verHuecos(!UI.vistaHuecos);
   $$('[data-hnuevo]').forEach(b => b.onclick = () => {
     if (!window.ClipperLib) { aviso('⚠ Falta assets/js/clipper.js'); return; }
-    P.huecos = P.huecos || []; const h = huecoNuevo(b.dataset.hnuevo);
+    P.huecos = P.huecos || [];
+    if (b.dataset.hnuevo.startsWith('llave')) { const t = b.dataset.hnuevo === 'llave_tri' ? 'tri' : 'cuad'; P.huecos.push(llaveNueva(t)); UI.hueco = P.huecos.length - 1; cambio(t === 'tri' ? 'Llave triangular' : 'Llave cuadrada'); if (!UI.vistaHuecos) verHuecos(true); else VH.pintar(); return; }
+    const h = huecoNuevo(b.dataset.hnuevo);
     if (P.tipo !== 'pared') h.modo = 'pasante';
     if (h.forma === 'texto') llenarLetras();
     P.huecos.push(h); UI.hueco = P.huecos.length - 1; cambio('Hueco ' + P.huecos.length + ': ' + NOMBRE_FORMA[h.forma].toLowerCase());
@@ -4275,6 +4599,7 @@ function iniciarHuecos() {
   campo('#hcNegrita', (h, el) => { h.negrita = el.checked; ajustarCajaTexto(h); });
   campo('#hcGiro', (h, el) => { const g = ((Math.round(+el.value || 0) % 360) + 540) % 360 - 180; if (h.forma === 'libre' && h.pts) { const C = centroHueco(h); h.pts = h.pts.map(p => rotarPunto(p, C, g - (h.giro || 0))); const cb = cajaDe(h.pts); h.x = cb.x0; h.y = cb.y0; h.ancho = cb.w; h.alto = cb.h; } h.giro = g; });
   campo('#hcActivo', (h, el) => { h.activo = el.checked; });
+  campo('#hcLlave', (h, el) => { h.llave = el.checked; h.modo = 'pasante'; });
   campo('#hcMueble', (h, el) => { h.mueble.tipo = el.value; });
   campo('#hcFondo', (h, el) => { h.mueble.fondo = Math.max(0, +el.value || 0); });
   campo('#hcTrasera', (h, el) => { h.mueble.trasera = el.checked; });
@@ -4285,7 +4610,9 @@ function iniciarHuecos() {
 function ponerCamposHueco() {
   const h = huecoSel(), fr = P.tipo === 'pared';
   $('#hcCampos').classList.toggle('oculto', !h); if (!h) return;
-  $('#hcTit').textContent = 'H' + (UI.hueco + 1) + ' · ' + NOMBRE_FORMA[h.forma];
+  const ap = P.tipo === 'apilado';
+  $('#hcTit').textContent = (h.llave && ap ? 'L' + (UI.hueco + 1) + ' · Llave ' + nombreLlave(h) : 'H' + (UI.hueco + 1) + ' · ' + NOMBRE_FORMA[h.forma]);
+  $('#hcLlave').checked = !!h.llave;
   $('#hcActivo').checked = h.activo !== false; const tx = h.forma === 'texto';
   $('#filaHcForma').classList.toggle('oculto', tx); if (!tx) $('#hcForma').value = h.forma;
   $('#hcTextoCampos').classList.toggle('oculto', !tx);
@@ -4293,7 +4620,8 @@ function ponerCamposHueco() {
   $('#hcX').value = Math.round(h.x * 10) / 10; $('#hcY').value = Math.round(h.y * 10) / 10; $('#hcAncho').value = Math.round(h.ancho * 10) / 10; $('#hcAlto').value = Math.round(h.alto * 10) / 10;
   $('#hcGiro').value = h.giro || 0; $('#filaHcGiro').classList.toggle('oculto', h.modo === 'mueble');
   $('#hcRadio').value = h.radio; $('#filaHcRadio').classList.toggle('oculto', h.forma !== 'redondeado');
-  [...$('#hcModo').options].forEach(o => { o.hidden = (!fr && ['rebaje', 'saliente', 'hundido'].includes(o.value)) || (tx && o.value === 'mueble'); });
+  [...$('#hcModo').options].forEach(o => { o.hidden = (!fr && ['rebaje', 'saliente', 'hundido'].includes(o.value)) || (tx && o.value === 'mueble') || (ap && o.value !== 'pasante'); });
+  if (ap) h.modo = 'pasante'; $('#hcModo').closest('label').classList.toggle('oculto', ap);
   if (!fr && ['rebaje', 'saliente', 'hundido'].includes(h.modo)) h.modo = 'pasante';
   if (tx && h.modo === 'mueble') h.modo = 'saliente';
   $('#hcModo').value = h.modo; $('#hcProf').value = h.prof; $('#filaHcProf').classList.toggle('oculto', h.modo !== 'rebaje');
@@ -4307,14 +4635,16 @@ function ponerCamposHueco() {
   $('#hcGrosorM').value = h.mueble.grosor || '';
   $('#hcTrasera').checked = !!h.mueble.trasera; $('#filaHcTrasera').classList.toggle('oculto', !fr || h.mueble.tipo === 'balda');
   $('#filaHcPuerta').classList.toggle('oculto', h.mueble.tipo !== 'armario'); $('#hcPuerta').value = h.mueble.puerta; $('#hcHolPuerta').value = h.mueble.holguraPuerta;
-  $('#hcXTit').textContent = fr ? 'X desde la izquierda (mm)' : 'u: fondo (mm)'; $('#hcYTit').textContent = fr ? 'Y desde abajo (mm)' : 'v: altura (mm)';
+  $('#hcXTit').textContent = fr ? 'X desde la izquierda (mm)' : ap ? 'x: a lo ancho (mm)' : 'u: fondo (mm)'; $('#hcYTit').textContent = fr ? 'Y desde abajo (mm)' : ap ? 'y: hacia atrás (mm)' : 'v: altura (mm)';
+  $('#filaHcDesde').querySelectorAll('label').forEach((l, i) => { l.firstChild.textContent = ap ? (i ? 'Hasta la altura (mm) ' : 'Desde la altura (mm) ') : (i ? 'Hasta x (mm) ' : 'Desde x (mm) '); });
 }
 function borrarHueco(k) {
   if (k == null || k < 0 || !P.huecos[k]) return;
   P.huecos.splice(k, 1); UI.hueco = Math.min(k, P.huecos.length - 1); cambio('Hueco H' + (k + 1) + ' borrado');
 }
 function refrescarHuecos() {
-  const ok = ['pared', 'costillas', 'reticula'].includes(P.tipo);
+  const ok = ['pared', 'costillas', 'reticula', 'apilado'].includes(P.tipo);
+  $$('.soloApilado').forEach(el => el.classList.toggle('oculto', P.tipo !== 'apilado'));
   $('#secHuecos').classList.toggle('oculto', !ok); $('#bVistaHuecos').classList.toggle('oculto', !ok); $('#bHuecoTexto').classList.toggle('oculto', P.tipo !== 'pared');
   if (!ok && UI.vistaHuecos) verHuecos(false);
   P.huecos = P.huecos || [];
@@ -4324,6 +4654,13 @@ function refrescarHuecos() {
   P.huecos.forEach((h, k) => {
     const li = document.createElement('li'); li.className = k === UI.hueco ? 'sel' : '';
     const modo = h.modo === 'mueble' ? { balda: 'con balda', caja: 'con caja', armario: 'con armario' }[h.mueble.tipo] : (NOMBRE_MODO[h.modo] || h.modo) + (['saliente', 'hundido'].includes(h.modo) ? ' ' + fmt(h.relieve || 0) + ' mm' : '');
+    if (h.llave && P.tipo === 'apilado') {
+      const l = (R && R.llaves || []).find(o => o.h === h || o.h.id === h.id);
+      li.innerHTML = `<span><b>L${k + 1}</b> Llave ${nombreLlave(h)} · ${fmt(h.ancho)} × ${fmt(h.alto)}${giraHueco(h) ? ' · ' + fmt(h.giro) + '°' : ''} · ${l && l.k0 >= 0 ? `capas ${l.k0 + 1}–${l.k1 + 1}` : '<i>no cabe</i>'}${h.activo === false ? ' <i>(apagada)</i>' : ''}</span><button class="quitarHueco" title="Borrar esta llave">🗑</button>`;
+      li.onclick = () => { UI.hueco = k; refrescarHuecos(); if (VH) VH.pintar(); };
+      li.querySelector('.quitarHueco').onclick = ev => { ev.stopPropagation(); borrarHueco(k); };
+      ul.appendChild(li); return;
+    }
     li.innerHTML = `<span><b>H${k + 1}</b> ${h.forma === 'texto' ? '«' + esc(String(h.texto || '').replace(/\n/g, ' ').slice(0, 18)) + '»' : NOMBRE_FORMA[h.forma]} · ${fmt(h.ancho)} × ${fmt(h.alto)}${giraHueco(h) ? ' · ' + fmt(h.giro) + '°' : ''} · ${modo}${h.activo === false ? ' <i>(apagado)</i>' : ''}</span><button class="quitarHueco" title="Borrar este hueco">🗑</button>`;
     li.onclick = () => { UI.hueco = k; refrescarHuecos(); if (VH) VH.pintar(); };
     li.querySelector('.quitarHueco').onclick = ev => { ev.stopPropagation(); borrarHueco(k); };
@@ -4357,6 +4694,9 @@ function materialesTablero() {
   if (m.color) {
     cara = new T.MeshStandardMaterial({ color: P.costillas.color, roughness: .5 });
     canto = cara;
+  } else if (m.solido) {   // espumas (porex, XPS): color liso y mate
+    cara = new T.MeshStandardMaterial({ color: m.solido, roughness: .97 });
+    canto = new T.MeshStandardMaterial({ color: new T.Color(m.solido).multiplyScalar(.8), roughness: 1 });
   } else {
     const B = (window.TEXTURAS_PBR || {})[m.cara];
     const mmCara = B ? B.cm * 10 : (m.mm || 800), mmCanto = m.canto === 'alma_contrachapado' ? 48 : (m.mm || 800);
@@ -4491,7 +4831,7 @@ function construir3D() {
   limpiar(G.modelo); G.modelo.clear(); G.modelo.position.set(0, 0, 0);
   G.costillas = []; G.largueros = []; G.varillas = []; G.claves3d = [];
   if (G.montaje) pararMontaje();
-  if (P.tipo === 'plano') { construir3DPlano(); return; }
+  if (P.tipo === 'plano' || P.tipo === 'apilado') { construir3DPlano(); return; }
   const e = grosor(), mats = materialesTablero(), rh = radioAgujero(), V = P.varillas;
   // medidas del mueble montado
   const bb = new T.Box3(), cs = R.costillas.filter(c => c.ok);
@@ -4590,11 +4930,17 @@ function construir3DPlano() {
     m.userData = { i: c.i, x: c.x, plano: c.plano };
     G.modelo.add(m); G.costillas.push(m);
   });
+  // figura apilada: los listones de las llaves (de la primera a la última capa que atraviesan)
+  if (P.tipo === 'apilado') (R.llaves || []).forEach(l => {
+    if (l.k0 < 0) return;
+    const m = new T.Mesh(extruir(l.forma, [], 1), new T.MeshStandardMaterial({ color: '#9a6a3c', roughness: .7 })); m.castShadow = true;
+    m.userData = { extra: 'llave', k0: l.k0, k1: l.k1 }; G.modelo.add(m); G.largueros.push(m);
+  });
   const sz = bb.map(r => r[1] - r[0]);
   G.dims = [sz[0], sz[2], sz[1]]; G.alto = bb[1][1]; G.fondo = sz[2]; G.rmax = Math.max(sz[0], sz[2]) / 2;
   G.centro = bb.map(r => (r[0] + r[1]) / 2);
   const tam = Math.max(sz[0], sz[1], sz[2], 300); G.tam = tam;
-  colocarExplosion(); resaltar3D();
+  colocarExplosion(); resaltar3D(); if (P.tipo === 'apilado') construirFantasma();
   G.suelo.scale.set(tam * 5, tam * 5, 1); luces3D();
 }
 // coloca una pieza plana (con la explosión: cada pieza se aparta del centro siguiendo su normal; las horizontales, hacia arriba)
@@ -4740,7 +5086,7 @@ function construirVarillas3D() {
 function construirClaves3D() {
   (G.claves3d || []).forEach(l => { G.modelo.remove(l); l.geometry.dispose(); l.material.dispose(); });
   G.claves3d = [];
-  if (!P.vista.claves || formaCalculada() || P.tipo === 'plano') return;
+  if (!P.vista.claves || formaCalculada() || P.tipo === 'plano' || P.tipo === 'apilado') return;
   const C = clavesOrdenadas(), acento = cssVar('--acento') || '#1f6fd1';
   C.forEach((k, i) => {
     if (P.tipo === 'radial' && k.x >= 359.999 && C.length > 1) return;     // la de 360° es la misma que la de 0°
@@ -4757,7 +5103,17 @@ function construirClaves3D() {
 }
 function colocarExplosion() {
   const e = grosor(), ex = P.vista.explosion || 0;
-  if (P.tipo === 'plano') { G.costillas.forEach(m => { if (m) colocarPiezaPlana(m); }); pedirRender(); return; }
+  if (P.tipo === 'plano' || P.tipo === 'apilado') {
+    G.costillas.forEach(m => { if (m) colocarPiezaPlana(m); });
+    // las llaves van de la capa k0 a la k1 (también separadas, con la explosión)
+    G.largueros.forEach(m => {
+      if (m.userData.extra !== 'llave') return;
+      const yE = y => { const ctr = (G.centro || [0, 0, 0])[1], tam = G.tam || 600; return y + (ex ? (y - ctr) * ex * 1.3 + ex * tam * 0.6 : 0); };
+      const y0 = yE((m.userData.k0 + 0.5) * e) - e / 2, y1 = yE((m.userData.k1 + 0.5) * e) + e / 2;
+      m.matrixAutoUpdate = false; m.matrix.makeBasis(V3([1, 0, 0]), V3([0, 0, -1]), V3([0, y1 - y0, 0])).setPosition(0, (y0 + y1) / 2, 0); m.matrixWorldNeedsUpdate = true;
+    });
+    pedirRender(); return;
+  }
   G.costillas.forEach(m => { if (m) ponerEnMarco(m, marcoExpl(m.userData.x)); });
   G.largueros.forEach(m => {
     if (m.userData.modulo) return;
@@ -4772,6 +5128,15 @@ function colocarExplosion() {
 }
 function construirFantasma() {
   if (P.tipo === 'plano') { if (G.fantasma) { G.modelo.remove(G.fantasma); G.fantasma.geometry.dispose(); G.fantasma = null; } return; }
+  if (P.tipo === 'apilado') {   // el modelo 3D, transparente, a la altura de las capas
+    if (G.fantasma) { G.modelo.remove(G.fantasma); G.fantasma.geometry.dispose(); G.fantasma.material.dispose(); G.fantasma = null; }
+    if (!P.vista.fantasma || !apiladoActivo() || !R || !R.capas) return;
+    const m = mallaFigura(), n = m.C.length, k = R.capas * grosor() / (m.alto || 1), pos = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { pos[3 * i] = m.U[i]; pos[3 * i + 1] = m.C[i] * k; pos[3 * i + 2] = -m.V[i]; }
+    const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(pos, 3)); g.setIndex(new T.BufferAttribute(new Uint32Array(m.F), 1)); g.computeVertexNormals();
+    G.fantasma = new T.Mesh(g, new T.MeshStandardMaterial({ color: '#4c95ee', transparent: true, opacity: .2, side: T.DoubleSide, depthWrite: false, roughness: .4 }));
+    G.modelo.add(G.fantasma); return;
+  }
   if (figuraActiva()) { if (G.fantasma) { G.modelo.remove(G.fantasma); G.fantasma.geometry.dispose(); G.fantasma = null; } return; }
   if (G.fantasma) { G.modelo.remove(G.fantasma); G.fantasma.geometry.dispose(); G.fantasma.material.dispose(); G.fantasma = null; }
   if (!P.vista.fantasma) return;
@@ -4794,7 +5159,7 @@ function construirFantasma() {
 function resaltar3D() {
   const base = materialesTablero();
   [...G.costillas, ...G.largueros].forEach(m => {
-    if (!m) return;
+    if (!m || m.userData.extra === 'llave') return;
     const sel = P.vista.resalta && m.userData.i === UI.costilla;
     if (sel) { if (!m.userData.matSel) m.userData.matSel = materialSel(base); m.material = m.userData.matSel; }
     else m.material = base;
@@ -4824,6 +5189,7 @@ let tRecalc = 0;
 // recalcula costillas y lo dibuja todo
 function recalcular() {
   R = calcular();
+  if (llavesTrasCalcular()) { R = calcular(); refrescarHuecos(); }
   UI.costilla = clamp(UI.costilla, 0, nPiezas() - 1);
   if (UI.varilla >= P.varillas.lista.length) UI.varilla = -1;
   construir3D();
@@ -4883,6 +5249,7 @@ function iniciarPanel() {
     if (P.editado && !confirm('Se perderán los retoques hechos a mano en los perfiles. ¿Cambiar de plantilla?')) { sp.value = P.plantilla; return; }
     P.plantilla = sp.value; P.params = paramsDefecto(sp.value); P.nombre = PLANTILLAS[sp.value].nombre;
     aplicarPlantilla(); UI.clave = 0;
+    if (P.tipo === 'apilado') { ajustesApilado(sp.value); ponerControles(); }
     if (P.tipo === 'costillas') { R = calcular(); autoVarillas(P.varillas.autoN); }
     construirParams(); cambio('Plantilla: ' + PLANTILLAS[sp.value].nombre);
     encuadrarSiHaceFalta(); camara('tres4');
@@ -4895,7 +5262,7 @@ function iniciarPanel() {
     const v = $('#cGrosor').value; $('#filaGrosorOtro').classList.toggle('oculto', v !== 'otro');
     P.costillas.grosor = v === 'otro' ? +$('#cGrosorOtro').value : +v; if (esPlano() && !P.editado) aplicarPlantilla(); cambio('Grosor ' + P.costillas.grosor + ' mm');
   });
-  enlazar('#cGrosorOtro', () => { P.costillas.grosor = clamp(+$('#cGrosorOtro').value || 18, 3, 80); if (esPlano() && !P.editado) aplicarPlantilla(); cambio('Grosor ' + P.costillas.grosor + ' mm'); });
+  enlazar('#cGrosorOtro', () => { P.costillas.grosor = clamp(+$('#cGrosorOtro').value || 18, 1, 200); if (esPlano() && !P.editado) aplicarPlantilla(); cambio('Grosor ' + P.costillas.grosor + ' mm'); });
   enlazar('#cModo', () => {
     P.costillas.modo = $('#cModo').value;
     // conserva el reparto actual al cambiar de modo
@@ -4965,7 +5332,10 @@ function iniciarPanel() {
     if (P.tipo === 'costillas' && !P.varillas.lista.length) autoVarillas(P.varillas.autoN);
     UI.costilla = 0; ponerControles();
     if (P.tipo === 'plano' && !planoP().piezas.length) aplicarPlantilla();
-    cambio({ costillas: 'Costillas con varillas', reticula: 'Retícula entrelazada', radial: 'Rebanadas radiales', pared: 'Panel de pared', plano: 'Piezas planas' }[P.tipo]);
+    UI.fab = null;
+    if (P.tipo === 'apilado') { ajustesApilado(P.plantilla); R = calcular(); ponerControles(); }
+    cambio({ costillas: 'Costillas con varillas', reticula: 'Retícula entrelazada', radial: 'Rebanadas radiales', pared: 'Panel de pared', plano: 'Piezas planas', apilado: 'Figura apilada' }[P.tipo]);
+    if (P.tipo === 'apilado') verHuecos(true);
     encuadrarSiHaceFalta(); camara('tres4');
   });
   // relieve: texto o modelo 3D
@@ -5016,7 +5386,7 @@ function iniciarPanel() {
   // figura desde un modelo 3D (costillas y retícula)
   const Fg = () => P.figura;
   const reFigura = (txt) => { R = calcular(); if (P.tipo === 'costillas') autoVarillas(P.varillas.autoN); ponerControles(); cambio(txt); encuadrarSiHaceFalta(); encuadrarPerfil(); camara('tres4'); };
-  enlazar('#fgAlto', () => { Fg().alto = clamp(+$('#fgAlto').value || 800, 100, 5000); reFigura('Alto de la figura'); });
+  enlazar('#fgAlto', () => { Fg().alto = clamp(+$('#fgAlto').value || 800, esApilado() ? 20 : 100, 5000); if (esApilado() && P.params) { P.params.alto = Fg().alto; construirParams(); } reFigura('Alto de la figura'); });
   enlazar('#fgEje', () => { Fg().eje = $('#fgEje').value; reFigura(Fg().eje === 'z' ? 'Cortes de delante a atrás' : 'Cortes de lado a lado'); });
   enlazar('#fgUnir', () => { Fg().unir = $('#fgUnir').checked; CACHE_SEC.clave = ''; reFigura(Fg().unir ? 'Unir trozos sueltos' : 'Solo el trozo mayor'); });
   enlazar('#fgMin', () => { Fg().minArea = clamp(+$('#fgMin').value || 0, 0, 60); reFigura('Costillas pequeñas'); });
@@ -5034,6 +5404,24 @@ function iniciarPanel() {
   };
   $('#bFigEjemplo').onclick = () => dialogoModelos(true);
   $('#bConvertirPerfiles').onclick = dialogoConvertir;
+  // figura apilada: capas y llaves
+  const Ap = () => apiladoP();
+  enlazar('#apCorte', () => { Ap().corte = $('#apCorte').value; cambio('Capas cortadas ' + NOMBRE_CORTE[Ap().corte]); });
+  enlazar('#apMin', () => { Ap().minArea = Math.max(0, +$('#apMin').value || 0); cambio('Trozos de menos de ' + fmt(Ap().minArea) + ' mm² fuera'); });
+  enlazar('#apLado', () => { Ap().lado = clamp(+$('#apLado').value || 8, 2, 500); });
+  enlazar('#apHolgura', () => { Ap().holgura = clamp(+$('#apHolgura').value || 0, 0, 5); cambio('Holgura de las llaves ' + fmt(Ap().holgura, 2) + ' mm'); });
+  enlazar('#apMargen', () => { Ap().margen = clamp(+$('#apMargen').value || 0, 0, 200); cambio('Material alrededor de las llaves ' + fmt(Ap().margen, 1) + ' mm'); });
+  enlazar('#apGrabar', () => { Ap().grabar = $('#apGrabar').checked; cambio(Ap().grabar ? 'Con el contorno de la capa de encima grabado' : 'Sin grabar el contorno de encima'); });
+  enlazar('#apHilo', () => { Ap().hilo = $('#apHilo').checked; cambio(Ap().hilo ? 'Con entrada del hilo a los huecos' : 'Sin entrada del hilo'); });
+  enlazar('#apAnchoHilo', () => { Ap().anchoHilo = clamp(+$('#apAnchoHilo').value || 1, 0.2, 5); cambio('Corte del hilo de ' + fmt(Ap().anchoHilo, 1) + ' mm'); });
+  const llave = f => { if (!window.ClipperLib) { aviso('⚠ Falta assets/js/clipper.js'); return; } P.huecos = P.huecos || []; P.huecos.push(llaveNueva(f)); UI.hueco = P.huecos.length - 1; cambio(f === 'tri' ? 'Llave triangular' : 'Llave cuadrada'); verHuecos(true); };
+  $('#bLlaveCuad').onclick = () => llave('cuad'); $('#bLlaveTri').onclick = () => llave('tri');
+  $('#bLlavesAuto').onclick = () => {
+    const n = colocarLlavesAuto();
+    if (!n) { aviso('No hay sitio común para las llaves: baja su lado o el material alrededor.', 5000); return; }
+    UI.hueco = P.huecos.length - 1; cambio(n === 1 ? 'Solo cabe una llave' : 'Llaves colocadas'); verHuecos(true);
+    if (n === 1) aviso('Solo cabe una llave: la zona común a las capas es pequeña.');
+  };
   $('#bSimplificar').onclick = dialogoSimplificar;
   $('#bPerfilDXF').onclick = dialogoPerfilDXF;
   $$('.bLetra').forEach(bt => bt.onclick = () => {
@@ -5163,36 +5551,38 @@ function llenarPlantillas() {
 }
 // enseña los apartados de cada tipo de mueble
 function mostrarSecciones(forzarFigura) {
-  const t = P.tipo;
+  const t = P.tipo, ap = t === 'apilado';
   $('#secVarillas').classList.toggle('oculto', t !== 'costillas');
   $('#secReticula').classList.toggle('oculto', t !== 'reticula');
   $('#secPlanta').classList.toggle('oculto', t !== 'costillas');
+  $('#secApilado').classList.toggle('oculto', !ap); $('#secMaqueta').classList.toggle('oculto', ap);
+  ['#filaFgEje', '#filaFgMin', '#filaFgUnir'].forEach(s => $(s).classList.toggle('oculto', ap));
   $('#secRadial').classList.toggle('oculto', t !== 'radial');
   $('#secPared').classList.toggle('oculto', t !== 'pared');
   const pl = t === 'plano';
   $('#secPlano').classList.toggle('oculto', !pl); $('#secPiezas').classList.toggle('oculto', !pl);
   $('#bMontaje').classList.toggle('oculto', !pl);
-  ['#cVarillas3d', '#cClaves3d', '#cFantasma'].forEach(s => $(s).closest('label').classList.toggle('oculto', pl));
-  $('#titCostillas').textContent = pl ? 'Tablero' : t === 'pared' ? 'Lamas' : 'Costillas';
-  $('#titLista').textContent = pl ? 'Piezas' : t === 'pared' ? 'Lamas' : 'Costillas';
-  ['#cBase', '#cTope'].forEach(s => $(s).closest('label').classList.toggle('oculto', pl)); $('#resCost').classList.toggle('oculto', pl);
+  ['#cVarillas3d', '#cClaves3d', '#cFantasma'].forEach(s => $(s).closest('label').classList.toggle('oculto', pl || (ap && s !== '#cFantasma')));
+  $('#titCostillas').textContent = pl ? 'Tablero' : ap ? 'Tablero o plancha' : t === 'pared' ? 'Lamas' : 'Costillas';
+  $('#titLista').textContent = pl ? 'Piezas' : ap ? 'Capas' : t === 'pared' ? 'Lamas' : 'Costillas';
+  ['#cBase', '#cTope'].forEach(s => $(s).closest('label').classList.toggle('oculto', pl || ap)); $('#resCost').classList.toggle('oculto', pl || ap);
   $$('.filaArco').forEach(f => f.classList.toggle('oculto', P.planta.forma !== 'arco'));
   $$('.filaS').forEach(f => f.classList.toggle('oculto', P.planta.forma !== 's'));
   const rad = t === 'radial';
-  $('#cModo').closest('label').classList.toggle('oculto', rad || pl);
-  $('#filaSep').classList.toggle('oculto', rad || pl || P.costillas.modo !== 'separacion');
-  $('#filaNum').classList.toggle('oculto', rad || pl || P.costillas.modo !== 'numero');
-  if (pl) $('#filaTope').classList.add('oculto');
+  $('#cModo').closest('label').classList.toggle('oculto', rad || pl || ap);
+  $('#filaSep').classList.toggle('oculto', rad || pl || ap || P.costillas.modo !== 'separacion');
+  $('#filaNum').classList.toggle('oculto', rad || pl || ap || P.costillas.modo !== 'numero');
+  if (pl || ap) $('#filaTope').classList.add('oculto');
   $('#kPosTit').textContent = rad ? 'Posición (°)' : 'Posición (mm)';
   // relieve (paneles de pared)
-  const rel = relieveActivo(), fig = figuraActiva() || (!!forzarFigura && t !== 'pared' && t !== 'radial'), calc = !!(rel || fig), Rl = P.relieve;
-  $('#filaOrigen').classList.toggle('oculto', t === 'radial' || pl);
+  const rel = relieveActivo(), fig = figuraActiva() || ap || (!!forzarFigura && t !== 'pared' && t !== 'radial'), calc = !!(rel || (fig && !ap)), Rl = P.relieve;
+  $('#filaOrigen').classList.toggle('oculto', t === 'radial' || pl || ap);
   [...$('#sOrigen').options].forEach(o => { o.hidden = t === 'pared' ? o.value === 'figura' : !['plantilla', 'figura'].includes(o.value); });
   $('#filaPlantilla').classList.toggle('oculto', calc); $('#bPlantillaFotos').classList.toggle('oculto', calc); $('#params').classList.toggle('oculto', calc); $('#descPlantilla').classList.toggle('oculto', calc);
   $('#secRelieve').classList.toggle('oculto', !rel); $('#secFigura').classList.toggle('oculto', !fig); $('#bConvertirPerfiles').classList.toggle('oculto', !(rel || figuraActiva()));
   $('#relTexto').classList.toggle('oculto', Rl.fuente !== 'texto'); $('#relModelo').classList.toggle('oculto', Rl.fuente !== 'modelo'); $('#relImagen').classList.toggle('oculto', Rl.fuente !== 'imagen');
-  $('#secClaves').classList.toggle('oculto', calc || pl);
-  $('#sClave').classList.toggle('oculto', calc || pl); $('#bEsquina').classList.toggle('oculto', calc); $('#infoClave').classList.toggle('oculto', calc || pl);
+  $('#secClaves').classList.toggle('oculto', calc || pl || ap);
+  $('#sClave').classList.toggle('oculto', calc || pl || ap); $('#bEsquina').classList.toggle('oculto', calc || ap); $('#infoClave').classList.toggle('oculto', calc || pl || ap);
 }
 // campos de «Partir las lamas» (se enseñan los que hacen falta)
 function ponerPartir() {
@@ -5238,6 +5628,11 @@ function ponerControles() {
   const Fg = P.figura; $('#fgAlto').value = Fg.alto; $('#fgEje').value = Fg.eje; $('#fgGiro').value = String(Fg.giro || 0); $('#fgMin').value = Fg.minArea; $('#fgUnir').checked = Fg.unir !== false;
   $('#fgInfo').textContent = Fg.malla ? `Modelo: ${Fg.malla.nombre} (${Fg.malla.nt.toLocaleString('es-ES')} triángulos${Fg.malla.original > Fg.malla.nt ? ', reducido de ' + Fg.malla.original.toLocaleString('es-ES') : ''}).` + (figuraActiva() ? ` La figura mide ${fmt(mallaFigura().largo)} × ${fmt(mallaFigura().ancho)} × ${fmt(mallaFigura().alto)} mm.` : '') : 'Sin modelo. Carga un STL u OBJ: cada costilla será un corte de verdad del modelo.';
   const Rl = P.relieve; $('#sOrigen').value = P.tipo === 'pared' ? Rl.fuente : (figuraActiva() ? 'figura' : 'plantilla'); $('#paOrient').value = Rl.orient || 'v';
+  { const A = apiladoP(); $('#apCorte').value = A.corte; $('#apMin').value = A.minArea; $('#apLado').value = A.lado; $('#apHolgura').value = A.holgura; $('#apMargen').value = A.margen;
+    $('#apGrabar').checked = !!A.grabar; $('#apHilo').checked = !!A.hilo; $('#apAnchoHilo').value = A.anchoHilo; $('#filaApHilo').classList.toggle('oculto', !A.hilo);
+    if (esApilado()) { const m = apiladoActivo() ? mallaFigura() : null, nL = (R && R.llaves || []).filter(l => l.k0 >= 0).length;
+      $('#apInfo').innerHTML = m ? `<b>${R ? R.capas : 0}</b> capas de <b>${fmt(grosor(), 1)}</b> mm · <b>${R ? R.n : 0}</b> piezas · figura de ${fmt(m.ancho)} × ${fmt(m.fondo)} × ${fmt(m.alto)} mm · <b>${nL}</b> llave${nL === 1 ? '' : 's'}` : 'Sin modelo: carga uno en «Figura (modelo 3D)».';
+      if (m) $('#fgInfo').textContent = `Modelo: ${P.figura.malla.nombre} (${P.figura.malla.nt.toLocaleString('es-ES')} triángulos). La figura mide ${fmt(m.ancho)} × ${fmt(m.fondo)} × ${fmt(m.alto)} mm (ancho × fondo × alto).`; } }
   $('#rlTexto').value = Rl.texto; $('#rlLetra').value = Rl.letra; $('#rlNegrita').checked = Rl.negrita; $('#rlTam').value = Rl.tamLetra; $('#rlInter').value = Rl.interlinea;
   $('#rlVista').value = Rl.vista; $('#rlGiro').value = String(Rl.giro || 0); $('#rlBase').value = Rl.base;
   $('#rlAncho').value = Rl.ancho; $('#rlAlto').value = Rl.alto; $('#rlFondo').value = Rl.fondo; $('#rlRelieve').value = Rl.relieve; $('#rlSuave').value = Rl.suavizado; $('#rlInvertir').checked = Rl.invertir; $('#rlOnda').value = Rl.ondaAmp; $('#rlOndas').value = Rl.ondas;
@@ -5312,10 +5707,11 @@ function refrescarListas() {
   const cm = calcularCompra(), largoV = cm.varillas.reduce((a, v) => a + v.largo, 0);
   $('#resumen').innerHTML = `<table>
     <tr><td>Medidas totales</td><td>${(G.dims || [0, 0, 0]).map(v => fmt(v)).join(' × ')} mm</td></tr>
-    <tr><td>${esPlano() ? 'Piezas' : P.tipo === 'pared' ? 'Lamas' : 'Costillas'}</td><td>${R.n} de ${fmt(grosor(), 1)} mm</td></tr>
+    <tr><td>${esPlano() ? 'Piezas' : esApilado() ? 'Capas' : P.tipo === 'pared' ? 'Lamas' : 'Costillas'}</td><td>${esApilado() ? `${R.capas} de ${fmt(grosor(), 1)} mm (${R.n} piezas)` : `${R.n} de ${fmt(grosor(), 1)} mm`}</td></tr>
     <tr><td>Superficie de tablero</td><td>${fmt(cm.area / 1e6, 2)} m²</td></tr>
     <tr><td>Tableros ${fmt(cm.tablero[0])}×${fmt(cm.tablero[1])}</td><td>${cm.nTableros}</td></tr>
     ${esPlano() ? `<tr><td>Uniones a media madera</td><td>${R.uniones.filter(u => u.tipo === 'media').length}</td></tr><tr><td>Espigas en caja pasante</td><td>${R.uniones.filter(u => u.tipo === 'caja').length}</td></tr><tr><td>Ancho de ranuras y cajas</td><td>${fmt(grosor() + planoP().holgura, 2)} mm</td></tr>`
+    : esApilado() ? (R.llaves || []).filter(l => l.k0 >= 0).map(l => `<tr><td>Llave L${l.n} (${nombreLlave(l.h)})</td><td>${listonLlave(l)} × ${fmt(l.largo)} mm</td></tr>`).join('') + `<tr><td>Material</td><td>${esc(MATERIALES[P.costillas.material].nombre)}</td></tr>`
     : P.tipo === 'radial' ? `<tr><td>Tubo central</td><td>Ø ${fmt(P.radial.tubo)} mm</td></tr><tr><td>Discos de unión</td><td>${R.discos.length}</td></tr>`
     : P.tipo === 'pared' ? `<tr><td>Rastreles ${fmt(P.pared.alto)} × ${fmt(P.pared.grueso)}</td><td>${R.rastreles.length} de ${fmt(P.largo)} mm</td></tr>`
     : ret ? `<tr><td>Largueros</td><td>${R.largueros.length} de ${fmt(grosor(), 1)} mm</td></tr>
@@ -5471,6 +5867,13 @@ const TABLEROS = [
   { n: '2850 × 2070 (aglomerado / MDF)', a: 2850, h: 2070 },
   { n: '1220 × 1220 (medio tablero)', a: 1220, h: 1220 },
   { n: '1220 × 610 (cuarto de tablero)', a: 1220, h: 610 },
+  { n: '600 × 400 (láser)', a: 600, h: 400 },
+  { n: '900 × 600 (láser)', a: 900, h: 600 },
+  { n: '1000 × 500 (plancha de porex, EPS)', a: 1000, h: 500 },
+  { n: '1200 × 600 (plancha de porex, EPS)', a: 1200, h: 600 },
+  { n: '2000 × 1000 (bloque de porex, EPS)', a: 2000, h: 1000 },
+  { n: '1250 × 600 (poliestireno extruido, XPS)', a: 1250, h: 600 },
+  { n: '2500 × 600 (poliestireno extruido, XPS)', a: 2500, h: 600 },
 ];
 const TABLEROS_MAQ = [
   { n: '600 × 400 (láser)', a: 600, h: 400 },
@@ -5524,10 +5927,14 @@ function geoFab(c) {
     // agujeros [x, y, radio]: los de las varillas y los propios de la pieza (el tubo en los discos)
     agujeros: c.agujeros.map(j => [sx * P.varillas.lista[j][0] * k, P.varillas.lista[j][1] * k, radioFab()]).concat((c.huecos || []).map(h => [sx * h.x * k, h.y * k, h.r * k])).concat((c.taladros || []).map(t => [sx * t[0] * k, t[1] * k, t[2] * k, t[3] === 'ciego' && t[4] ? t[4] * k : 0, t[3] === 'ciego' && t[5] && t[5] !== caraArriba])),
     cantos: (c.cantos || []).map(q => ({ a: [sx * q.a[0] * k, q.a[1] * k], b: [sx * q.b[0] * k, q.b[1] * k], r: q.r * k })),
+    marcas: (c.marcas || []).map(l => l.map(p => [sx * p[0] * k, p[1] * k])),   // figura apilada: contorno de la capa de encima (a grabar)
     etiqueta: puntoEtiqueta(c).map((v, i) => (i ? 1 : sx) * v * k),
   };
 }
 function fabDefecto(maq) {
+  // figuras apiladas: la plancha de su plantilla (láser o porex)
+  const ap = !maq && P && P.tipo === 'apilado' && PLANTILLAS[P.plantilla] && PLANTILLAS[P.plantilla].ajustes;
+  if (ap && ap.fab) return Object.assign({ girar: true, modo: 'tableros', numeros: true }, ap.fab);
   return maq ? { ancho: 600, alto: 400, borde: 5, sep: 4, girar: true, modo: 'tableros', numeros: true }
              : { ancho: 2440, alto: 1220, borde: 10, sep: 12, girar: true, modo: 'tableros', numeros: true };
 }
@@ -5606,7 +6013,7 @@ function abrirFabricar() {
   const f = fabActual(), lista = enMaqueta() ? TABLEROS_MAQ : TABLEROS;
   const ops = lista.map(t => `<option value="${t.a}x${t.h}" ${t.a === f.ancho && t.h === f.alto ? 'selected' : ''}>${t.n}</option>`).join('');
   const maq = enMaqueta() ? `<div class="aviso-maq">Maqueta <b>1:${P.maqueta.escala}</b>: ${esPlano() ? 'piezas' : 'costillas'} a escala, tablero de ${fmt(P.maqueta.grosor, 1)} mm y ${P.tipo === 'costillas' ? `agujeros de Ø ${fmt(P.maqueta.diam + P.maqueta.holgura, 2)} mm` : `ranuras de ${fmt(P.maqueta.grosor + P.maqueta.holgura, 2)} mm`}. Para el mueble real, quita «Fabricar como maqueta» en el panel izquierdo.</div>` : '';
-  modal('🪚 Fabricar: ' + (esPlano() ? 'piezas' : P.tipo === 'pared' ? 'lamas' : 'costillas') + ' en tableros' + (enMaqueta() ? ' · maqueta 1:' + P.maqueta.escala : ''), `${maq}
+  modal('🪚 Fabricar: ' + (esPlano() ? 'piezas' : esApilado() ? 'capas' : P.tipo === 'pared' ? 'lamas' : 'costillas') + ((MATERIALES[P.costillas.material] || {}).espuma ? ' en planchas' : ' en tableros') + (enMaqueta() ? ' · maqueta 1:' + P.maqueta.escala : ''), `${maq}
     <div class="fab">
       <div class="opc">
         <label class="fila">Colocación <select id="fModo"><option value="tableros">En tableros</option><option value="fila">En fila (sin tablero)</option></select></label>
@@ -5624,7 +6031,7 @@ function abrirFabricar() {
         <label class="fila chk" title="El contorno sale en rectas y arcos (G01, G02, G03) en vez de muchos tramos rectos"><input type="checkbox" id="fArcos" ${P.cnc.arcos ? 'checked' : ''}> Contornos con arcos</label>
         <label class="fila" title="Lo que se puede separar el arco de la curva original">Tolerancia de los arcos (mm) <input type="number" id="fTol" value="${P.cnc.tolArco}" min="0.005" max="1" step="0.01"></label>
         <div class="info" id="fInfo"></div>
-        <p class="nota" style="margin-top:10px">El DXF lleva las capas <b>CORTE</b> (contornos, con las ranuras), <b>TALADROS</b> (agujeros de las varillas), <b>GRABADO</b> (números) y <b>TABLERO</b> (borde del tablero); los taladros ciegos van en capas <b>CIEGO_…MM</b> con su profundidad y los taladros de canto de los herrajes, como una raya en la capa <b>CANTO</b> (se hacen a mano).</p>
+        <p class="nota" style="margin-top:10px">El DXF lleva las capas <b>CORTE</b> (contornos, con las ranuras), <b>TALADROS</b> (agujeros de las varillas), <b>GRABADO</b> (números${esApilado() ? ' y el contorno de la capa de encima' : ''}) y <b>TABLERO</b> (borde del tablero); los taladros ciegos van en capas <b>CIEGO_…MM</b> con su profundidad y los taladros de canto de los herrajes, como una raya en la capa <b>CANTO</b> (se hacen a mano).</p>
         <p class="nota">Esta colocación usa el rectángulo de cada costilla. Para encajarlas por su forma real, usa <b>🧩 Anidador</b>.</p>
       </div>
       <div><canvas id="fPrev" width="900" height="520"></canvas></div>
@@ -5731,7 +6138,7 @@ function previsualizarFab() {
     if (fr && (P.tipo === 'reticula' || esPlano()) && fr > anchoR - 0.2) info.push(`<span style="color:var(--peligro)">La fresa de Ø ${fmt(fr, 1)} mm no cabe en las ranuras de ${fmt(anchoR, 2)} mm.</span>`);
   }
   if (P.cnc.arcos && ps.length) { const p0 = ps[0], cc = contornoCNC(p0.g.poly); info.push(`Contornos con arcos: la ${esc(p0.c.nombre.toLowerCase())} pasa de ${p0.g.poly.length} puntos a ${cc.pts.length} tramos (${cc.b.filter(v => v).length} arcos).`); }
-  info.push(P.tipo === 'reticula' || esPlano() ? `Ranuras${esPlano() ? ' y cajas' : ''} de ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm · grosor del tablero ${fmt(grosorFab(), 1)} mm.` : `Agujeros: Ø ${fmt(2 * radioFab(), 2)} mm · grosor del tablero ${fmt(grosorFab(), 1)} mm.`);
+  info.push(esApilado() ? `${R.capas} capas de ${fmt(grosorFab(), 1)} mm · huecos de las llaves con ${fmt(apiladoP().holgura, 2)} mm de holgura${apiladoP().hilo ? ' · con entrada del hilo' : ''}${apiladoP().grabar ? ' · el contorno de la capa de encima, en GRABADO' : ''}.` : P.tipo === 'reticula' || esPlano() ? `Ranuras${esPlano() ? ' y cajas' : ''} de ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm · grosor del tablero ${fmt(grosorFab(), 1)} mm.` : `Agujeros: Ø ${fmt(2 * radioFab(), 2)} mm · grosor del tablero ${fmt(grosorFab(), 1)} mm.`);
   $('#fInfo').innerHTML = info.join('<br>');
 }
 
@@ -5766,6 +6173,7 @@ function dxf() {
       poli('CORTE', cc.pts.map(p => { const q = aTablero(pz, p); return [ox + q[0], q[1]]; }), cc.b);
       (pz.g.cantos || []).forEach(m => { const a = aTablero(pz, m.a), b = aTablero(pz, m.b); g(0, 'LINE'); g(8, 'CANTO'); g(10, n(ox + a[0])); g(20, n(a[1])); g(30, 0); g(11, n(ox + b[0])); g(21, n(b[1])); g(31, 0); });
       pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); g(0, 'CIRCLE'); g(8, a[3] ? capaA(a) : 'TALADROS'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(a[2])); });
+      (pz.g.marcas || []).forEach(l => { g(0, 'POLYLINE'); g(8, 'GRABADO'); g(66, 1); g(10, 0); g(20, 0); g(30, 0); g(70, 0); l.forEach(p => { const q = aTablero(pz, p); g(0, 'VERTEX'); g(8, 'GRABADO'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); }); g(0, 'SEQEND'); g(8, 'GRABADO'); });
       if (f.numeros) {
         const q = aTablero(pz, pz.g.etiqueta), h = altoTexto(pz.g);
         g(0, 'TEXT'); g(8, 'GRABADO'); g(10, n(ox + q[0])); g(20, n(q[1])); g(30, 0); g(40, n(h)); g(1, pz.c.etq); g(72, 1); g(11, n(ox + q[0])); g(21, n(q[1] - h / 2)); g(31, 0);
@@ -5776,7 +6184,7 @@ function dxf() {
   return out.join('\r\n') + '\r\n';
 }
 const sufijoFab = () => enMaqueta() ? '_maqueta_1-' + P.maqueta.escala : '';
-function exportarDXF() { descargar(nombreArchivo(P.nombre) + '_costillas' + sufijoFab() + '.dxf', dxf(), 'application/dxf'); aviso('DXF guardado'); }
+function exportarDXF() { descargar(nombreArchivo(P.nombre) + (esApilado() ? '_capas' : '_costillas') + sufijoFab() + '.dxf', dxf(), 'application/dxf'); aviso('DXF guardado'); }
 
 function svg() {
   const f = fabActual(), col = colocarEnTableros(f);
@@ -5803,6 +6211,7 @@ function svg() {
         d += ' Z';
       });
       partes.push(`<path d="${d}" fill="none" stroke="#000" stroke-width="0.2"/>`);
+      (pz.g.marcas || []).forEach(l => partes.push(`<polyline points="${l.map(p => { const q = aTablero(pz, p); return n(ox + q[0]) + ',' + n(Y(q[1])); }).join(' ')}" fill="none" stroke="#00f" stroke-width="0.2"/>`));
       pz.g.agujeros.forEach(a => { const q = aTablero(pz, a); partes.push(`<circle cx="${n(ox + q[0])}" cy="${n(Y(q[1]))}" r="${n(a[2])}" fill="none" stroke="#d00" stroke-width="0.2"/>`); });
       if (f.numeros) { const q = aTablero(pz, pz.g.etiqueta); partes.push(`<text x="${n(ox + q[0])}" y="${n(Y(q[1]))}" font-family="Arial" font-size="${n(altoTexto(pz.g))}" text-anchor="middle" dominant-baseline="middle" fill="#00f">${pz.c.etq}</text>`); }
     });
@@ -5843,7 +6252,15 @@ function listaCompra() {
         `${nT} tablero${nT === 1 ? '' : 's'} de ${fmt(cm.tablero[0])} × ${fmt(cm.tablero[1])} mm`]);
     });
     L.push(['Superficie de las piezas', `${fmt(cm.area / 1e6, 2)} m² en total`]);
-  } else L.push([tablero, `${cm.nTableros} tablero${cm.nTableros === 1 ? '' : 's'} de ${fmt(cm.tablero[0])} × ${fmt(cm.tablero[1])} mm (${maq ? fmt(cm.area / 100, 0) + ' cm²' : fmt(cm.area / 1e6, 2) + ' m²'} de piezas)`]);
+  } else L.push([tablero, `${cm.nTableros} ${(MATERIALES[P.costillas.material] || {}).espuma ? 'plancha' : 'tablero'}${cm.nTableros === 1 ? '' : 's'} de ${fmt(cm.tablero[0])} × ${fmt(cm.tablero[1])} mm (${maq ? fmt(cm.area / 100, 0) + ' cm²' : fmt(cm.area / 1e6, 2) + ' m²'} de piezas)`]);
+  if (esApilado()) {
+    const A = apiladoP(), esp = !!(MATERIALES[P.costillas.material] || {}).espuma;
+    L.push(['Piezas', `${R.n} en ${R.capas} capas de ${fmt(grosorFab(), 1)} mm (numeradas desde abajo)`]);
+    (R.llaves || []).filter(l => l.k0 >= 0).forEach(l => L.push([`Llave L${l.n}: listón ${listonLlave(l)}`, `${fmt(l.largo)} mm${esp ? ', del mismo porex' : ', de pino o haya'}`]));
+    L.push(esp ? ['Cola sin disolventes (cola blanca o para poliestireno)', 'los disolventes deshacen el porex'] : ['Cola blanca', 'capa fina; peso encima al secar']);
+    L.push(esp ? ['Lija gruesa o escofina, masilla, imprimación y pintura al agua', 'para el acabado'] : ['Lija fina', 'o deja los escalones a la vista']);
+    return L;
+  }
   if (esPlano()) {
     const nSo = R.uniones.filter(u => u.tipo === 'solape').length;
     L.push(['Piezas', `${R.costillas.filter(c => c.ok).length}, con ${R.uniones.filter(u => u.tipo === 'media').length} uniones a media madera, ${R.uniones.filter(u => u.tipo === 'caja').length} espigas en caja pasante` + (nSo ? `, ${nSo} solapes` : '') + (R.uniones.some(u => u.tipo === 'dentada') ? ` y ${R.uniones.filter(u => u.tipo === 'dentada').length} uniones dentadas` : '')]);
@@ -6060,8 +6477,8 @@ function planoPDF(F = null) {   // F: opciones de la ficha de práctica (enuncia
     filas.forEach((f, i) => {
       if (f.titulo) { D.texto(x, y + alto * 0.75, f.titulo, { pt: 9.5, b: true, col: azul }); y += alto + 0.6; return; }
       const yy = D.parrafo(x, y + alto * 0.72, c1 - 2, f[0], { pt: 8.5 });
-      D.parrafo(x + c1, y + alto * 0.72, ancho - c1, f[1], { pt: 8.5, b: true });
-      const h = Math.max(alto, yy - y - alto * 0.72 + alto);
+      const yy2 = D.parrafo(x + c1, y + alto * 0.72, ancho - c1, f[1], { pt: 8.5, b: true });
+      const h = Math.max(alto, Math.max(yy, yy2) - y - alto * 0.72 + alto);   // la fila crece con la columna más larga
       D.trazo([225, 225, 225]).grosor(0.2).linea(x, y + h, x + ancho, y + h).trazo();
       y += h;
     });
@@ -6087,6 +6504,14 @@ function planoPDF(F = null) {   // F: opciones de la ficha de práctica (enuncia
     ...(R.uniones.some(u => u.tipo === 'herraje') ? [['Uniones con herraje', `${R.uniones.filter(u => u.tipo === 'herraje').length} a tope, ${R.uniones.reduce((s, u) => s + (u.tipo === 'herraje' ? u.puntos.length : 0), 0)} × ${NOMBRE_HERRAJE[planoP().herraje] || 'herraje'}`]] : []),
     ['Ancho de ranuras y cajas', `${fmt(grosorFab() + holguraRanuraFab(), 2)} mm`],
     ...(planoP().flexion !== false ? analisisFlexion(R).slice(0, 4).map(c => [`Flexión: ${c.lamas ? 'lamas del asiento' : c.asiento ? 'asiento' : c.H.nombre.toLowerCase()}`, `${fmt(c.flecha, 1)} mm (máx. ${fmt(c.lim, 1)}) con ${c.carga.replace('²', '2')}`]) : []),
+  ]) : esApilado() ? tabla(x2, M + 18, a2, [
+    { titulo: 'Datos' },
+    ['Medidas (ancho × fondo × alto)', `${fmt((G.dims || [0])[0])} × ${fmt(fondo)} × ${fmt(alto)} mm`],
+    ['Capas', `${R.capas} de ${fmt(e, 1)} mm, en ${R.n} piezas`],
+    ['Corte de las capas', NOMBRE_CORTE[apiladoP().corte] || ''],
+    ['Material', MATERIALES[P.costillas.material].nombre],
+    ['Modelo 3D', P.figura.malla ? P.figura.malla.nombre : '—'],
+    ['Llaves de alineación', `${(R.llaves || []).filter(l => l.k0 >= 0).length} (hoja 2), huecos con ${fmt(apiladoP().holgura, 2)} mm de holgura`],
   ]) : tabla(x2, M + 18, a2, [
     { titulo: 'Datos' },
     ['Medidas (largo × fondo × alto)', `${fmt(P.largo * k)} × ${fmt(fondo * k)} × ${fmt(alto * k)} mm`],
@@ -6110,6 +6535,7 @@ function planoPDF(F = null) {   // F: opciones de la ficha de práctica (enuncia
   else if (ret) hojaReticula(D, cabecera, tabla, oH);
   else if (P.tipo === 'radial') hojaRadial(D, cabecera, tabla, oH);
   else if (P.tipo === 'pared') hojaPared(D, cabecera, tabla, oH);
+  else if (esApilado()) hojaApilado(D, cabecera, tabla, oH);
   else if (disposicion() === 'curva') hojaCurva(D, cabecera, tabla, oH);
   else {
   // ---- hoja 2: vista lateral (orden de montaje) y perfil con las varillas ----
@@ -6169,7 +6595,7 @@ function planoPDF(F = null) {   // F: opciones de la ficha de práctica (enuncia
   const mw = Math.max(...csP.map(c => c.caja.w)), mh = Math.max(...csP.map(c => c.caja.h));
   const s3 = Math.min((cw - 10) / mw, (ch - 16) / mh);
   for (let h0 = 0; h0 < csP.length; h0 += porHoja) {
-    cabecera(`3. ${esPlano() ? 'Piezas' : P.tipo === 'pared' ? 'Lamas' : 'Costillas'} ${csP[h0].etq} a ${csP[Math.min(csP.length, h0 + porHoja) - 1].etq} (todas a la misma escala, 1:${fmt(k / s3, 0)} aprox.)`);
+    cabecera(`3. ${esPlano() ? 'Piezas' : esApilado() ? 'Capas' : P.tipo === 'pared' ? 'Lamas' : 'Costillas'} ${csP[h0].etq} a ${csP[Math.min(csP.length, h0 + porHoja) - 1].etq} (todas a la misma escala, 1:${fmt(k / s3, 0)} aprox.)${esApilado() && apiladoP().grabar ? ' · en azul, el contorno de la capa de encima (se graba)' : ''}`);
     csP.slice(h0, h0 + porHoja).forEach((c, j) => {
       const g = geoFab(c), cx = M + (j % cols) * cw, cy = M + 18 + Math.floor(j / cols) * ch;
       D.trazo([225, 225, 225]).grosor(0.2).rect(cx + 1, cy + 1, cw - 2, ch - 2);
@@ -6181,12 +6607,14 @@ function planoPDF(F = null) {   // F: opciones de la ficha de práctica (enuncia
       c.agujeros.forEach(j2 => D.circulo(PX(V.lista[j2][0]), PY(V.lista[j2][1]), Math.max(0.6, radioAgujero() * s3), 'b'));
       (c.taladros || []).forEach(t => D.circulo(PX(t[0]), PY(t[1]), Math.max(0.5, t[2] * s3), t[3] === 'ciego' ? 's' : 'b'));
       (c.cantos || []).forEach(m => D.linea(PX(m.a[0]), PY(m.a[1]), PX(m.b[0]), PY(m.b[1])));
+      if (c.marcas) { D.trazo(azul).grosor(0.15); c.marcas.forEach(l => D.poli(l.map(p => [PX(p[0]), PY(p[1])]), false, 's')); }
       D.relleno([0, 0, 0]).trazo();
       const et = puntoEtiqueta(c);
       D.texto(PX(et[0]), PY(et[1]) + 2.2, c.etq, { pt: 14, b: true, al: 'c', col: azul });
       D.texto(cx + 3, cy + 6, c.nombre, { pt: 9, b: true });
       D.texto(cx + cw - 3, cy + 6, `${fmt(g.caja.w, maq ? 1 : 0)} × ${fmt(g.caja.h, maq ? 1 : 0)} mm`, { pt: 8.5, al: 'r', col: gris });
       if (esPlano()) D.texto(cx + 3, cy + ch - 3.5, `${PLANOS[c.plano].normal} = ${fmt(c.x * k)} mm · ${textoUnionesPieza(c)}`, { pt: 6.5, col: gris });
+      else if (esApilado()) D.texto(cx + 3, cy + ch - 3.5, `altura ${fmt(c.capa * e)}–${fmt((c.capa + 1) * e)} mm${(c.int || []).length ? ` · ${c.int.length} hueco${c.int.length > 1 ? 's' : ''}` : ''}`, { pt: 7, col: gris });
       else D.texto(cx + 3, cy + ch - 3.5, (P.tipo === 'radial' ? `a ${fmt(c.x, 1)}° · ` : `x = ${fmt(c.x * k)} mm · `) + (ret ? `${c.ranuras.length} ranuras` : P.tipo === 'radial' || P.tipo === 'pared' ? `${c.ranuras.length} muescas` : `${c.agujeros.length} agujeros`), { pt: 7.5, col: gris });
     });
   }
@@ -6253,7 +6681,7 @@ function planoPDF(F = null) {   // F: opciones de la ficha de práctica (enuncia
   cabecera('5. Montaje paso a paso');
   const wR = fmt(grosorFab() + holguraRanuraFab(), 2), nZ = (R.largueros || []).length, ultZ = nZ ? R.largueros[nZ - 1].etq : '';
   const tabla2 = maq ? `tablero de ${fmt(P.maqueta.grosor, 1)} mm` : `${MATERIALES[P.costillas.material].nombre.toLowerCase()} de ${fmt(grosor(), 1)} mm`;
-  const pasos = esPlano() ? pasosPlano(k, maq) : P.tipo === 'radial' ? [
+  const pasos = esPlano() ? pasosPlano(k, maq) : esApilado() ? pasosApilado() : P.tipo === 'radial' ? [
     `Corta las ${R.n} costillas y los ${R.discos.length} discos en ${tabla2}. Las muescas y ranuras son de ${fmt(grosorFab() + holguraRanuraFab(), 2)} mm: prueba antes una en un retal.`,
     `Corta el tubo central de Ø ${fmt(P.radial.tubo * k, 1)} mm a ${fmt(cm.tubo)} mm.` + (maq ? '' : ' Si es una lámpara, pasa antes el cable por dentro.'),
     'Mete los discos en el tubo a su altura (hoja 2) y fíjalos con una gota de cola, con las ranuras de los dos discos alineadas.',
@@ -6308,7 +6736,7 @@ function planoPDF(F = null) {   // F: opciones de la ficha de práctica (enuncia
     D.texto(M + 4, yp + 0.1, String(i + 1), { pt: 9, b: true, al: 'c', col: [255, 255, 255] });
     yp = D.parrafo(M + 11, yp, 170, t, { pt: 10 }) + 3;
   });
-  D.texto(M, H - M - 4, 'Herramientas: ' + (esPlano() ? (maq ? 'cortadora láser, lija fina; cola si se quiere fijo.' : 'CNC (o sierra de calar y escoplo), lija, maza de goma; cola si se quiere fijo.') : P.tipo === 'radial' ? (maq ? 'cortadora láser o cúter, cola.' : 'CNC o láser, sierra para el tubo, cola, lija.') : P.tipo === 'pared' ? 'CNC o sierra de calar, taladro, tacos y tornillos, nivel, taco separador.' : ret ? (maq ? 'cortadora láser o cúter, lija fina.' : 'CNC (fresa menor que la ranura), formón o lima, mazo de goma, lija.') : maq ? 'cortadora láser o cúter, cola blanca.' : `CNC o sierra de calar, broca de Ø ${fmt(2 * radioFab(), 1)}, lija, llaves para las tuercas M${V.diam}.`), { pt: 9, col: gris });
+  D.texto(M, H - M - 4, 'Herramientas: ' + (esApilado() ? ((MATERIALES[P.costillas.material] || {}).espuma ? 'cortadora de hilo caliente (o sierra de calar), lija o escofina, cola sin disolventes, palillos.' : 'cortadora láser (o CNC), lija fina, cola blanca, pinzas o peso.') : esPlano() ? (maq ? 'cortadora láser, lija fina; cola si se quiere fijo.' : 'CNC (o sierra de calar y escoplo), lija, maza de goma; cola si se quiere fijo.') : P.tipo === 'radial' ? (maq ? 'cortadora láser o cúter, cola.' : 'CNC o láser, sierra para el tubo, cola, lija.') : P.tipo === 'pared' ? 'CNC o sierra de calar, taladro, tacos y tornillos, nivel, taco separador.' : ret ? (maq ? 'cortadora láser o cúter, lija fina.' : 'CNC (fresa menor que la ranura), formón o lima, mazo de goma, lija.') : maq ? 'cortadora láser o cúter, cola blanca.' : `CNC o sierra de calar, broca de Ø ${fmt(2 * radioFab(), 1)}, lija, llaves para las tuercas M${V.diam}.`), { pt: 9, col: gris });
 
   // ---- última hoja: tiempo de mecanizado y presupuesto (o, en la ficha, la rúbrica) ----
   if (F) hojaRubrica(D, cabecera, { M, W, H, gris, azul, madera, F });
@@ -6677,6 +7105,53 @@ function hojaVistas(D, cabecera, o) {
   if (aEjes && cadX.length > 2 && cadX.length <= 10) D.texto(xA + ancho + 4, yP + fondo + 8, 'a ejes de las piezas', { pt: 6.5, col: gris });
   // cuadro de datos
   D.texto(W - M, H - M - 6, `${P.nombre} · ${fmt(lx)} × ${fmt(lz)} × ${fmt(ly)} mm (ancho × fondo × alto)`, { pt: 8, al: 'r', col: azul });
+}
+
+// ---- figura apilada: montaje de abajo arriba con las llaves ----
+function pasosApilado() {
+  const A = apiladoP(), esp = !!(MATERIALES[P.costillas.material] || {}).espuma, ll = (R.llaves || []).filter(l => l.k0 >= 0), e = grosor();
+  const tabla2 = `${MATERIALES[P.costillas.material].nombre.toLowerCase()} de ${fmt(e, 1)} mm`;
+  return [
+    `Corta las ${R.n} piezas de las ${R.capas} capas en ${tabla2} (DXF o SVG en «Fabricar»)${esp ? ' con el hilo caliente: el corte fino que va del borde a cada hueco es la entrada del hilo y se cierra al pegar' : ''}. ${A.grabar && !esp ? 'El láser graba en cada pieza su número y la línea donde va la capa de encima.' : 'Escribe el número de cada pieza en su cara de abajo.'}`,
+    ll.length ? `Prepara las llaves: ${ll.map(l => `L${l.n}, listón ${listonLlave(l)} de ${fmt(l.largo)} mm`).join('; ')}. Lija un poco sus puntas para que entren fácil; los huecos tienen ${fmt(A.holgura, 2)} mm de holgura por cada lado.` : 'No hay llaves: alinea cada capa con la línea grabada o con marcas a lápiz.',
+    ll.length ? `Pon la capa 1 en la mesa y clava en ella las llaves, bien verticales (con una escuadra). ${esp ? 'Una gota de cola en el hueco las deja fijas.' : ''}` : 'Pon la capa 1 en la mesa, sobre un papel por si cae cola.',
+    `Ve subiendo capa a capa (2, 3, 4…): cola fina en la cara de arriba de la de abajo${esp ? ' (sin disolventes)' : ''}, ensártala en las llaves${A.grabar && !esp ? ' y ajústala a la línea grabada' : ''} y aprieta un poco. Las capas con varios trozos (12a, 12b…) van a la vez.`,
+    ll.length && ll.some(l => l.k1 < R.capas - 1) ? `Las llaves terminan en la capa ${Math.max(...ll.map(l => l.k1 + 1))}: las de encima se alinean con ${A.grabar && !esp ? 'la línea grabada' : 'cuidado, mirando la figura de lado'}.` : 'Termina con la última capa.',
+    esp ? 'Deja secar con peso encima (unos libros) y lija los escalones con lija gruesa o escofina hasta la forma. Después, masilla, imprimación acrílica y pintura al agua.' : 'Deja secar con peso encima. Los escalones se pueden dejar a la vista o lijar; acabado con aceite, cera o barniz.',
+  ];
+}
+
+// ---- figura apilada: alzado de las capas con su número y planta con las llaves ----
+function hojaApilado(D, cabecera, tabla, o) {
+  const { M, W, H, e, gris, azul, madera, rojo } = o, cs = R.costillas.filter(c => c.ok); if (!cs.length) return;
+  cabecera('2. Capas y llaves de alineación');
+  const bb = R.bbox, altoT = R.capas * e, anchoT = bb[0][1] - bb[0][0];
+  // alzado (de frente): cada capa, una franja de su ancho
+  const zA = { x: M + 4, y: M + 24, w: 120, h: H - M - 24 - (M + 14) }, sA = Math.min(zA.w / anchoT, zA.h / altoT);
+  const AX = x => zA.x + (zA.w - anchoT * sA) / 2 + (x - bb[0][0]) * sA, AY = y => zA.y + zA.h - y * sA;
+  D.texto(zA.x, M + 20, 'Alzado: capas numeradas desde abajo', { pt: 8.5, b: true, col: gris });
+  cs.forEach(c => { D.relleno([240, 228, 208]).trazo(madera).grosor(0.12).rect(AX(c.caja.x0), AY((c.capa + 1) * e), c.caja.w * sA, e * sA, 'b'); });
+  const paso = R.capas > 60 ? 10 : R.capas > 25 ? 5 : R.capas > 12 ? 2 : 1;
+  for (let k = 0; k < R.capas; k += paso) D.texto(AX(bb[0][0]) - 2, AY((k + 0.5) * e) + 1, String(k + 1), { pt: 6.5, al: 'r', col: gris });
+  (R.llaves || []).filter(l => l.k0 >= 0).forEach(l => {
+    const cb = cajaDe(l.forma);
+    D.relleno([246, 200, 196]).trazo(rojo).grosor(0.25).rect(AX(cb.x0), AY((l.k1 + 1) * e), cb.w * sA, (l.k1 - l.k0 + 1) * e * sA, 'b');
+    D.texto(AX(cb.x0 + cb.w / 2), AY((l.k1 + 1) * e) - 1.5, 'L' + l.n, { pt: 7.5, b: true, al: 'c', col: rojo });
+  });
+  D.relleno([0, 0, 0]).trazo([0, 0, 0]);
+  // planta de la capa más grande con las llaves
+  const mayor = cs.reduce((m, c) => c.area > m.area ? c : m, cs[0]), zP = { x: M + 140, y: M + 24, w: 120, h: 95 };
+  const cbM = cajaDe([mayor.poly, ...(R.llaves || []).map(l => l.forma)].flat()), sP = Math.min(zP.w / cbM.w, zP.h / cbM.h);
+  const PX = u => zP.x + (zP.w - cbM.w * sP) / 2 + (u - cbM.x0) * sP, PY = v => zP.y + zP.h - (zP.h - cbM.h * sP) / 2 - (v - cbM.y0) * sP;
+  D.texto(zP.x, M + 20, `Planta (vista desde arriba, el frente abajo): capa ${mayor.etq}`, { pt: 8.5, b: true, col: gris });
+  D.relleno([240, 228, 208]).trazo(madera).grosor(0.3).poli(mayor.poly.map(p => [PX(p[0]), PY(p[1])]), true, 'b');
+  (R.llaves || []).forEach(l => { D.relleno([246, 200, 196]).trazo(rojo).grosor(0.3).poli(l.forma.map(p => [PX(p[0]), PY(p[1])]), true, 'b'); const cb = cajaDe(l.forma); D.texto(PX(cb.x0 + cb.w / 2), PY(cb.y0 + cb.h) - 1.5, 'L' + l.n, { pt: 7.5, b: true, al: 'c', col: rojo }); });
+  D.relleno([0, 0, 0]).trazo([0, 0, 0]);
+  const A = apiladoP(), filas = [{ titulo: 'Llaves' }, ...(R.llaves || []).map(l => [`L${l.n} · ${nombreLlave(l.h)}`, l.k0 >= 0 ? `listón ${listonLlave(l)} × ${fmt(l.largo)} mm · capas ${l.k0 + 1} a ${l.k1 + 1}` : 'no cabe en ninguna capa']),
+    ['Holgura de los huecos', `${fmt(A.holgura, 2)} mm por cada lado`], ['Material alrededor', `${fmt(A.margen, 1)} mm como mínimo`]];
+  if (!(R.llaves || []).length) filas.splice(1, 0, ['Sin llaves', 'las capas se alinean a ojo (o con la línea grabada)']);
+  let y = tabla(zP.x, zP.y + zP.h + 8, W - M - zP.x, filas);
+  D.parrafo(zP.x, y + 4, W - M - zP.x, `Las capas se pegan de abajo arriba, sin separación. Cada llave atraviesa las capas seguidas en las que cabe con su holgura y ${fmt(A.margen, 1)} mm de material alrededor; en las de encima, las capas se alinean ${A.grabar ? 'con el contorno grabado' : 'a ojo'}.${A.hilo ? ' Con hilo caliente, el corte fino desde el borde hasta cada hueco es la entrada del hilo.' : ''}`, { pt: 8.5, col: gris });
 }
 
 /* ===================== ANIDADOR DE TABLEROS (assets/anidador) =====================
@@ -7438,10 +7913,11 @@ function fichaDefecto() {
   const horas = Math.max(2, Math.ceil(r.minTotal / 60 * 1.5 + (pl ? 1 : 2) + R.n * 0.05));
   const obj = [
     'Interpretar un plano de fabricación con vistas acotadas, despiece y orden de montaje.',
-    `Preparar el archivo de corte (DXF) con la fresa, la holgura de las ${pl || P.tipo === 'reticula' ? 'uniones' : 'ranuras y agujeros'} y el hueso de perro adecuados.`,
+    esApilado() ? 'Pasar un modelo 3D a capas (planos seriados) y preparar el archivo de corte (DXF) con las llaves de alineación y su holgura.' : `Preparar el archivo de corte (DXF) con la fresa, la holgura de las ${pl || P.tipo === 'reticula' ? 'uniones' : 'ranuras y agujeros'} y el hueso de perro adecuados.`,
     'Colocar las piezas en el tablero aprovechando el material.',
     `Mecanizar las piezas en ${maq ? 'la cortadora láser' : 'la CNC'} con seguridad y comprobar sus medidas.`,
-    pl && R.uniones.some(u => u.tipo === 'herraje') ? `Montar un mueble de kit con uniones a tope y ${NOMBRE_HERRAJE[planoP().herraje]}, y hacer a mano los taladros de canto con una guía.`
+    esApilado() ? 'Montar una figura de planos seriados: pegar las capas de abajo arriba, alineadas con las llaves, y repasar los escalones.'
+      : pl && R.uniones.some(u => u.tipo === 'herraje') ? `Montar un mueble de kit con uniones a tope y ${NOMBRE_HERRAJE[planoP().herraje]}, y hacer a mano los taladros de canto con una guía.`
       : pl ? 'Montar un mueble de piezas planas con uniones a media madera, caja y espiga o dentadas, sin herrajes.'
       : P.tipo === 'costillas' ? 'Montar un mueble de costillas con varillas y separadores, en orden y a escuadra.'
       : 'Montar el mueble en el orden del plano y comprobar que ajusta.',
@@ -7614,6 +8090,7 @@ function proyectoDePlantilla(id, extra) {
   if (grupoDe(id) === 'pared') { p.tipo = 'pared'; p.costillas.grosor = 12; p.costillas.separacion = 26; }
   // radiales: tablero fino, reparto por número y un tubo en el que quepan las costillas
   if (grupoDe(id) === 'plano') { p.tipo = 'plano'; p.costillas.material = 'abedul'; }
+  if (grupoDe(id) === 'apilado') { p.tipo = 'apilado'; ajustesApilado(id, p); }
   if (grupoDe(id) === 'radial') { p.tipo = 'radial'; p.costillas.grosor = 6; p.costillas.modo = 'numero'; p.costillas.numero = 12; p.radial.tubo = Math.max(p.radial.tubo, Math.ceil(p.costillas.numero * (p.costillas.grosor + 1) / Math.PI)); }
   if (extra) {
     if (extra.params) Object.assign(p.params, extra.params);
@@ -7622,7 +8099,7 @@ function proyectoDePlantilla(id, extra) {
     if (extra.reticula) Object.assign(p.reticula, extra.reticula);
     if (extra.tipo) p.tipo = extra.tipo;
     if (extra.plano) Object.assign(p.plano, JSON.parse(JSON.stringify(extra.plano)));
-    ['planta', 'radial', 'pared', 'relieve', 'figura'].forEach(k => { if (extra[k]) Object.assign(p[k], extra[k]); });
+    ['planta', 'radial', 'pared', 'relieve', 'figura', 'apilado'].forEach(k => { if (extra[k]) Object.assign(p[k], extra[k]); });
     if (Array.isArray(extra.huecos)) p.huecos = extra.huecos.map(h => {
       const b = huecoNuevo(h.forma || 'rect'), r = Object.assign(b, JSON.parse(JSON.stringify(h)), { mueble: Object.assign(b.mueble, h.mueble || {}) });
       if (r.forma === 'texto' && h.ancho == null) ajustarCajaTexto(r, true);
@@ -7633,7 +8110,7 @@ function proyectoDePlantilla(id, extra) {
   return p;
 }
 function cargarProyecto(p, autoVar) {
-  P = p; UI.clave = 0; UI.punto = -1; UI.varilla = -1; UI.costilla = 0;
+  P = p; UI.fab = null; UI.clave = 0; UI.punto = -1; UI.varilla = -1; UI.costilla = 0;
   if (!P.claves || !P.claves.length) aplicarPlantilla();
   // huecos de los ejemplos que van centrados en el panel (ya se conocen sus medidas)
   (P.huecos || []).forEach(h => { if (!h.centrar) return; if (P.tipo === 'pared') { const [W, H] = medidasPanel(); h.x = Math.round((W - h.ancho) / 2); h.y = Math.round((H - h.alto) / 2); } delete h.centrar; });
@@ -7646,6 +8123,7 @@ function cargarProyecto(p, autoVar) {
   C.forEach((k, i) => { if (Math.abs(k.x - P.largo / 2) < Math.abs(C[mejor].x - P.largo / 2)) mejor = i; });
   UI.clave = mejor; refrescarClaves();
   encuadrarPerfil(); selCostilla(Math.floor(R.n / 2)); camara('tres4'); colores3D();
+  if (P.tipo === 'apilado') verHuecos(true);
   registrarLetras();
   UI.sucio = false;
 }
@@ -7658,6 +8136,7 @@ function validarProyecto(o) {
   p.maqueta = Object.assign(proyectoBase().maqueta, o.maqueta || {});
   p.cnc = Object.assign(proyectoBase().cnc, o.cnc || {});
   p.ficha = Object.assign(proyectoBase().ficha, o.ficha || {});
+  p.apilado = Object.assign(proyectoBase().apilado, o.apilado || {});
   p.presupuesto = Object.assign(proyectoBase().presupuesto, o.presupuesto || {});
   p.reticula = Object.assign(proyectoBase().reticula, o.reticula || {});
   ['planta', 'radial', 'pared', 'relieve', 'figura'].forEach(k => p[k] = Object.assign(proyectoBase()[k], o[k] || {}));
@@ -7665,7 +8144,7 @@ function validarProyecto(o) {
   p.pared.partir = Object.assign(proyectoBase().pared.partir, (o.pared || {}).partir || {});
   p.pared.modulos = Object.assign(proyectoBase().pared.modulos, (o.pared || {}).modulos || {});
   p.huecos = Array.isArray(o.huecos) ? o.huecos.map(h => { const b = huecoNuevo(h.forma || 'rect'); return Object.assign(b, h, { mueble: Object.assign(b.mueble, h.mueble || {}) }); }) : [];
-  if (!['reticula', 'radial', 'pared', 'plano'].includes(p.tipo)) p.tipo = 'costillas';
+  if (!['reticula', 'radial', 'pared', 'plano', 'apilado'].includes(p.tipo)) p.tipo = 'costillas';
   p.plano = Object.assign(proyectoBase().plano, o.plano || {});
   p.plano.solape = Object.assign(proyectoBase().plano.solape, (o.plano || {}).solape || {});
   p.plano.piezas = (Array.isArray(p.plano.piezas) ? p.plano.piezas : []).filter(z => z && (z.igualA != null || (Array.isArray(z.pts) && z.pts.length >= 3)))
@@ -7708,7 +8187,7 @@ async function dialogoModelos(paraFigura) {
   try { aviso('Cargando los modelos…'); await cargarRecurso('modelos'); } catch (e) { aviso('⚠ ' + esc(e.message), 5000); return; }
   const M = modelosEjemplo();
   const items = M.map(m => `<button data-mod="${m.id}"><b>${esc(m.nombre)}</b><small>${esc(m.desc)} · ${m.triangulos.toLocaleString('es-ES')} triángulos · <a href="assets/modelos/${m.archivo}" download data-stl>${m.archivo}</a></small></button>`).join('');
-  modal('🗿 Modelos 3D de ejemplo', `<p class="nota">${paraFigura ? 'Modelos para probar la figura: cada costilla será un corte del modelo. Al elegir uno se carga a 800 mm de alto; después cambia el alto, los cortes, el giro o la separación.' : 'Modelos para probar el relieve. Al elegir uno se carga con su vista y unas medidas de panel adecuadas; después cambia la vista, el giro, el relieve o las lamas para ver qué pasa.'} Los mismos modelos están como STL en <b>assets/modelos</b>.</p><div class="ejemplos">${items || '<p>No se encuentra assets/modelos/modelos.js</p>'}</div>`);
+  modal('🗿 Modelos 3D de ejemplo', `<p class="nota">${paraFigura && P.tipo === 'apilado' ? 'Modelos para la figura apilada: cada capa será un corte horizontal del modelo, del grosor del tablero o de la plancha. El conejo y el moái están hechos para esto; las llaves se colocan solas.' : paraFigura ? 'Modelos para probar la figura: cada costilla será un corte del modelo. Al elegir uno se carga a 800 mm de alto; después cambia el alto, los cortes, el giro o la separación.' : 'Modelos para probar el relieve. Al elegir uno se carga con su vista y unas medidas de panel adecuadas; después cambia la vista, el giro, el relieve o las lamas para ver qué pasa.'} Los mismos modelos están como STL en <b>assets/modelos</b>.</p><div class="ejemplos">${items || '<p>No se encuentra assets/modelos/modelos.js</p>'}</div>`);
   $$('[data-stl]').forEach(a => a.onclick = e => e.stopPropagation());
   $$('[data-mod]').forEach(b => b.onclick = () => {
     cerrarModal();
@@ -7835,9 +8314,10 @@ function iniciar() {
   requestAnimationFrame(() => { ajustar3D(); VP.ajustar(); VC.ajustar(); cargarProyecto(P, true); });
 }
 // para las pruebas automáticas
-window.MadeRebanadas = { get P() { return P; }, get R() { return R; }, calcular: () => { const t = performance.now(); R = calcular(); return performance.now() - t; }, autoVar: () => autoVarillas(P.varillas.autoN), construir3D: () => { const t = performance.now(); construir3D(); return performance.now() - t; }, cargar: o => cargarProyecto(validarProyecto(o)), dxf: () => dxf(), svg: () => svg(), plano: () => planoPDF(), malla3D: o => piezasMalla3D(o || {}), pieza: i => piezaCalcador([...R.costillas, ...R.otras][i]), geo: i => geoFab([...R.costillas, ...R.otras][i]), camara: t => camara(t), selCostilla: i => selCostilla(i), slugEjemplo: n => slugEjemplo(n), formasTexto: h => formasTexto(h), leerSVG: t => leerSVG(t), leerMalla: (b, n) => leerMalla(b, n), polyVista: i => { const c = [...R.costillas, ...R.otras][i]; return { poly: c.poly, vista: polyVista(c.poly), esq: c.poly.esq || [] }; }, presupuesto: () => calcularPresupuesto(), geoFab: i => geoFab(R.costillas[i]), ficha: () => fichaPDF(), flexion: () => analisisFlexion(R).map(c => ({ pieza: c.H.nombre, asiento: !!c.asiento, L: c.L, vuelo: c.vuelo, flecha: c.flecha, lim: c.lim, seg: c.seg })), prueba: o => { const g = geoPrueba(o); return { g, dxf: dxfPrueba(g), svg: svgPrueba(g) }; }, ordenMontaje: () => ordenMontaje(), montaje: () => montajeAnimado(), cerradas: o => piezasCerradas(o || { zArriba: true, escala: 1, herrajes: true }),
+window.MadeRebanadas = { get P() { return P; }, get R() { return R; }, get G() { return G; }, calcular: () => { const t = performance.now(); R = calcular(); return performance.now() - t; }, autoVar: () => autoVarillas(P.varillas.autoN), construir3D: () => { const t = performance.now(); construir3D(); return performance.now() - t; }, cargar: o => cargarProyecto(validarProyecto(o)), dxf: () => dxf(), svg: () => svg(), plano: () => planoPDF(), malla3D: o => piezasMalla3D(o || {}), pieza: i => piezaCalcador([...R.costillas, ...R.otras][i]), geo: i => geoFab([...R.costillas, ...R.otras][i]), camara: t => camara(t), selCostilla: i => selCostilla(i), slugEjemplo: n => slugEjemplo(n), formasTexto: h => formasTexto(h), leerSVG: t => leerSVG(t), leerMalla: (b, n) => leerMalla(b, n), polyVista: i => { const c = [...R.costillas, ...R.otras][i]; return { poly: c.poly, vista: polyVista(c.poly), esq: c.poly.esq || [] }; }, presupuesto: () => calcularPresupuesto(), geoFab: i => geoFab(R.costillas[i]), ficha: () => fichaPDF(), flexion: () => analisisFlexion(R).map(c => ({ pieza: c.H.nombre, asiento: !!c.asiento, L: c.L, vuelo: c.vuelo, flecha: c.flecha, lim: c.lim, seg: c.seg })), prueba: o => { const g = geoPrueba(o); return { g, dxf: dxfPrueba(g), svg: svgPrueba(g) }; }, ordenMontaje: () => ordenMontaje(), montaje: () => montajeAnimado(), cerradas: o => piezasCerradas(o || { zArriba: true, escala: 1, herrajes: true }),
   leerDXF: t => leerDXF(t), colocar: () => colocarEnTableros(fabActual()), compra: () => listaCompra(), despiece: () => filasDespiece(), csvCortes: () => { let out; const d0 = descargar; descargar = (n, c) => { out = c; }; try { exportarCSVCortes(); } finally { descargar = d0; } return out; }, vetaDe: c => vetaDe(c), ponVeta: (c, v) => ponVeta(c, v),
   pantallaPunto: i => { const k = claveActual().pts[i], r = $('#cPerfil').getBoundingClientRect(), q = VP.aPantalla(k[0], k[1]); return [r.left + q[0], r.top + q[1]]; },
+  pantallaHueco: i => { const c = centroHueco(P.huecos[i]), r = $('#cHuecos').getBoundingClientRect(), q = VH.aPantalla(c[0], c[1]); return [r.left + q[0], r.top + q[1]]; },
   pantallaVarilla: i => { const k = P.varillas.lista[i], r = $('#cPerfil').getBoundingClientRect(), q = VP.aPantalla(k[0], k[1]); return [r.left + q[0], r.top + q[1]]; } };
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();
 })();

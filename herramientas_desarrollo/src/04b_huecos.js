@@ -10,7 +10,7 @@ const HU = { arr: null };
 const NOMBRE_FORMA = { rect: 'Rectángulo', redondeado: 'Redondeado', arco: 'Arco', circulo: 'Círculo', libre: 'Forma libre', texto: 'Texto' };
 const NOMBRE_MODO = { pasante: 'pasante', rebaje: 'rebaje', saliente: 'sale hacia fuera', hundido: 'hundido' };
 const huecoSel = () => (P.huecos || [])[UI.hueco] || null;
-const snapH = (v, ev) => ev && ev.shiftKey ? Math.round(v * 10) / 10 : Math.round(v / 10) * 10;
+const snapH = (v, ev) => { if (ev && ev.shiftKey) return Math.round(v * 10) / 10; const g = P && P.tipo === 'apilado' ? (grosor() < 10 ? 1 : 5) : 10; return Math.round(v / g) * g; };   // en las figuras apiladas pequeñas, de mm en mm
 
 function dibujarHuecos(ctx, V) {
   V.rejilla(ctx);
@@ -47,9 +47,10 @@ function dibujarHuecos(ctx, V) {
       ctx.strokeStyle = 'rgba(80,90,100,.7)'; ctx.strokeRect(a, b, rc[2] * V.sc, rc[3] * V.sc);
     });
   } else {
-    // perfil: todas las costillas en claro
+    // perfil: todas las costillas en claro (en la figura apilada, las capas en planta; la de encima de la elegida, en discontinua)
     ctx.strokeStyle = cssVar('--ejes'); ctx.lineWidth = 1;
     R.costillas.forEach(c => { if (c.ok) { V.camino(ctx, c.poly); ctx.stroke(); } });
+    if (P.tipo === 'apilado' && piezaSel()) { const s = piezaSel(); ctx.save(); ctx.strokeStyle = colorCostilla(.9); ctx.lineWidth = 1.3; ctx.setLineDash([5, 4]); R.costillas.filter(c => c.capa === s.capa + 1).forEach(c => { V.camino(ctx, c.poly); ctx.stroke(); }); ctx.restore(); }
     const cs = piezaSel(); if (cs && cs.ok && !cs.z && !cs.modulo) { ctx.fillStyle = conAlfa(acento, .1); ctx.beginPath(); [cs.poly, ...(cs.int || [])].forEach(pol => { pol.forEach((p, i) => { const [x, y] = V.aPantalla(p[0], p[1]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.closePath(); }); ctx.fill('evenodd'); }
   }
   // los huecos
@@ -70,7 +71,7 @@ function dibujarHuecos(ctx, V) {
     const cb = cajaDe(f), [lx, ly] = V.aPantalla(cb.x0 + cb.w / 2, cb.y0 + cb.h / 2);
     if (h.forma !== 'texto') {
     ctx.fillStyle = act ? (sel ? acento : '#d0453a') : cssVar('--suave'); ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('H' + (k + 1), lx, ly); ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+    ctx.fillText((h.llave && P.tipo === 'apilado' ? 'L' : 'H') + (k + 1), lx, ly); ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
     }
     if (sel) {
       // asas
@@ -87,7 +88,7 @@ function dibujarHuecos(ctx, V) {
     }
   });
   ctx.fillStyle = acento; ctx.font = '600 12px system-ui';
-  ctx.fillText(fr ? 'Huecos · frente del panel' : 'Huecos · perfil (cada hueco es un túnel de «desde» a «hasta»)', 8, V.h - 26);
+  ctx.fillText(fr ? 'Huecos · frente del panel' : P.tipo === 'apilado' ? `Llaves y huecos · planta vista desde arriba (el frente, abajo) · capa ${(piezaSel() || {}).etq || ''} en color` : 'Huecos · perfil (cada hueco es un túnel de «desde» a «hasta»)', 8, V.h - 26);
 }
 function asasHueco(h) {
   const g = giraHueco(h), c = centroHueco(h), R2 = p => g ? rotarPunto(p, c, g) : p;
@@ -106,7 +107,7 @@ function encuadrarHuecos() {
   VH.encuadrar(b, 50);
 }
 function verHuecos(si) {
-  UI.vistaHuecos = !!si && ['pared', 'costillas', 'reticula'].includes(P.tipo);
+  UI.vistaHuecos = !!si && ['pared', 'costillas', 'reticula', 'apilado'].includes(P.tipo);
   $('#cPerfil').classList.toggle('oculto', UI.vistaHuecos); $('#cHuecos').classList.toggle('oculto', !UI.vistaHuecos);
   $('#bVistaHuecos').classList.toggle('activo', UI.vistaHuecos);
   ['#sClave', '#infoClave', '#bEsquina'].forEach(s => $(s).classList.toggle('oculto2', UI.vistaHuecos));
@@ -180,7 +181,9 @@ function iniciarHuecos() {
   $('#bVistaHuecos').onclick = () => verHuecos(!UI.vistaHuecos);
   $$('[data-hnuevo]').forEach(b => b.onclick = () => {
     if (!window.ClipperLib) { aviso('⚠ Falta assets/js/clipper.js'); return; }
-    P.huecos = P.huecos || []; const h = huecoNuevo(b.dataset.hnuevo);
+    P.huecos = P.huecos || [];
+    if (b.dataset.hnuevo.startsWith('llave')) { const t = b.dataset.hnuevo === 'llave_tri' ? 'tri' : 'cuad'; P.huecos.push(llaveNueva(t)); UI.hueco = P.huecos.length - 1; cambio(t === 'tri' ? 'Llave triangular' : 'Llave cuadrada'); if (!UI.vistaHuecos) verHuecos(true); else VH.pintar(); return; }
+    const h = huecoNuevo(b.dataset.hnuevo);
     if (P.tipo !== 'pared') h.modo = 'pasante';
     if (h.forma === 'texto') llenarLetras();
     P.huecos.push(h); UI.hueco = P.huecos.length - 1; cambio('Hueco ' + P.huecos.length + ': ' + NOMBRE_FORMA[h.forma].toLowerCase());
@@ -212,6 +215,7 @@ function iniciarHuecos() {
   campo('#hcNegrita', (h, el) => { h.negrita = el.checked; ajustarCajaTexto(h); });
   campo('#hcGiro', (h, el) => { const g = ((Math.round(+el.value || 0) % 360) + 540) % 360 - 180; if (h.forma === 'libre' && h.pts) { const C = centroHueco(h); h.pts = h.pts.map(p => rotarPunto(p, C, g - (h.giro || 0))); const cb = cajaDe(h.pts); h.x = cb.x0; h.y = cb.y0; h.ancho = cb.w; h.alto = cb.h; } h.giro = g; });
   campo('#hcActivo', (h, el) => { h.activo = el.checked; });
+  campo('#hcLlave', (h, el) => { h.llave = el.checked; h.modo = 'pasante'; });
   campo('#hcMueble', (h, el) => { h.mueble.tipo = el.value; });
   campo('#hcFondo', (h, el) => { h.mueble.fondo = Math.max(0, +el.value || 0); });
   campo('#hcTrasera', (h, el) => { h.mueble.trasera = el.checked; });
@@ -222,7 +226,9 @@ function iniciarHuecos() {
 function ponerCamposHueco() {
   const h = huecoSel(), fr = P.tipo === 'pared';
   $('#hcCampos').classList.toggle('oculto', !h); if (!h) return;
-  $('#hcTit').textContent = 'H' + (UI.hueco + 1) + ' · ' + NOMBRE_FORMA[h.forma];
+  const ap = P.tipo === 'apilado';
+  $('#hcTit').textContent = (h.llave && ap ? 'L' + (UI.hueco + 1) + ' · Llave ' + nombreLlave(h) : 'H' + (UI.hueco + 1) + ' · ' + NOMBRE_FORMA[h.forma]);
+  $('#hcLlave').checked = !!h.llave;
   $('#hcActivo').checked = h.activo !== false; const tx = h.forma === 'texto';
   $('#filaHcForma').classList.toggle('oculto', tx); if (!tx) $('#hcForma').value = h.forma;
   $('#hcTextoCampos').classList.toggle('oculto', !tx);
@@ -230,7 +236,8 @@ function ponerCamposHueco() {
   $('#hcX').value = Math.round(h.x * 10) / 10; $('#hcY').value = Math.round(h.y * 10) / 10; $('#hcAncho').value = Math.round(h.ancho * 10) / 10; $('#hcAlto').value = Math.round(h.alto * 10) / 10;
   $('#hcGiro').value = h.giro || 0; $('#filaHcGiro').classList.toggle('oculto', h.modo === 'mueble');
   $('#hcRadio').value = h.radio; $('#filaHcRadio').classList.toggle('oculto', h.forma !== 'redondeado');
-  [...$('#hcModo').options].forEach(o => { o.hidden = (!fr && ['rebaje', 'saliente', 'hundido'].includes(o.value)) || (tx && o.value === 'mueble'); });
+  [...$('#hcModo').options].forEach(o => { o.hidden = (!fr && ['rebaje', 'saliente', 'hundido'].includes(o.value)) || (tx && o.value === 'mueble') || (ap && o.value !== 'pasante'); });
+  if (ap) h.modo = 'pasante'; $('#hcModo').closest('label').classList.toggle('oculto', ap);
   if (!fr && ['rebaje', 'saliente', 'hundido'].includes(h.modo)) h.modo = 'pasante';
   if (tx && h.modo === 'mueble') h.modo = 'saliente';
   $('#hcModo').value = h.modo; $('#hcProf').value = h.prof; $('#filaHcProf').classList.toggle('oculto', h.modo !== 'rebaje');
@@ -244,14 +251,16 @@ function ponerCamposHueco() {
   $('#hcGrosorM').value = h.mueble.grosor || '';
   $('#hcTrasera').checked = !!h.mueble.trasera; $('#filaHcTrasera').classList.toggle('oculto', !fr || h.mueble.tipo === 'balda');
   $('#filaHcPuerta').classList.toggle('oculto', h.mueble.tipo !== 'armario'); $('#hcPuerta').value = h.mueble.puerta; $('#hcHolPuerta').value = h.mueble.holguraPuerta;
-  $('#hcXTit').textContent = fr ? 'X desde la izquierda (mm)' : 'u: fondo (mm)'; $('#hcYTit').textContent = fr ? 'Y desde abajo (mm)' : 'v: altura (mm)';
+  $('#hcXTit').textContent = fr ? 'X desde la izquierda (mm)' : ap ? 'x: a lo ancho (mm)' : 'u: fondo (mm)'; $('#hcYTit').textContent = fr ? 'Y desde abajo (mm)' : ap ? 'y: hacia atrás (mm)' : 'v: altura (mm)';
+  $('#filaHcDesde').querySelectorAll('label').forEach((l, i) => { l.firstChild.textContent = ap ? (i ? 'Hasta la altura (mm) ' : 'Desde la altura (mm) ') : (i ? 'Hasta x (mm) ' : 'Desde x (mm) '); });
 }
 function borrarHueco(k) {
   if (k == null || k < 0 || !P.huecos[k]) return;
   P.huecos.splice(k, 1); UI.hueco = Math.min(k, P.huecos.length - 1); cambio('Hueco H' + (k + 1) + ' borrado');
 }
 function refrescarHuecos() {
-  const ok = ['pared', 'costillas', 'reticula'].includes(P.tipo);
+  const ok = ['pared', 'costillas', 'reticula', 'apilado'].includes(P.tipo);
+  $$('.soloApilado').forEach(el => el.classList.toggle('oculto', P.tipo !== 'apilado'));
   $('#secHuecos').classList.toggle('oculto', !ok); $('#bVistaHuecos').classList.toggle('oculto', !ok); $('#bHuecoTexto').classList.toggle('oculto', P.tipo !== 'pared');
   if (!ok && UI.vistaHuecos) verHuecos(false);
   P.huecos = P.huecos || [];
@@ -261,6 +270,13 @@ function refrescarHuecos() {
   P.huecos.forEach((h, k) => {
     const li = document.createElement('li'); li.className = k === UI.hueco ? 'sel' : '';
     const modo = h.modo === 'mueble' ? { balda: 'con balda', caja: 'con caja', armario: 'con armario' }[h.mueble.tipo] : (NOMBRE_MODO[h.modo] || h.modo) + (['saliente', 'hundido'].includes(h.modo) ? ' ' + fmt(h.relieve || 0) + ' mm' : '');
+    if (h.llave && P.tipo === 'apilado') {
+      const l = (R && R.llaves || []).find(o => o.h === h || o.h.id === h.id);
+      li.innerHTML = `<span><b>L${k + 1}</b> Llave ${nombreLlave(h)} · ${fmt(h.ancho)} × ${fmt(h.alto)}${giraHueco(h) ? ' · ' + fmt(h.giro) + '°' : ''} · ${l && l.k0 >= 0 ? `capas ${l.k0 + 1}–${l.k1 + 1}` : '<i>no cabe</i>'}${h.activo === false ? ' <i>(apagada)</i>' : ''}</span><button class="quitarHueco" title="Borrar esta llave">🗑</button>`;
+      li.onclick = () => { UI.hueco = k; refrescarHuecos(); if (VH) VH.pintar(); };
+      li.querySelector('.quitarHueco').onclick = ev => { ev.stopPropagation(); borrarHueco(k); };
+      ul.appendChild(li); return;
+    }
     li.innerHTML = `<span><b>H${k + 1}</b> ${h.forma === 'texto' ? '«' + esc(String(h.texto || '').replace(/\n/g, ' ').slice(0, 18)) + '»' : NOMBRE_FORMA[h.forma]} · ${fmt(h.ancho)} × ${fmt(h.alto)}${giraHueco(h) ? ' · ' + fmt(h.giro) + '°' : ''} · ${modo}${h.activo === false ? ' <i>(apagado)</i>' : ''}</span><button class="quitarHueco" title="Borrar este hueco">🗑</button>`;
     li.onclick = () => { UI.hueco = k; refrescarHuecos(); if (VH) VH.pintar(); };
     li.querySelector('.quitarHueco').onclick = ev => { ev.stopPropagation(); borrarHueco(k); };

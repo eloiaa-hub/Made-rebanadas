@@ -1,6 +1,6 @@
 # Made-rebanadas — Por Eloi A.A.
 
-**Versión 1.5** · novedades en [NOVEDADES.md](NOVEDADES.md)
+**Versión 1.6** · novedades en [NOVEDADES.md](NOVEDADES.md)
 
 **Portada en línea:** <https://eloiaa-hub.github.io/Made-rebanadas/>
 
@@ -21,6 +21,7 @@ Funciona en el navegador (Chrome, Edge o Firefox), sin instalar nada y **sin con
 - **Perfiles clave**: la forma se define con unos pocos perfiles a lo largo del mueble; cada costilla es la mezcla suave de los perfiles que tiene a los lados. Se editan a mano (puntos de curva o de esquina)) o se traen de un **DXF** dibujado en otro programa.
 - **Cinco tipos**: costillas unidas con varillas (en planta recta, en **arco** o **en S**), **retícula entrelazada** a media madera, **radiales** (lámparas y columnas alrededor de un tubo, con discos de unión), **paneles de pared** (lamas sobre rastreles) y **piezas planas** (sillas, taburetes y bancos de tableros con forma, que encajan a media madera, con espigas en cajas pasantes (con cuña si se quiere), con esquinas dentadas o espigas en T, o solapadas con tacos o tornillos; las uniones salen solas, también con piezas inclinadas; comprueba el vuelco de las sillas y anima el montaje).
 - **Pieza de prueba de holgura**: un retal con ranuras y cajas de varios anchos para ajustar la holgura al tablero real antes de cortar el mueble.
+- **Figuras apiladas (planos seriados)**: capas horizontales de un modelo 3D pegadas unas sobre otras, alineadas con llaves cuadradas y triangulares; en DM con láser o en porex/XPS con hilo caliente.
 - **Ficha de práctica para alumnos** (enunciado, plano acotado, piezas y rúbrica), **muebles de kit** con perno y tuerca de barril o excéntricas, y **comprobación de la flexión** de asientos y baldas.
 - **Vistas acotadas** en el plano PDF (alzado, planta y perfil, sistema europeo, escala normalizada) y **tiempo de mecanizado y presupuesto** (corte, pasadas, tableros, herrajes y acabado).
 - **Lamas partidas** para paredes altas: juntas a tope o con sombra, a la misma altura (módulos con su par de rastreles), alternas o en escalera.

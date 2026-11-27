@@ -19,6 +19,7 @@ No hacen falta para usar el programa: solo para cambiarlo.
 | `02b_reticula.js` | Retícula entrelazada: largueros sacados del volumen, cruces y ranuras a media madera, comprobaciones |
 | `fuentes/` | Modelos de fuera ya reducidos y orientados (Y arriba, mirando a +Z): `busto_mujer.stl`; `modelos.py` lo incluye |
 | `modelos.py` | Genera los STL y las imágenes en grises de ejemplo (`assets/modelos/modelos.js`, `assets/imagenes/imagenes.js`) (numpy y scikit-image) |
+| `modelos_figuras.py` | Genera el conejo y el moái de las figuras apiladas (`conejo.stl`, `moai.stl`) y los añade a `assets/modelos/modelos.js` sin tocar los demás (después de `modelos.py`, si se vuelve a ejecutar) |
 | `02f_huecos.js` | Huecos: formas, restas con Clipper, trozos (12a, 12b), muebles insertados (tableros), rastreles cortados y avisos |
 | `02g_dxf.js` | Lectura de DXF de texto (LINE, ARC, CIRCLE, ELLIPSE, LWPOLYLINE y POLYLINE con bulge, SPLINE): contornos cerrados para huecos libres y perfiles clave; también SVG (`leerSVG`: path con curvas y arcos, rect, circle, ellipse, polygon, polyline, line, transform) |
 | `04b_huecos.js` | Vista ▦ Huecos (frente del panel o perfil) y apartado Huecos del panel |
@@ -27,6 +28,7 @@ No hacen falta para usar el programa: solo para cambiarlo.
 | `02c_disposicion.js` | Dónde va cada costilla (recta, curva, radial, pared), varillas curvas, tubo y discos, rastreles, comprobaciones de radial y pared |
 | `02h_plano.js` | Piezas planas (flat-pack): cada pieza con su plano (`lado`, `frente`, `horizontal`), su posición y su contorno; busca los cruces y hace las uniones (media madera, caja pasante con `rectCaja`, solape de piezas paralelas pegadas con tacos o tornillos repartidos por `puntosFijacion`, esquinas dentadas y espigas en T con `finCanto` y `aplicarDientes`, cuñas), piezas inclinadas (`marcoPieza`, `cruceGeneral`: gira el contorno para poner la recta de cruce vertical), comprobaciones de asiento y vuelco (`analisisAsiento`), flexión de asientos y baldas (`analisisFlexion`, `MECANICA`), uniones a tope con herraje (`ponerHerraje`, `datosHerraje`: perno y tuerca de barril o excéntrica; taladros con profundidad y `cantos`), comprobaciones, posición 3D (`basePieza`) |
 | `07f_prueba.js` | Pieza de prueba de holgura: retal con ranuras y cajas de varios anchos (`geoPrueba`), DXF y SVG |
+| `02i_apilado.js` | Figuras apiladas (planos seriados): capas horizontales del modelo (`calcularApilado`, `regionCapa`: centro, por fuera o por dentro), llaves de alineación (huecos con `llave`, tramo de capas en `LLAVE_RANGO`, `colocarLlavesAuto`), entrada del hilo, grabado de la capa de encima, avisos y plantillas (`ajustesApilado`) |
 | `07h_ficha.js` | Ficha de práctica para alumnos: enunciado (`hojaEnunciado`), rúbrica (`hojaRubrica`), textos por defecto y ventana; usa `planoPDF(F)` |
 | `07g_presupuesto.js` | Tiempo de mecanizado (largo de corte × pasadas, entradas, taladros, tableros) y presupuesto (`calcularPresupuesto`, ventana, CSV, hoja del plano) |
 | `03_plantillas.js` | Plantillas paramétricas (banco, tumbona, pouf, mesa, estantería, libre…; las de piezas planas devuelven `piezas`) |

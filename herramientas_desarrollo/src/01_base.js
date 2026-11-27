@@ -8,7 +8,7 @@
 'use strict';
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
-const VERSION = '1.5';
+const VERSION = '1.6';
 const T = window.THREE;
 
 /* ===================== UTILIDADES ===================== */
@@ -63,6 +63,8 @@ const MATERIALES = {
   pino:     { nombre: 'Tablero alistonado de pino', cara: 'pino', canto: 'pino', hex: '#ddb77f' },
   mdf:      { nombre: 'MDF crudo', cara: 'alma_mdf', canto: 'alma_mdf', hex: '#a9845c', mm: 200 },
   lacado:   { nombre: 'MDF lacado (color a elegir)', color: true, hex: '#f2efe8' },
+  porex:    { nombre: 'Porex (poliestireno expandido, EPS)', solido: '#ecebe4', hex: '#ecebe4', espuma: true },
+  xps:      { nombre: 'Poliestireno extruido (XPS)', solido: '#9cc7e8', hex: '#9cc7e8', espuma: true },
 };
 const VARILLA_TIPOS = {
   roscada: { nombre: 'Varilla roscada', sep: 'Tubo separador', hex: '#b8bcc0', metal: true },
@@ -111,6 +113,7 @@ function proyectoBase() {
       capa: { activa: false, texto: 'Hola', letra: 'Arial Black', negrita: true, tamLetra: 160, relieve: 30, x: 50, y: 15, modo: 'sale' } },
     huecos: [],
     figura: { activa: false, malla: null, alto: 800, eje: 'x', giro: 0, minArea: 2, unir: true },
+    apilado: Object.assign({}, APILADO_DEF),
     plano: { holgura: 0.3, piezas: [], solape: { tipo: 'tacos', diam: 8, n: 0 }, cunas: false, flexion: true, persona: 100, cargaBalda: 150 },
   };
 }

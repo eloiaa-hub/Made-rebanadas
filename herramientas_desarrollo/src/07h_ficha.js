@@ -20,10 +20,11 @@ function fichaDefecto() {
   const horas = Math.max(2, Math.ceil(r.minTotal / 60 * 1.5 + (pl ? 1 : 2) + R.n * 0.05));
   const obj = [
     'Interpretar un plano de fabricación con vistas acotadas, despiece y orden de montaje.',
-    `Preparar el archivo de corte (DXF) con la fresa, la holgura de las ${pl || P.tipo === 'reticula' ? 'uniones' : 'ranuras y agujeros'} y el hueso de perro adecuados.`,
+    esApilado() ? 'Pasar un modelo 3D a capas (planos seriados) y preparar el archivo de corte (DXF) con las llaves de alineación y su holgura.' : `Preparar el archivo de corte (DXF) con la fresa, la holgura de las ${pl || P.tipo === 'reticula' ? 'uniones' : 'ranuras y agujeros'} y el hueso de perro adecuados.`,
     'Colocar las piezas en el tablero aprovechando el material.',
     `Mecanizar las piezas en ${maq ? 'la cortadora láser' : 'la CNC'} con seguridad y comprobar sus medidas.`,
-    pl && R.uniones.some(u => u.tipo === 'herraje') ? `Montar un mueble de kit con uniones a tope y ${NOMBRE_HERRAJE[planoP().herraje]}, y hacer a mano los taladros de canto con una guía.`
+    esApilado() ? 'Montar una figura de planos seriados: pegar las capas de abajo arriba, alineadas con las llaves, y repasar los escalones.'
+      : pl && R.uniones.some(u => u.tipo === 'herraje') ? `Montar un mueble de kit con uniones a tope y ${NOMBRE_HERRAJE[planoP().herraje]}, y hacer a mano los taladros de canto con una guía.`
       : pl ? 'Montar un mueble de piezas planas con uniones a media madera, caja y espiga o dentadas, sin herrajes.'
       : P.tipo === 'costillas' ? 'Montar un mueble de costillas con varillas y separadores, en orden y a escuadra.'
       : 'Montar el mueble en el orden del plano y comprobar que ajusta.',

@@ -23,6 +23,9 @@ function materialesTablero() {
   if (m.color) {
     cara = new T.MeshStandardMaterial({ color: P.costillas.color, roughness: .5 });
     canto = cara;
+  } else if (m.solido) {   // espumas (porex, XPS): color liso y mate
+    cara = new T.MeshStandardMaterial({ color: m.solido, roughness: .97 });
+    canto = new T.MeshStandardMaterial({ color: new T.Color(m.solido).multiplyScalar(.8), roughness: 1 });
   } else {
     const B = (window.TEXTURAS_PBR || {})[m.cara];
     const mmCara = B ? B.cm * 10 : (m.mm || 800), mmCanto = m.canto === 'alma_contrachapado' ? 48 : (m.mm || 800);
@@ -157,7 +160,7 @@ function construir3D() {
   limpiar(G.modelo); G.modelo.clear(); G.modelo.position.set(0, 0, 0);
   G.costillas = []; G.largueros = []; G.varillas = []; G.claves3d = [];
   if (G.montaje) pararMontaje();
-  if (P.tipo === 'plano') { construir3DPlano(); return; }
+  if (P.tipo === 'plano' || P.tipo === 'apilado') { construir3DPlano(); return; }
   const e = grosor(), mats = materialesTablero(), rh = radioAgujero(), V = P.varillas;
   // medidas del mueble montado
   const bb = new T.Box3(), cs = R.costillas.filter(c => c.ok);
@@ -256,11 +259,17 @@ function construir3DPlano() {
     m.userData = { i: c.i, x: c.x, plano: c.plano };
     G.modelo.add(m); G.costillas.push(m);
   });
+  // figura apilada: los listones de las llaves (de la primera a la última capa que atraviesan)
+  if (P.tipo === 'apilado') (R.llaves || []).forEach(l => {
+    if (l.k0 < 0) return;
+    const m = new T.Mesh(extruir(l.forma, [], 1), new T.MeshStandardMaterial({ color: '#9a6a3c', roughness: .7 })); m.castShadow = true;
+    m.userData = { extra: 'llave', k0: l.k0, k1: l.k1 }; G.modelo.add(m); G.largueros.push(m);
+  });
   const sz = bb.map(r => r[1] - r[0]);
   G.dims = [sz[0], sz[2], sz[1]]; G.alto = bb[1][1]; G.fondo = sz[2]; G.rmax = Math.max(sz[0], sz[2]) / 2;
   G.centro = bb.map(r => (r[0] + r[1]) / 2);
   const tam = Math.max(sz[0], sz[1], sz[2], 300); G.tam = tam;
-  colocarExplosion(); resaltar3D();
+  colocarExplosion(); resaltar3D(); if (P.tipo === 'apilado') construirFantasma();
   G.suelo.scale.set(tam * 5, tam * 5, 1); luces3D();
 }
 // coloca una pieza plana (con la explosión: cada pieza se aparta del centro siguiendo su normal; las horizontales, hacia arriba)
@@ -406,7 +415,7 @@ function construirVarillas3D() {
 function construirClaves3D() {
   (G.claves3d || []).forEach(l => { G.modelo.remove(l); l.geometry.dispose(); l.material.dispose(); });
   G.claves3d = [];
-  if (!P.vista.claves || formaCalculada() || P.tipo === 'plano') return;
+  if (!P.vista.claves || formaCalculada() || P.tipo === 'plano' || P.tipo === 'apilado') return;
   const C = clavesOrdenadas(), acento = cssVar('--acento') || '#1f6fd1';
   C.forEach((k, i) => {
     if (P.tipo === 'radial' && k.x >= 359.999 && C.length > 1) return;     // la de 360° es la misma que la de 0°
@@ -423,7 +432,17 @@ function construirClaves3D() {
 }
 function colocarExplosion() {
   const e = grosor(), ex = P.vista.explosion || 0;
-  if (P.tipo === 'plano') { G.costillas.forEach(m => { if (m) colocarPiezaPlana(m); }); pedirRender(); return; }
+  if (P.tipo === 'plano' || P.tipo === 'apilado') {
+    G.costillas.forEach(m => { if (m) colocarPiezaPlana(m); });
+    // las llaves van de la capa k0 a la k1 (también separadas, con la explosión)
+    G.largueros.forEach(m => {
+      if (m.userData.extra !== 'llave') return;
+      const yE = y => { const ctr = (G.centro || [0, 0, 0])[1], tam = G.tam || 600; return y + (ex ? (y - ctr) * ex * 1.3 + ex * tam * 0.6 : 0); };
+      const y0 = yE((m.userData.k0 + 0.5) * e) - e / 2, y1 = yE((m.userData.k1 + 0.5) * e) + e / 2;
+      m.matrixAutoUpdate = false; m.matrix.makeBasis(V3([1, 0, 0]), V3([0, 0, -1]), V3([0, y1 - y0, 0])).setPosition(0, (y0 + y1) / 2, 0); m.matrixWorldNeedsUpdate = true;
+    });
+    pedirRender(); return;
+  }
   G.costillas.forEach(m => { if (m) ponerEnMarco(m, marcoExpl(m.userData.x)); });
   G.largueros.forEach(m => {
     if (m.userData.modulo) return;
@@ -438,6 +457,15 @@ function colocarExplosion() {
 }
 function construirFantasma() {
   if (P.tipo === 'plano') { if (G.fantasma) { G.modelo.remove(G.fantasma); G.fantasma.geometry.dispose(); G.fantasma = null; } return; }
+  if (P.tipo === 'apilado') {   // el modelo 3D, transparente, a la altura de las capas
+    if (G.fantasma) { G.modelo.remove(G.fantasma); G.fantasma.geometry.dispose(); G.fantasma.material.dispose(); G.fantasma = null; }
+    if (!P.vista.fantasma || !apiladoActivo() || !R || !R.capas) return;
+    const m = mallaFigura(), n = m.C.length, k = R.capas * grosor() / (m.alto || 1), pos = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { pos[3 * i] = m.U[i]; pos[3 * i + 1] = m.C[i] * k; pos[3 * i + 2] = -m.V[i]; }
+    const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(pos, 3)); g.setIndex(new T.BufferAttribute(new Uint32Array(m.F), 1)); g.computeVertexNormals();
+    G.fantasma = new T.Mesh(g, new T.MeshStandardMaterial({ color: '#4c95ee', transparent: true, opacity: .2, side: T.DoubleSide, depthWrite: false, roughness: .4 }));
+    G.modelo.add(G.fantasma); return;
+  }
   if (figuraActiva()) { if (G.fantasma) { G.modelo.remove(G.fantasma); G.fantasma.geometry.dispose(); G.fantasma = null; } return; }
   if (G.fantasma) { G.modelo.remove(G.fantasma); G.fantasma.geometry.dispose(); G.fantasma.material.dispose(); G.fantasma = null; }
   if (!P.vista.fantasma) return;
@@ -460,7 +488,7 @@ function construirFantasma() {
 function resaltar3D() {
   const base = materialesTablero();
   [...G.costillas, ...G.largueros].forEach(m => {
-    if (!m) return;
+    if (!m || m.userData.extra === 'llave') return;
     const sel = P.vista.resalta && m.userData.i === UI.costilla;
     if (sel) { if (!m.userData.matSel) m.userData.matSel = materialSel(base); m.material = m.userData.matSel; }
     else m.material = base;

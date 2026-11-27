@@ -39,6 +39,7 @@ function proyectoDePlantilla(id, extra) {
   if (grupoDe(id) === 'pared') { p.tipo = 'pared'; p.costillas.grosor = 12; p.costillas.separacion = 26; }
   // radiales: tablero fino, reparto por número y un tubo en el que quepan las costillas
   if (grupoDe(id) === 'plano') { p.tipo = 'plano'; p.costillas.material = 'abedul'; }
+  if (grupoDe(id) === 'apilado') { p.tipo = 'apilado'; ajustesApilado(id, p); }
   if (grupoDe(id) === 'radial') { p.tipo = 'radial'; p.costillas.grosor = 6; p.costillas.modo = 'numero'; p.costillas.numero = 12; p.radial.tubo = Math.max(p.radial.tubo, Math.ceil(p.costillas.numero * (p.costillas.grosor + 1) / Math.PI)); }
   if (extra) {
     if (extra.params) Object.assign(p.params, extra.params);
@@ -47,7 +48,7 @@ function proyectoDePlantilla(id, extra) {
     if (extra.reticula) Object.assign(p.reticula, extra.reticula);
     if (extra.tipo) p.tipo = extra.tipo;
     if (extra.plano) Object.assign(p.plano, JSON.parse(JSON.stringify(extra.plano)));
-    ['planta', 'radial', 'pared', 'relieve', 'figura'].forEach(k => { if (extra[k]) Object.assign(p[k], extra[k]); });
+    ['planta', 'radial', 'pared', 'relieve', 'figura', 'apilado'].forEach(k => { if (extra[k]) Object.assign(p[k], extra[k]); });
     if (Array.isArray(extra.huecos)) p.huecos = extra.huecos.map(h => {
       const b = huecoNuevo(h.forma || 'rect'), r = Object.assign(b, JSON.parse(JSON.stringify(h)), { mueble: Object.assign(b.mueble, h.mueble || {}) });
       if (r.forma === 'texto' && h.ancho == null) ajustarCajaTexto(r, true);
@@ -58,7 +59,7 @@ function proyectoDePlantilla(id, extra) {
   return p;
 }
 function cargarProyecto(p, autoVar) {
-  P = p; UI.clave = 0; UI.punto = -1; UI.varilla = -1; UI.costilla = 0;
+  P = p; UI.fab = null; UI.clave = 0; UI.punto = -1; UI.varilla = -1; UI.costilla = 0;
   if (!P.claves || !P.claves.length) aplicarPlantilla();
   // huecos de los ejemplos que van centrados en el panel (ya se conocen sus medidas)
   (P.huecos || []).forEach(h => { if (!h.centrar) return; if (P.tipo === 'pared') { const [W, H] = medidasPanel(); h.x = Math.round((W - h.ancho) / 2); h.y = Math.round((H - h.alto) / 2); } delete h.centrar; });
@@ -71,6 +72,7 @@ function cargarProyecto(p, autoVar) {
   C.forEach((k, i) => { if (Math.abs(k.x - P.largo / 2) < Math.abs(C[mejor].x - P.largo / 2)) mejor = i; });
   UI.clave = mejor; refrescarClaves();
   encuadrarPerfil(); selCostilla(Math.floor(R.n / 2)); camara('tres4'); colores3D();
+  if (P.tipo === 'apilado') verHuecos(true);
   registrarLetras();
   UI.sucio = false;
 }
@@ -83,6 +85,7 @@ function validarProyecto(o) {
   p.maqueta = Object.assign(proyectoBase().maqueta, o.maqueta || {});
   p.cnc = Object.assign(proyectoBase().cnc, o.cnc || {});
   p.ficha = Object.assign(proyectoBase().ficha, o.ficha || {});
+  p.apilado = Object.assign(proyectoBase().apilado, o.apilado || {});
   p.presupuesto = Object.assign(proyectoBase().presupuesto, o.presupuesto || {});
   p.reticula = Object.assign(proyectoBase().reticula, o.reticula || {});
   ['planta', 'radial', 'pared', 'relieve', 'figura'].forEach(k => p[k] = Object.assign(proyectoBase()[k], o[k] || {}));
@@ -90,7 +93,7 @@ function validarProyecto(o) {
   p.pared.partir = Object.assign(proyectoBase().pared.partir, (o.pared || {}).partir || {});
   p.pared.modulos = Object.assign(proyectoBase().pared.modulos, (o.pared || {}).modulos || {});
   p.huecos = Array.isArray(o.huecos) ? o.huecos.map(h => { const b = huecoNuevo(h.forma || 'rect'); return Object.assign(b, h, { mueble: Object.assign(b.mueble, h.mueble || {}) }); }) : [];
-  if (!['reticula', 'radial', 'pared', 'plano'].includes(p.tipo)) p.tipo = 'costillas';
+  if (!['reticula', 'radial', 'pared', 'plano', 'apilado'].includes(p.tipo)) p.tipo = 'costillas';
   p.plano = Object.assign(proyectoBase().plano, o.plano || {});
   p.plano.solape = Object.assign(proyectoBase().plano.solape, (o.plano || {}).solape || {});
   p.plano.piezas = (Array.isArray(p.plano.piezas) ? p.plano.piezas : []).filter(z => z && (z.igualA != null || (Array.isArray(z.pts) && z.pts.length >= 3)))
@@ -133,7 +136,7 @@ async function dialogoModelos(paraFigura) {
   try { aviso('Cargando los modelos…'); await cargarRecurso('modelos'); } catch (e) { aviso('⚠ ' + esc(e.message), 5000); return; }
   const M = modelosEjemplo();
   const items = M.map(m => `<button data-mod="${m.id}"><b>${esc(m.nombre)}</b><small>${esc(m.desc)} · ${m.triangulos.toLocaleString('es-ES')} triángulos · <a href="assets/modelos/${m.archivo}" download data-stl>${m.archivo}</a></small></button>`).join('');
-  modal('🗿 Modelos 3D de ejemplo', `<p class="nota">${paraFigura ? 'Modelos para probar la figura: cada costilla será un corte del modelo. Al elegir uno se carga a 800 mm de alto; después cambia el alto, los cortes, el giro o la separación.' : 'Modelos para probar el relieve. Al elegir uno se carga con su vista y unas medidas de panel adecuadas; después cambia la vista, el giro, el relieve o las lamas para ver qué pasa.'} Los mismos modelos están como STL en <b>assets/modelos</b>.</p><div class="ejemplos">${items || '<p>No se encuentra assets/modelos/modelos.js</p>'}</div>`);
+  modal('🗿 Modelos 3D de ejemplo', `<p class="nota">${paraFigura && P.tipo === 'apilado' ? 'Modelos para la figura apilada: cada capa será un corte horizontal del modelo, del grosor del tablero o de la plancha. El conejo y el moái están hechos para esto; las llaves se colocan solas.' : paraFigura ? 'Modelos para probar la figura: cada costilla será un corte del modelo. Al elegir uno se carga a 800 mm de alto; después cambia el alto, los cortes, el giro o la separación.' : 'Modelos para probar el relieve. Al elegir uno se carga con su vista y unas medidas de panel adecuadas; después cambia la vista, el giro, el relieve o las lamas para ver qué pasa.'} Los mismos modelos están como STL en <b>assets/modelos</b>.</p><div class="ejemplos">${items || '<p>No se encuentra assets/modelos/modelos.js</p>'}</div>`);
   $$('[data-stl]').forEach(a => a.onclick = e => e.stopPropagation());
   $$('[data-mod]').forEach(b => b.onclick = () => {
     cerrarModal();
