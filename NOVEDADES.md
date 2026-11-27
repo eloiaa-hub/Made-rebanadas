@@ -8,6 +8,7 @@
 - Materiales **porex (EPS)** y **poliestireno extruido (XPS)**, grosores de 3 a 100 mm, y medidas de **planchas de porex y XPS** en Fabricar y en el **Anidador** («Medida típica»).
 - Plano en PDF con la hoja de **capas y llaves** (alzado numerado, planta y tabla de llaves), las capas con el contorno de encima y el montaje de abajo arriba; lista de compra con los listones, la cola sin disolventes para el porex y el acabado.
 - Las tablas del plano ajustan el alto de cada fila a la columna más larga.
+- La pieza seleccionada se ve también en los materiales claros (porex, XPS, lacado blanco): se tiñe de azul, o de naranja en el XPS azul.
 
 ## v1.5
 

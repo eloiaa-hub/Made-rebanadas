@@ -37,7 +37,12 @@ function materialesTablero() {
   return G.cacheMat[ck] = [cara, canto];
 }
 function materialSel(base) {
-  return base.map(m => { const c = m.clone(); c.userData = { propio: true }; c.emissive = new T.Color('#2f7fe0'); c.emissiveIntensity = .35; return c; });
+  return base.map(m => {
+    const c = m.clone(); c.userData = { propio: true }; c.emissive = new T.Color('#2f7fe0'); c.emissiveIntensity = .35;
+    // en los colores claros sin textura (porex, XPS, lacado blanco) el brillo azul casi no se ve: se tiñe la pieza de azul
+    if (!c.map) { const k = c.color, L = 0.2126 * k.r + 0.7152 * k.g + 0.0722 * k.b; if (L > 0.3) { const azulado = k.b > k.r + 0.08, tono = new T.Color(azulado ? '#e8661c' : '#1f6fe0'); c.color = k.clone().lerp(tono, 0.8); c.emissive = tono; c.emissiveIntensity = .3; } }   // en el XPS (azul), naranja
+    return c;
+  });
 }
 
 function iniciar3D() {
